@@ -4,15 +4,17 @@ import {fileURLToPath} from 'url';
 import fs from 'fs'; 
 import moment from 'moment-timezone';
 
-global.botnumber = "2126xxxxxxxx" // هنا أضف رقمك
+// رقم البوت المصرح له
+global.botnumber = "962795106901"
 
+// قائمة المالكين والمطورين
 global.owner = [
-  ['2126xxxxxxxx', '☪ ISLAMIC-WHATSAPP-BOT ☪', false]
+  ['962796163926', '☪ ISLAMIC-WHATSAPP-BOT ☪', true],
+  ['962795106901', 'البوت', true]
 ];
 
-global.suittag = ['2126xxxxxxxx'];
-global.prems = ['2126xxxxxxxx'];
-
+global.suittag = ['962796163926'];
+global.prems = ['962796163926'];
 
 global.packname = '♛ 𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚'
 global.author = '𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚 ♛'
@@ -21,19 +23,18 @@ global.igfg = '♛ 𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚 ♛'
 global.wait = '*⠿⠶ إنتظر ⠶⠿*'
 global.eror = '*خطأ في جلب البيانات*'
 global.sitfe = 'ᴡᴡᴡ.ᴛᴇᴄʜsᴏᴜɴᴇ.ᴄᴏᴍ'
-global.nomorown = '212697118528' // لتجربة البوت
-
+global.nomorown = '962796163926'
 
 global.mods = [];
 
 //* *******Tiempo***************
 global.d = new Date(new Date + 3600000);
-global.locale = 'en';
+global.locale = 'ar';
 global.dia = d.toLocaleDateString(locale, {weekday: 'long'});
 global.fecha = d.toLocaleDateString('ar', {day: 'numeric', month: 'numeric', year: 'numeric'});
 global.mes = d.toLocaleDateString('ar', {month: 'long'});
 global.año = d.toLocaleDateString('ar', {year: 'numeric'});
-global.tiempo = d.toLocaleString('ar-MA', {hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true});
+global.tiempo = d.toLocaleString('ar-JO', {hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true});
 //* ****************************
 global.wm2 = `▸ ISLAMIC-WHATSAPP-BOT`;
 global.gt = 'ISLAMIC-WHATSAPP-BOT';
@@ -54,8 +55,8 @@ global.htki = '*⭑•̩̩͙⊱•••• ☪*';
 global.htka = '*☪ ••••̩̩͙⊰•⭑*';
 global.comienzo = '• • ◕◕════';
 global.fin = '════◕◕ • •';
-global.botdate = `*[ 📅 ] Fecha:*  ${moment.tz('Africa/Casablanca').format('DD/MM/YY')}`;
-global.bottime = `*[ ⏳ ] Hora:* ${moment.tz('Africa/Casablanca').format('HH:mm:ss')}`;
+global.botdate = `*[ 📅 ] التاريخ:*  ${moment.tz('Asia/Amman').format('DD/MM/YY')}`;
+global.bottime = `*[ ⏳ ] الوقت:* ${moment.tz('Asia/Amman').format('HH:mm:ss')}`;
 global.fgif = {key: {participant: '0@s.whatsapp.net'}, message: {'videoMessage': {'title': wm, 'h': `Hmm`, 'seconds': '999999999', 'gifPlayback': 'true', 'caption': bottime, 'jpegThumbnail': fs.readFileSync('./Menu.png')}}};
 global.multiplier = 99;
 global.flaaa = [
