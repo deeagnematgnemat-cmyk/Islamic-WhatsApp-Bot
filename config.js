@@ -7,19 +7,19 @@ import moment from 'moment-timezone';
 // رقم البوت المصرح له
 global.botnumber = "962795106901"
 
-// قائمة المالكين والمطورين
+// قائمة المالكين والمطورين واسم البوت
 global.owner = [
-  ['962796163926', '☪ ISLAMIC-WHATSAPP-BOT ☪', true],
+  ['962796163926', '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』', true],
   ['962795106901', 'البوت', true]
 ];
 
 global.suittag = ['962796163926'];
 global.prems = ['962796163926'];
 
-global.packname = '♛ 𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚'
-global.author = '𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚 ♛'
-global.wm = 'MidSoune'
-global.igfg = '♛ 𝙈𝙞𝙙𝙨𝙤𝙪𝙣𝙚 ♛'
+global.packname = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
+global.author = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
+global.wm = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
+global.igfg = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
 global.wait = '*⠿⠶ إنتظر ⠶⠿*'
 global.eror = '*خطأ في جلب البيانات*'
 global.sitfe = 'ᴡᴡᴡ.ᴛᴇᴄʜsᴏᴜɴᴇ.ᴄᴏᴍ'
@@ -36,11 +36,10 @@ global.mes = d.toLocaleDateString('ar', {month: 'long'});
 global.año = d.toLocaleDateString('ar', {year: 'numeric'});
 global.tiempo = d.toLocaleString('ar-JO', {hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true});
 //* ****************************
-global.wm2 = `▸ ISLAMIC-WHATSAPP-BOT`;
-global.gt = 'ISLAMIC-WHATSAPP-BOT';
-global.mysticbot = 'ISLAMIC-WHATSAPP-BOT';
+global.wm2 = `▸ 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+global.gt = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
+global.mysticbot = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 global.md = 'https://github.com/BrunoSobrino/TheMystic-Bot-MD';
-global.mysticbot = 'https://github.com/BrunoSobrino/TheMystic-Bot-MD';
 global.pdoc = ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/msword', 'application/pdf', 'text/rtf'];
 global.cmenut = '❖––––––『';
 global.cmenub = '┊✦ ';
