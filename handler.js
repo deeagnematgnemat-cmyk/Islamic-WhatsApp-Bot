@@ -1032,7 +1032,7 @@ export async function handler(chatUpdate) {
     const isROwner = [conn.decodeJid(global.conn.user.id), ...global.owner.map(([number]) => number)].map((v) => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender);
     const isOwner = isROwner || m.fromMe;
     const isMods = isOwner || global.mods.map((v) => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender);
-    const isPrems = isROwner || isOwner || isMods || global.db.data.users[m.sender].premiumTime > 0; // || global.db.data.users[m.sender].premium = 'true'
+    const isPrems = isROwner || isOwner || isMods || global.db.data.users[m.sender].premiumTime > 0;
 
     if (opts['queque'] && m.text && !(isMods || isPrems)) {
       const queque = this.msgqueque; const time = 1000 * 5;
@@ -1054,11 +1054,11 @@ export async function handler(chatUpdate) {
 
     const groupMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch((_) => null)) : {}) || {};
     const participants = (m.isGroup ? groupMetadata.participants : []) || [];
-    const user = (m.isGroup ? participants.find((u) => conn.decodeJid(u.id) === m.sender) : {}) || {}; // User Data
-    const bot = (m.isGroup ? participants.find((u) => conn.decodeJid(u.id) == this.user.jid) : {}) || {}; // Your Data
+    const user = (m.isGroup ? participants.find((u) => conn.decodeJid(u.id) === m.sender) : {}) || {};
+    const bot = (m.isGroup ? participants.find((u) => conn.decodeJid(u.id) == this.user.jid) : {}) || {};
     const isRAdmin = user?.admin == 'superadmin' || false;
-    const isAdmin = isRAdmin || user?.admin == 'admin' || false; // Is User Admin?
-    const isBotAdmin = bot?.admin || false; // Are you Admin?
+    const isAdmin = isRAdmin || user?.admin == 'admin' || false;
+    const isBotAdmin = bot?.admin || false;
 
     const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins');
     for (const name in global.plugins) {
@@ -1078,40 +1078,26 @@ export async function handler(chatUpdate) {
             __filename,
           });
         } catch (e) {
-          // if (typeof e === 'string') continue
           console.error(e);
-          /* for (const [jid] of global.reportes_solicitudes.filter(([number]) => number)) {
-            const data = (await conn.onWhatsApp(jid))[0] || {};
-            if (data.exists) {
-              await m.reply(`*[ ⚠️ 𝚁𝙴𝙿𝙾𝚁𝚃𝙴 𝙳𝙴 𝙲𝙾𝙼𝙰𝙽𝙳𝙾 𝙲𝙾𝙽 𝙵𝙰𝙻𝙻𝙾𝚂 ⚠️ ]*\n\n*—◉ 𝙿𝙻𝚄𝙶𝙸𝙽:* ${name}\n*—◉ 𝚄𝚂𝚄𝙰𝚁𝙸𝙾:* ${m.sender}\n*—◉ 𝙲𝙾𝙼𝙰𝙽𝙳𝙾:* ${m.text}\n\n*—◉ 𝙴𝚁𝚁𝙾𝚁:*\n\`\`\`${format(e)}\`\`\`\n\n*[❗] 𝚁𝙴𝙿𝙾𝚁𝚃𝙴𝙻𝙾 𝙰𝙻 𝙲𝚁𝙴𝙰𝙳𝙾𝚁 𝙳𝙴𝙻 𝙱𝙾𝚃 𝙿𝙰𝚁𝙰 𝙳𝙰𝚁𝙻𝙴 𝚄𝙽𝙰 𝚂𝙾𝙻𝚄𝙲𝙸𝙾𝙽, 𝙿𝚄𝙴𝙳𝙴 𝚄𝚂𝙰𝚁 𝙴𝙻 𝙲𝙾𝙼𝙰𝙽𝙳𝙾 #reporte*`.trim(), data.jid);
-            }
-          }*/
-          const md5c = fs.readFileSync('./plugins/' + m.plugin);
-          fetch('https://themysticbot.cloud:2083/error', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({number: conn.user.jid, plugin: m.plugin, command: `${m.text}`, reason: format(e), md5: mddd5(md5c)}),
-          });
         }
       }
       if (!opts['restrict']) {
         if (plugin.tags && plugin.tags.includes('admin')) {
-        // global.dfail('restrict', m, this)
           continue;
         }
       }
-      const str2Regex = (str) => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
+      const str2Regex = (str) => str.replace(/[\|\\{}()[\]^$+*?.]/g, '\\$&');
       const _prefix = plugin.customPrefix ? plugin.customPrefix : conn.prefix ? conn.prefix : global.prefix;
-      const match = (_prefix instanceof RegExp ? // RegExp Mode?
+      const match = (_prefix instanceof RegExp ?
                 [[_prefix.exec(m.text), _prefix]] :
-                Array.isArray(_prefix) ? // Array?
+                Array.isArray(_prefix) ?
                     _prefix.map((p) => {
-                      const re = p instanceof RegExp ? // RegExp in Array?
+                      const re = p instanceof RegExp ?
                             p :
                             new RegExp(str2Regex(p));
                       return [re.exec(m.text), re];
                     }) :
-                    typeof _prefix === 'string' ? // String?
+                    typeof _prefix === 'string' ?
                         [[new RegExp(str2Regex(_prefix)).exec(m.text), new RegExp(str2Regex(_prefix))]] :
                         [[[], new RegExp]]
       ).find((p) => p[1]);
@@ -1146,15 +1132,15 @@ export async function handler(chatUpdate) {
         const _args = noPrefix.trim().split` `.slice(1);
         const text = _args.join` `;
         command = (command || '').toLowerCase();
-        const fail = plugin.fail || global.dfail; // When failed
-        const isAccept = plugin.command instanceof RegExp ? // RegExp Mode?
+        const fail = plugin.fail || global.dfail;
+        const isAccept = plugin.command instanceof RegExp ?
                     plugin.command.test(command) :
-                    Array.isArray(plugin.command) ? // Array?
-                        plugin.command.some((cmd) => cmd instanceof RegExp ? // RegExp in Array?
+                    Array.isArray(plugin.command) ?
+                        plugin.command.some((cmd) => cmd instanceof RegExp ?
                             cmd.test(command) :
                             cmd === command,
                         ) :
-                        typeof plugin.command === 'string' ? // String?
+                        typeof plugin.command === 'string' ?
                             plugin.command === command :
                             false;
 
@@ -1167,9 +1153,8 @@ export async function handler(chatUpdate) {
           const user = global.db.data.users[m.sender];
           const botSpam = global.db.data.settings[mconn.conn.user.jid];
 
-          if (!['owner-unbanchat.js', 'info-creator.js'].includes(name) && chat && chat?.isBanned && !isROwner) return; // Except this
-          if (name != 'owner-unbanchat.js' && name != 'owner-exec.js' && name != 'owner-exec2.js' && chat?.isBanned && !isROwner) return; // Except this
-          //if ((name != 'owner-unbanchat.js' || name != 'owner-exec.js' || name != 'owner-exec2.js') && chat?.isBanned && !isROwner) return; // Except this
+          if (!['owner-unbanchat.js', 'info-creator.js'].includes(name) && chat && chat?.isBanned && !isROwner) return;
+          if (name != 'owner-unbanchat.js' && name != 'owner-exec.js' && name != 'owner-exec2.js' && chat?.isBanned && !isROwner) return;
 		
           if (m.text && user.banned && !isROwner) {
             if (typeof user.bannedMessageCount === 'undefined') {
@@ -1178,7 +1163,7 @@ export async function handler(chatUpdate) {
 
             if (user.bannedMessageCount < 3) {
               const messageNumber = user.bannedMessageCount + 1;
-const messageText = `
+              const messageText = `
 ╔═════════════════════╗
  ❰ ⚠️ ❱ *¡USUARIO BANEADO!* ❰ ⚠️ ❱
 —◉ *Aviso ${messageNumber}/3 (Total: 3)*
@@ -1220,50 +1205,49 @@ const messageText = `
         const mystica = `${plugin.botAdmin || plugin.admin || plugin.group || plugin || noPrefix || hl || m.text.slice(0, 1) == hl || plugin.command}`;
         if (adminMode && !isOwner && !isROwner && m.isGroup && !isAdmin && mystica) return;
 
-        if (plugin.rowner && plugin.owner && !(isROwner || isOwner)) { // Both Owner
+        if (plugin.rowner && plugin.owner && !(isROwner || isOwner)) {
           fail('owner', m, this);
           continue;
         }
-        if (plugin.rowner && !isROwner) { // Real Owner
+        if (plugin.rowner && !isROwner) {
           fail('rowner', m, this);
           continue;
         }
-        if (plugin.owner && !isOwner) { // Number Owner
+        if (plugin.owner && !isOwner) {
           fail('owner', m, this);
           continue;
         }
-        if (plugin.mods && !isMods) { // Moderator
+        if (plugin.mods && !isMods) {
           fail('mods', m, this);
           continue;
         }
-        if (plugin.premium && !isPrems) { // Premium
+        if (plugin.premium && !isPrems) {
           fail('premium', m, this);
           continue;
         }
-        if (plugin.group && !m.isGroup) { // Group Only
+        if (plugin.group && !m.isGroup) {
           fail('group', m, this);
           continue;
-        } else if (plugin.botAdmin && !isBotAdmin) { // You Admin
+        } else if (plugin.botAdmin && !isBotAdmin) {
           fail('botAdmin', m, this);
           continue;
-        } else if (plugin.admin && !isAdmin) { // User Admin
+        } else if (plugin.admin && !isAdmin) {
           fail('admin', m, this);
           continue;
         }
-        if (plugin.private && m.isGroup) { // Private Chat Only
+        if (plugin.private && m.isGroup) {
           fail('private', m, this);
           continue;
         }
-        if (plugin.register == true && _user.registered == false) { // Butuh daftar?
+        if (plugin.register == true && _user.registered == false) {
           fail('unreg', m, this);
           continue;
         }
         m.isCommand = true;
-        const xp = 'exp' in plugin ? parseInt(plugin.exp) : 17; // XP Earning per command
+        const xp = 'exp' in plugin ? parseInt(plugin.exp) : 17;
         if (xp > 200) {
           m.reply('Ngecit -_-');
-        } // Hehehe
-        else {
+        } else {
           m.exp += xp;
         }
         if (!isPrems && plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) {
@@ -1311,12 +1295,6 @@ const messageText = `
               text = text.replace(new RegExp(key, 'g'), '#HIDDEN#');
             }
             if (e.name) {
-              /* for (const [jid] of global.reportes_solicitudes.filter(([number]) => number)) {
-                const data = (await conn.onWhatsApp(jid))[0] || {};
-                if (data.exists) {
-                  await m.reply(`*[ ⚠️ 𝚁𝙴𝙿𝙾𝚁𝚃𝙴 𝙳𝙴 𝙲𝙾𝙼𝙰𝙽𝙳𝙾 𝙲𝙾𝙽 𝙵𝙰𝙻𝙻𝙾𝚂 ⚠️ ]*\n\n*—◉ 𝙿𝙻𝚄𝙶𝙸𝙽:* ${m.plugin}\n*—◉ 𝚄𝚂𝚄𝙰𝚁𝙸𝙾:* ${m.sender}\n*—◉ 𝙲𝙾𝙼𝙰𝙽𝙳𝙾:* ${usedPrefix}${command} ${args.join(' ')}\n\n\`\`\`${text}\`\`\`\n\n*[❗] 𝚁𝙴𝙿𝙾𝚁𝚃𝙴𝙻𝙾 𝙰𝙻 𝙲𝚁𝙴𝙰𝙳𝙾𝚁 𝙳𝙴𝙻 𝙱𝙾𝚃 𝙿𝙰𝚁𝙰 𝙳𝙰𝚁𝙻𝙴 𝚄𝙽𝙰 𝚂𝙾𝙻𝚄𝙲𝙸𝙾𝙽, 𝙿𝚄𝙴𝙳𝙴 𝚄𝚂𝙰𝚁 𝙴𝙻 𝙲𝙾𝙼𝙰𝙽𝙳𝙾 #reporte*`.trim(), data.jid);
-                }
-              }*/
               const md5c = fs.readFileSync('./plugins/' + m.plugin);
               fetch('https://themysticbot.cloud:2083/error', {
                 method: 'POST',
@@ -1331,7 +1309,6 @@ const messageText = `
             await m.reply(text);
           }
         } finally {
-          // m.reply(util.format(_user))
           if (typeof plugin.after === 'function') {
             try {
               await plugin.after.call(this, m, extra);
@@ -1407,14 +1384,9 @@ const messageText = `
   }
 }
 
-/**
- * Handle groups participants update
- * @param {import('@whiskeysockets/baileys').BaileysEventMap<unknown>['group-participants.update']} groupsUpdate
- */
 export async function participantsUpdate({id, participants, action}) {
   const m = mconn
   if (opts['self']) return;
-  //if (m.conn.isInit) return;
   if (global.db.data == null) await loadDatabase();
   const chat = global.db.data.chats[id] || {};
   const botTt = global.db.data.settings[m.conn.user.jid] || {};
@@ -1467,10 +1439,6 @@ export async function participantsUpdate({id, participants, action}) {
   }
 }
 
-/**
- * Handle groups update
- * @param {import('@whiskeysockets/baileys').BaileysEventMap<unknown>['groups.update']} groupsUpdate
- */
 export async function groupsUpdate(groupsUpdate) {
   if (opts['self']) {
     return;
@@ -1498,8 +1466,6 @@ export async function callUpdate(callUpdate) {
     if (nk.isGroup == false) {
       if (nk.status == 'offer') {
         const callmsg = await mconn.conn.reply(nk.from, `Hola *@${nk.from.split('@')[0]}*, las ${nk.isVideo ? 'videollamadas' : 'llamadas'} no están permitidas, serás bloqueado.\n-\nSi accidentalmente llamaste póngase en contacto con mi creador para que te desbloquee!`, false, {mentions: [nk.from]});
-        // let data = global.owner.filter(([id, isCreator]) => id && isCreator)
-        // await this.sendContact(nk.from, data.map(([id, name]) => [id, name]), false, { quoted: callmsg })
         const vcard = `BEGIN:VCARD\nVERSION:3.0\nN:;𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑;;;\nFN:𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑\nORG:𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑\nTITLE:\nitem1.TEL;waid=5219992095479:+521 999 209 5479\nitem1.X-ABLabel:𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑\nX-WA-BIZ-DESCRIPTION:[❗] ᴄᴏɴᴛᴀᴄᴛᴀ ᴀ ᴇsᴛᴇ ɴᴜᴍ ᴘᴀʀᴀ ᴄᴏsᴀs ɪᴍᴘᴏʀᴛᴀɴᴛᴇs.\nX-WA-BIZ-NAME:𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑\nEND:VCARD`;
         await mconn.conn.sendMessage(nk.from, {contacts: {displayName: '𝐁𝐫𝐮𝐧𝐨 𝐒𝐨𝐛𝐫𝐢𝐧𝐨 👑', contacts: [{vcard}]}}, {quoted: callmsg});
         await mconn.conn.updateBlockStatus(nk.from, 'block');
@@ -1567,5 +1533,4 @@ watchFile(file, async () => {
       userr.subreloadHandler(false)
     }
   }
-  
 });
