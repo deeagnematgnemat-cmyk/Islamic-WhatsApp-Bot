@@ -117,16 +117,14 @@ const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFil
 const msgRetryCounterMap = (MessageRetryMap) => { };
 const msgRetryCounterCache = new NodeCache()
 const {version} = await fetchLatestBaileysVersion();
-let phoneNumber = global.botnumber
+let phoneNumber = global.botnumber || "962795106901";
 
-const pairingCode = !!phoneNumber || process.argv.includes("--pairing-code")
+const pairingCode = true
 const useMobile = process.argv.includes("--mobile")
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-const question = (texto) => new Promise((resolver) => rl.question(texto, resolver))
 
 const connectionOptions = {
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: !pairingCode, 
+        printQRInTerminal: false, 
         mobile: useMobile, 
         browser: ['Chrome (Linux)', '', ''],
         auth: {
@@ -151,25 +149,7 @@ global.conn = makeWASocket(connectionOptions);
     if (pairingCode && !conn.authState.creds.registered) {
         if (useMobile) throw new Error('No se puede usar un código de emparejamiento con la API móvil')
 
-        let numeroTelefono
-        if (!!phoneNumber) {
-            numeroTelefono = phoneNumber.replace(/[^0-9]/g, '')
-
-            if (!PHONENUMBER_MCC || !Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
-                console.log(chalk.bgBlack(chalk.redBright("Comience con el código de país de su número de WhatsApp.\nEjemplo: +5219992095479")))
-                process.exit(0)
-            }
-        } else {
-            numeroTelefono = await question(chalk.bgBlack(chalk.greenBright(`Por favor, escriba su número de WhatsApp.\nEjemplo: +5219992095479 : `)))
-            numeroTelefono = numeroTelefono.replace(/[^0-9]/g, '')
-            if (!PHONENUMBER_MCC || !Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
-                console.log(chalk.bgBlack(chalk.redBright("Comience con el código de país de su número de WhatsApp.\nEjemplo: +5219992095479")))
-
-                numeroTelefono = await question(chalk.bgBlack(chalk.greenBright(`Por favor, escriba su número de WhatsApp.\nEjemplo: +5219992095479 : `)))
-                numeroTelefono = numeroTelefono.replace(/[^0-9]/g, '')
-                rl.close()
-            }
-        }
+        let numeroTelefono = phoneNumber.replace(/[^0-9]/g, '')
 
         setTimeout(async () => {
             let codigo = await conn.requestPairingCode(numeroTelefono)
