@@ -41,14 +41,103 @@ const gamesData = {
         { word: 'ايرين', answer: 'ا ي ر ن' },
         { word: 'لوفي', answer: 'ل و ف ي' },
         { word: 'زورو', answer: 'ز و ر و' },
-        { word: 'ساسكي', answer: 'س ا س ك ي' }
+        { word: 'ساسكي', answer: 'س ا س ك ي' },
+        { word: 'كاكاشي', answer: 'ك ا ك ا ش ي' },
+        { word: 'غوكو', answer: 'غ و ك و' },
+        { word: 'فيجيتا', answer: 'ف ي ج ي ت ا' },
+        { word: 'تنجيرو', answer: 'ت ن ج ي ر و' },
+        { word: 'نيزوكو', answer: 'ن ي ز و ك و' },
+        { word: 'سايتاما', answer: 'س ا ي ت ا م ا' },
+        { word: 'جوجو', answer: 'ج و ج و' },
+        { word: 'كيلوا', answer: 'ك ي ل و ا' },
+        { word: 'غون', answer: 'غ و ن' },
+        { word: 'كورابيكا', answer: 'ك و ر ا ب ي ك ا' },
+        { word: 'باكوغو', answer: 'ب ا ك و غ و' },
+        { word: 'ميدوريا', answer: 'م ي د و ر ي ا' },
+        { word: 'تودوروكي', answer: 'ت و د و ر و ك ي' },
+        { word: 'إتشيغو', answer: 'إ ت ش ي غ و' },
+        { word: 'كينما', answer: 'ك ي ن م ا' },
+        { word: 'هيناتا', answer: 'ه ي ن ا ت ا' },
+        { word: 'كاجياما', answer: 'ك ا ج ي ا م ا' },
+        { word: 'لايت', answer: 'ل ا ي ت' },
+        { word: 'إل', answer: 'إ ل' },
+        { word: 'كانيكي', answer: 'ك ا ن ي ك ي' },
+        { word: 'توشيرو', answer: 'ت و ش ي ر و' },
+        { word: 'ايزن', answer: 'ا ي ز ن' },
+        { word: 'شانكس', answer: 'ش ا ن ك س' },
+        { word: 'ميهوك', answer: 'م ي ه و ك' },
+        { word: 'سانجي', answer: 'س ا ن ج ي' },
+        { word: 'نامي', answer: 'ن ا م ي' },
+        { word: 'البيضاء', answer: 'ا ل ب ي ض ا ء' },
+        { word: 'كادوكا', answer: 'ك ا د و ك ا' },
+        { word: 'بين', answer: 'ب ي ن' },
+        { word: 'ايتاشي', answer: 'ا ي ت ا ش ي' },
+        { word: 'مادار', answer: 'م ا د ا ر ا' },
+        { word: 'اوبيتو', answer: 'ا و ب ي ت و' },
+        { word: 'ميناتو', answer: 'م ي ن ا ت و' },
+        { word: 'جيرايا', answer: 'ج ي ر ا ي ا' },
+        { word: 'تسунаدي', answer: 'ت س و ن ا د ي' },
+        { word: 'اوروتشيمارو', answer: 'ا و ر و ت ش ي م ا ر و' },
+        { word: 'غارا', answer: 'غ ا ر ا' },
+        { word: 'تيماري', answer: 'ت ي م ا ر ي' },
+        { word: 'شيكامارو', answer: 'ش ي ك ا م ا ر و' },
+        { word: 'تشوجي', answer: 'ت ش و ج ي' },
+        { word: 'ينو', answer: 'ي ن و' },
+        { word: 'كيبر', answer: 'ك ي ب ر' },
+        { word: 'ارمين', answer: 'ا ر م ي ن' },
+        { word: 'ميكاسا', answer: 'م ي ك ا س ا' },
+        { word: 'ليفاى', answer: 'ل ي ف ا ي' },
+        { word: 'هوانغ', answer: 'ه و ا ن غ' },
+        { word: 'ريوك', answer: 'ر ي و ك' },
+        { word: 'ميسا', answer: 'م ي س ا' },
+        { word: 'سوبارو', answer: 'س و ب ا ر و' },
+        { word: 'ريم', answer: 'ر ي م' },
+        { word: 'رام', answer: 'ر ا م' },
+        { word: 'اميا', answer: 'ا م ي ا' },
+        { word: 'سابر', answer: 'س ا ب ر' },
+        { word: 'جيلجامش', answer: 'ج ي ل ج ا م ش' }
     ],
     typing: [
-        'ناروتو أوزوماكي بطل القرى المخفية وصاحب الإرادة الصلبة',
-        'ايرين ييغر عملاق الهجوم الذي سعى خلف حرية شعبه حتى النهاية'
+        'ناروتو أوزوماكي',
+        'ايرين ييغر الأسطوري',
+        'مونكي دي لوفي',
+        'رورونوا زورو',
+        'ساسكي أوتشيها',
+        'كاكاشي هاتابي',
+        'سون غوكو البطل',
+        'فيجيتا الأمير',
+        'تنجيرو كامادو',
+        'نيزوكو الشيطانية',
+        'سايتاما بطل القوة',
+        'كيلوا زولديك',
+        'غون فريكس',
+        'كورابيكا المنتقم',
+        'باكوغو كاتسوكي',
+        'ميدوريا إيزوكو',
+        'تودوروكي شوتو',
+        'إتشيغو كوروساكي',
+        'كينما كوزومي',
+        'هيناتا شويو',
+        'لايت ياغامي',
+        'كانيكي كين',
+        'ليفاي أكرمان',
+        'ميكاسا أكرمان',
+        'أرمين أرليرت',
+        'جيرايا العظيم',
+        'ايتاشي أوتشيها',
+        'مادارا أوتشيها',
+        'شانكس ذو الشعر الأحمر',
+        'ماركو الفينيق'
     ],
     riddles: [
-        { question: 'من هو الشخصية التي تمتلك قوة العمالقة المؤسس وتتعهد بتحرير شعبها؟', answer: 'ايرين' }
+        { question: 'من هو بطل أنمي هجوم العمالقة؟', answer: 'ايرين' },
+        { question: 'من هو ملك القراصنة المستقبلي؟', answer: 'لوفي' },
+        { question: 'من هو النينجا الأقوى في قرية الورق وصاحب الكيوبي؟', answer: 'ناروتو' },
+        { question: 'من هو سياف القرية ويزرع الخوف في القلوب بمهارته؟', answer: 'زورو' },
+        { question: 'من هو مدمر الأقزام والعملاق الأفضل في فيق الاستطلاع؟', answer: 'ليفاي' },
+        { question: 'من هو بطل أنمي بليتش؟', answer: 'اتشيغو' },
+        { question: 'من هو أذكى محقق في أنمي مذكرة الموت؟', answer: 'ال' },
+        { question: 'من هو صاحب عين الشارينغان المنسوخة؟', answer: 'كاكاشي' }
     ],
     sports: [
         { question: 'من هو اللاعب الحاصل على أكبر عدد من الكرات الذهبية؟', answer: 'ميسي' }
@@ -1007,8 +1096,10 @@ async function startBot() {
 
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+            
+            // ضبط محاذاة النص والأسطر لرسالة .بوت بالشكل المطلوب مطابقة للصور تماماً
             const botWelcomeText = `
-🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞𝐧 𝐁𝐨𝐭* 🍷
+🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1032,7 +1123,6 @@ async function startBot() {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 `.trim();
 
-            // عند طلب أمر .بوت الرد بصورة بروفايل البوت
             const botPp = await getBotProfilePic(sock);
             const mediaMessage = await prepareWAMessageMedia({ image: { url: botPp } }, { upload: sock.waUploadToServer });
 
@@ -1115,7 +1205,6 @@ async function startBot() {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
-            // عند طلب .اوامر الرد بصورة بروفايل المطور
             const devPp = await getDeveloperProfilePic(sock);
             try {
                 await sock.sendMessage(from, { image: { url: devPp }, caption: menuText, mentions: [sender] });
@@ -1324,7 +1413,6 @@ async function startBot() {
 > 🤖 \`.تعطيل_البوتات تفعيل/ايقاف\` ↞ تعطيل البوتات الأخرى وبقاء بوتك فقط
 > 🔄 \`.ريستارت\` ↞ إعادة تشغيل البوت.`;
 
-            // عند طلب قسم المطور الرد بصورة بروفايل المطور
             const devPp = await getDeveloperProfilePic(sock);
             try { await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: devMenuText }); }
             return;
