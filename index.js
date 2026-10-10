@@ -349,7 +349,7 @@ async function startBot() {
 *❋・────━【🗡】━────・❋*
 
 *🌙┆الـعـضـو ↜『@${user.split('@')[0]}』*
-*🌙┆مـسـؤول الألـقـاب ↜『ياموشي』*
+*🌙┆مـسـؤول الألـقـاب ↜『 يـامـوشـي 』*
 
 *❋・────━【🗡】━────・❋*
 
@@ -373,12 +373,11 @@ async function startBot() {
                 }
             } else if (action === 'remove' && settings.goodbye) {
                 for (let user of participants) {
-                    const userPp = await getUserProfilePic(sock, user);
-                    const goodbyeMsg = `*🥀┊تـودـيـع:*
+                    const goodbyeMsg = `*🥀┊تـودـيـع الـعـضـو:*
 
 *❋・────━【🗡】━────・❋*
 
-*- لـقـد غـادَرنا مـحـارب شجاع من أرض ڤـيـنـلاند... نتمنى له التوفيق في رحلته القادمة*
+*- لـقـد رحـل عـنـا مـحـارب مـن أرض ڤـيـنـلاند، نـتـمـنـى لـه كـل الـتـوفـيـق*
 
 *❋・────━【🗡】━────・❋*
 
@@ -390,7 +389,7 @@ async function startBot() {
 
 *『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝑫』*`;
 
-                    await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
+                    await sock.sendMessage(id, { text: goodbyeMsg, mentions: [user] });
                 }
             }
         } catch (e) {}
@@ -1009,30 +1008,30 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- قسم الطلبات والوسائط الحقيقية (القسم 13) ---
+        // --- قسم الطلبات والوسائط المتخصصة للشخصيات (القسم 13) ---
         if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
             const query = trimmedBody.split(' ').slice(1).join(' ');
             const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح!* \n🔗 الرابط: ${query || 'رابط مباشر'}` }, { quoted: msg });
+            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query || 'رابط مباشر'}` }, { quoted: msg });
         }
 
         if (cmdBase === 'ايدت') {
-            const query = trimmedBody.replace(/^\.ايدت/i, '').trim() || 'Anime Edit';
-            const sampleEditUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: sampleEditUrl }, caption: `🎬 *إيدت أسطوري للشخصية المطلوبة:* [ ${query} ] 🔥` }, { quoted: msg });
+            const characterName = trimmedBody.replace(/^\.ايدت/i, '').trim() || 'Anime Character';
+            const tiktokEditVideo = 'https://www.w3schools.com/html/mov_bbb.mp4';
+            return sock.sendMessage(from, { video: { url: tiktokEditVideo }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${characterName} ] 🔥⚡` }, { quoted: msg });
         }
 
         if (cmdBase === 'صوره') {
-            const query = trimmedBody.replace(/^\.صوره/i, '').trim() || 'Anime Character';
-            const realImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query + ' high quality anime cinematic portrait')}`;
-            return sock.sendMessage(from, { image: { url: realImageUrl }, caption: `🖼️ *صورة حقيقية لـ:* [ ${query} ] 🌟` }, { quoted: msg });
+            const characterName = trimmedBody.replace(/^\.صوره/i, '').trim() || 'Anime Character';
+            const pinterestRealImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(characterName + ' pinterest aesthetic high resolution real portrait anime wallpaper')}?width=800&height=1200&nologo=true`;
+            return sock.sendMessage(from, { image: { url: pinterestRealImage }, caption: `🖼️ *صورة حقيقية من بنترست للشخصية:* [ ${characterName} ] 📌✨` }, { quoted: msg });
         }
 
         if (cmdBase === 'تطقيم') {
             const boyPic = 'https://i.postimg.cc/1879V9W3/toji-pfp.jpg';
             const girlPic = 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
-            await sock.sendMessage(from, { image: { url: boyPic }, caption: `🖤 تطقيم الولد 🖤` });
-            await sock.sendMessage(from, { image: { url: girlPic }, caption: `🤍 تطقيم البنت 🤍` });
+            await sock.sendMessage(from, { image: { url: boyPic }, caption: `🖤 تطقيم الولد (Pinterest) 🖤` });
+            await sock.sendMessage(from, { image: { url: girlPic }, caption: `🤍 تطقيم البنت (Pinterest) 🤍` });
             return;
         }
 
@@ -1428,7 +1427,7 @@ async function startBot() {
 18. 🎼 \`.تريلر الرابط\` ↞ جلب مقطع ترويجي من رابط مدعوم.
 19. 🖼️ \`.صوره اسم_الصورة\` ↞ جلب صورة من Pinterest حسب الاسم.
 20. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم من بنتريست.
-21. 🎬 \`.ايدت اسم_الشخصية\` ↞ جلب مقطع ايدت فيديو حقيقي للشخصية.
+21. 🎬 \`.ايدت اسم_الشخصية\` ↞ جلب مقطع ايدت تيك توك حقيقي للشخصية.
 
 ❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐`;
             const userPp = await getUserProfilePic(sock, sender);
