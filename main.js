@@ -1,13 +1,14 @@
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1';
+Process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1';
 import './config.js';
 import {createRequire} from 'module';
 import path, {join} from 'path';
 import {fileURLToPath, pathToFileURL} from 'url';
 import {platform} from 'process';
 import * as ws from 'ws';
-import {readdirSync, statSync, unlinkSync, existsSync, readFileSync, rmSync, watch} from 'fs';
+import {readdirSync, statSync, unlinkSync, existsSync, readFileSync, rmSync, watch, stat} from 'fs';
+import os from 'os';
+import cp, {spawn} from 'child_process';
 import yargs from 'yargs';
-import {spawn} from 'child_process';
 import lodash from 'lodash';
 import chalk from 'chalk';
 import syntaxerror from 'syntax-error';
@@ -22,12 +23,16 @@ import {Low, JSONFile} from 'lowdb';
 import {mongoDB, mongoDBV2} from './lib/mongoDB.js';
 import store from './lib/store.js';
 const {proto} = (await import('@whiskeysockets/baileys')).default;
-const {DisconnectReason, useMultiFileAuthState, MessageRetryMap, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser, PHONENUMBER_MCC} = await import('@whiskeysockets/baileys');
+const baileysImport = await import('@whiskeysockets/baileys');
+const {DisconnectReason, useMultiFileAuthState, MessageRetryMap, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser} = baileysImport;
+const PHONENUMBER_MCC = baileysImport.PHONENUMBER_MCC || {};
 import readline from 'readline';
 import NodeCache from 'node-cache';
 const {CONNECTING} = ws;
 const {chain} = lodash;
 const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
+
+let stopped = null;
 
 protoType();
 serialize();
@@ -150,14 +155,14 @@ global.conn = makeWASocket(connectionOptions);
         if (!!phoneNumber) {
             numeroTelefono = phoneNumber.replace(/[^0-9]/g, '')
 
-            if (!Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
+            if (!PHONENUMBER_MCC || !Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
                 console.log(chalk.bgBlack(chalk.redBright("Comience con el código de país de su número de WhatsApp.\nEjemplo: +5219992095479")))
                 process.exit(0)
             }
         } else {
             numeroTelefono = await question(chalk.bgBlack(chalk.greenBright(`Por favor, escriba su número de WhatsApp.\nEjemplo: +5219992095479 : `)))
             numeroTelefono = numeroTelefono.replace(/[^0-9]/g, '')
-            if (!Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
+            if (!PHONENUMBER_MCC || !Object.keys(PHONENUMBER_MCC).some(v => numeroTelefono.startsWith(v))) {
                 console.log(chalk.bgBlack(chalk.redBright("Comience con el código de país de su número de WhatsApp.\nEjemplo: +5219992095479")))
 
                 numeroTelefono = await question(chalk.bgBlack(chalk.greenBright(`Por favor, escriba su número de WhatsApp.\nEjemplo: +5219992095479 : `)))
@@ -181,7 +186,10 @@ if (!opts['test']) {
   if (global.db) {
     setInterval(async () => {
       if (global.db.data) await global.db.write();
-      if (opts['autocleartmp'] && (global.support || {}).find) (tmp = [os.tmpdir(), 'tmp', 'jadibts'], tmp.forEach((filename) => cp.spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete'])));
+      if (opts['autocleartmp'] && (global.support || {}).find) {
+        const tmp = [os.tmpdir(), 'tmp', 'jadibts'];
+        tmp.forEach((filename) => cp.spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete']));
+      }
     }, 30 * 1000);
   }
 }
@@ -210,7 +218,11 @@ if (opts['server']) (await import('./server.js')).default(global.conn, PORT);
 function clearTmp() {
   const tmp = [join(__dirname, './tmp')];
   const filename = [];
-  tmp.forEach((dirname) => readdirSync(dirname).forEach((file) => filename.push(join(dirname, file))));
+  tmp.forEach((dirname) => {
+    if (existsSync(dirname)) {
+      readdirSync(dirname).forEach((file) => filename.push(join(dirname, file)));
+    }
+  });
   return filename.map((file) => {
     const stats = statSync(file);
     if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 3)) return unlinkSync(file); // 3 minutes
@@ -220,6 +232,7 @@ function clearTmp() {
 
 function purgeSession() {
 let prekey = []
+if (!existsSync("./MidSession")) return;
 let directorio = readdirSync("./MidSession")
 let filesFolderPreKeys = directorio.filter(file => {
 return file.startsWith('pre-key-') /*|| file.startsWith('session-') || file.startsWith('sender-') || file.startsWith('app-') */
@@ -232,6 +245,7 @@ unlinkSync(`./MidSession/${files}`)
 
 function purgeSessionSB() {
 try {
+if (!existsSync('./jadibts/')) return;
 let listaDirectorios = readdirSync('./jadibts/');
 let SBprekey = []
 listaDirectorios.forEach(directorio => {
@@ -254,6 +268,7 @@ function purgeOldFiles() {
 const directories = ['./MidSession/', './jadibts/']
 const oneHourAgo = Date.now() - (60 * 60 * 1000)
 directories.forEach(dir => {
+if (!existsSync(dir)) return;
 readdirSync(dir, (err, files) => {
 if (err) throw err
 files.forEach(file => {
@@ -272,6 +287,7 @@ console.log(chalk.bold.red(`Archivo ${file} no borrado` + err))
 
 async function connectionUpdate(update) {
   const {connection, lastDisconnect, isNewLogin} = update;
+  stopped = connection;
   global.stopped = connection;
   if (isNewLogin) conn.isInit = true;
   const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode;
@@ -420,6 +436,7 @@ const pluginFolder = global.__dirname(join(__dirname, './Awamir/index'));
 const pluginFilter = (filename) => /\.js$/.test(filename);
 global.plugins = {};
 async function filesInit() {
+  if (!existsSync(pluginFolder)) return;
   for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
     try {
       const file = global.__filename(join(pluginFolder, filename));
@@ -461,7 +478,7 @@ global.reload = async (_ev, filename) => {
   }
 };
 Object.freeze(global.reload);
-watch(pluginFolder, global.reload);
+if (existsSync(pluginFolder)) watch(pluginFolder, global.reload);
 await global.reloadHandler();
 async function _quickTest() {
   const test = await Promise.all([
