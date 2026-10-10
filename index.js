@@ -1,6 +1,6 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
-import qrcode from 'qrcode-terminal';
 import pino from 'pino';
+import readline from 'readline';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
@@ -219,8 +219,23 @@ async function startBot() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let phoneNumber = "962795106901";
+                let code = await sock.requestPairingCode(phoneNumber);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                console.log(`\n========================================`);
+                console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+                console.log(`========================================\n`);
+            } catch (e) {
+                console.error('خطأ في طلب كود الاقتران:', e);
+            }
+        }, 4000);
+    }
+
     sock.ev.on('connection.update', (u) => {
-        if (u.qr) qrcode.generate(u.qr, { small: true });
         if (u.connection === 'close') {
             if (u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
         } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
