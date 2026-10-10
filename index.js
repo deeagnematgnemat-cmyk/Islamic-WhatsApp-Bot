@@ -520,20 +520,32 @@ async function startBot() {
         if (cmdBase === 'رفع' || cmdBase === 'ترقية') {
             const targetUser = getTargetUser(msg);
             if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`' });
-            await sock.groupParticipantsUpdate(from, [targetUser], 'promote');
-            return sock.sendMessage(from, { text: `👑 تم رفع @${targetUser.split('@')[0]} مشرفاً!`, mentions: [targetUser] }, { quoted: msg });
+            try {
+                await sock.groupParticipantsUpdate(from, [targetUser], 'promote');
+                return sock.sendMessage(from, { text: `👑 تم رفع @${targetUser.split('@')[0]} مشرفاً بنجاح!`, mentions: [targetUser] }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: '❌ فشل رفع العضو، تأكد أن البوت مشرف ولديه الصلاحيات.' });
+            }
         }
         if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {
             const targetUser = getTargetUser(msg);
             if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.تنزيل @عضو`' });
-            await sock.groupParticipantsUpdate(from, [targetUser], 'demote');
-            return sock.sendMessage(from, { text: `📉 تم تنزيل @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+            try {
+                await sock.groupParticipantsUpdate(from, [targetUser], 'demote');
+                return sock.sendMessage(from, { text: `📉 تم تنزيل @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: '❌ فشل تنزيل العضو، تأكد أن البوت مشرف.' });
+            }
         }
         if (cmdBase === 'طرد') {
             const targetUser = getTargetUser(msg);
             if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`' });
-            await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
-            return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+            try {
+                await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
+                return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.' });
+            }
         }
         if (cmdBase === 'اضف_انذار') {
             const targetUser = getTargetUser(msg);
@@ -996,7 +1008,7 @@ async function startBot() {
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
             const botWelcomeText = `
-🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭* 🍷
+🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞𝐧 𝐁𝐨𝐭* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
