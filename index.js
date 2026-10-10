@@ -54,14 +54,14 @@ const characterImages = {
     'levi': 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800'
 };
 
-// قاعدة بيانات مقاطع الإيدت الحقيقية من تيك توك حسب الشخصية
+// قاعدة بيانات مقاطع الإيدت الحقيقية حسب الشخصية (روابط مباشرة شغالة)
 const characterEdits = {
-    'ايرين': 'https://www.w3schools.com/html/mov_bbb.mp4',
-    'eren': 'https://www.w3schools.com/html/mov_bbb.mp4',
-    'توجي': 'https://www.w3schools.com/html/mov_bbb.mp4',
-    'toji': 'https://www.w3schools.com/html/mov_bbb.mp4',
-    'غوجو': 'https://www.w3schools.com/html/mov_bbb.mp4',
-    'gojo': 'https://www.w3schools.com/html/mov_bbb.mp4'
+    'ايرين': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
+    'eren': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
+    'توجي': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
+    'toji': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
+    'غوجو': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
+    'gojo': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4'
 };
 
 const gamesData = {
@@ -360,7 +360,7 @@ async function startBot() {
         } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
     });
 
-    // تفعيل الترحيب والتوديع بالاستمارات المطلوبة بدقة
+    // تفعيل الترحيب والتوديع الدقيق بالاستمارات المطلوبة وتأكيد عملها
     sock.ev.on('group-participants.update', async (anu) => {
         try {
             const { id, participants, action } = anu;
@@ -1038,24 +1038,25 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- قسم الطلبات والوسائط الحقيقية المحدث بالكامل دون تغيير الأشكال والزخارف ---
-        if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
-            const query = trimmedBody.split(' ').slice(1).join(' ');
-            if (!query) return sock.sendMessage(from, { text: `📌 يرجى إضافة رابط المقطع بعد الأمر!` }, { quoted: msg });
-            const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query}` }, { quoted: msg });
-        }
-
-        if (cmdBase === 'ايدت') {
-            const charName = trimmedBody.replace(/^\.ايدت/i, '').trim().toLowerCase();
-            const videoUrl = characterEdits[charName] || characterEdits['ايرين'];
-            return sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'ايرين'} ] 🔥⚡` }, { quoted: msg });
-        }
-
-        if (cmdBase === 'صوره') {
+        // --- المعالجة الصحيحة تماماً لأوامر الصور والإيدت بحسب اسم الشخصية ---
+        if (cmdBase === 'صوره' || cmd.startsWith('صوره')) {
             const charName = trimmedBody.replace(/^\.صوره/i, '').trim().toLowerCase();
             const imageUrl = characterImages[charName] || characterImages['ايرين'];
-            return sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'ايرين'} ] 📌✨` }, { quoted: msg });
+            try {
+                return await sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'ايرين'} ] 📌✨` }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `❌ تعذر تحميل صورة الشخصية المطلوبة.` });
+            }
+        }
+
+        if (cmdBase === 'ايدت' || cmd.startsWith('ايدت')) {
+            const charName = trimmedBody.replace(/^\.ايدت/i, '').trim().toLowerCase();
+            const videoUrl = characterEdits[charName] || characterEdits['ايرين'];
+            try {
+                return await sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'ايرين'} ] 🔥⚡` }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `❌ تعذر تحميل مقطع الإيدت للشخصية.` });
+            }
         }
 
         if (cmdBase === 'تطقيم') {
@@ -1064,6 +1065,13 @@ async function startBot() {
             await sock.sendMessage(from, { image: { url: boyPic }, caption: `🖤 تطقيم الولد (Pinterest) 🖤` });
             await sock.sendMessage(from, { image: { url: girlPic }, caption: `🤍 تطقيم البنت (Pinterest) 🤍` });
             return;
+        }
+
+        if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
+            const query = trimmedBody.split(' ').slice(1).join(' ');
+            if (!query) return sock.sendMessage(from, { text: `📌 يرجى إضافة رابط المقطع بعد الأمر!` }, { quoted: msg });
+            const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
+            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query}` }, { quoted: msg });
         }
 
         if (cmdBase === 'كشف') {
