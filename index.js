@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
@@ -22,6 +22,7 @@ let dailyRewards = {};
 let mutedUsers = {}; 
 let userMessagesCount = {};
 let groupSettings = {}; 
+let marriages = {}; // سجل الزيجات للمجموعات
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -56,29 +57,11 @@ const gamesData = {
         { word: 'ميكاسا', answer: 'م ي ك ا س ا' },
         { word: 'أرمين', answer: 'أ ر م ي ن' },
         { word: 'شانكس', answer: 'ش ا ن ك س' },
-        { word: 'جينكي', answer: 'ج ي ن ك ي' }
+        { word: 'كانيكي', answer: 'ك ا ن ي ك ي' }
     ],
     typing: [
-        'ناروتو',
-        'ايرين',
-        'لوفي',
-        'زورو',
-        'ساسكي',
-        'كاكاشي',
-        'غوكو',
-        'فيجيتا',
-        'تنجيرو',
-        'سايتاما',
-        'كيلوا',
-        'غون',
-        'ايتاشي',
-        'مادارا',
-        'ليفاي',
-        'ميكاسا',
-        'أرمين',
-        'شانكس',
-        'جوجو',
-        'كانيكي'
+        'ناروتو', 'ايرين', 'لوفي', 'زورو', 'ساسكي', 'كاكاشي', 'غوكو', 'فيجيتا', 'تنجيرو', 'سايتاما',
+        'كيلوا', 'غون', 'ايتاشي', 'مادارا', 'ليفاي', 'ميكاسا', 'أرمين', 'شانكس', 'جوجو', 'كانيكي'
     ],
     riddles: [
         { question: 'من هو بطل أنمي هجوم العمالقة؟', answer: 'ايرين' },
@@ -112,31 +95,43 @@ const gamesData = {
         { question: 'كم عدد سور القرآن الكريم؟', answer: '114 سورة' }
     ],
     truth: [
-        { question: 'لعبة صراحة: ما هو أقوى موقف سويته وتندمت عليه؟', answer: 'صراحة' }
+        "لو خيروك: تعيش بدون إنترنت أسبوع كامل أو بدون أكل مفضل شهر؟",
+        "لو خيروك: تسافر للمستقبل أو ترجع للماضي؟",
+        "لو خيروك: تكون أذكى شخص في العالم أو أغنى شخص؟",
+        "لو خيروك: تقرأ أفكار الناس أو تختفي متى شئت؟",
+        "لو خيروك: تعيش في عالم الأنمي أو تعيش في الفضاء الخارجي؟"
     ],
-    challenge: [
-        { question: 'تحدي: قم بإرسال ايموجي 🦅 في الشات حالاً!', answer: '🦅' }
+    truthQuestions: [
+        "صراحة: ما هو أقوى موقف محرج تعرضت له أمام عائلتك؟",
+        "صراحة: من هو الشخص الذي تكذب عليه دائماً؟",
+        "صراحة: هل تسببت في مشكلة كبيرة لشخص ونفدت بفعلك؟",
+        "صراحة: ما هو السر الأكبر الذي تخفيه عن الجميع؟",
+        "صراحة: هل سبق وبكيت بسبب رسالة نصية من شخص تحبه؟"
+    ],
+    challengeTasks: [
+        "تحدي: قم بإرسال 5 إيموجيات نارية في الشات حالاً!",
+        "تحدي: اكتب اسم أطول أنمي شاهدته بحياتك وبدون أخطاء املائية.",
+        "تحدي: غير حالتك الشخصية في الواتساب إلى (عالم Eren Bot الأسطوري).",
+        "تحدي: ارسل ايموجي 🦅 في الشات 3 مرات متتالية."
     ],
     complete: [
-        { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' }
+        { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' },
+        { question: 'أكمل المثل: الجار قبل ...', answer: 'الدار' }
     ],
     arrange: [
-        { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' }
+        { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' },
+        { question: 'رتب الحروف لتكون اسم شخصية: ن ي ر ا', answer: 'ايرين' }
     ],
     guess: [
         { question: 'خمن رقم شخصية بطل أنمي من 1 إلى 3:', answer: '2' }
     ],
-    letterGame: [
-        { question: 'اكتب اسم شخصية تبدأ بحرف السين (س):', answer: 'ساسكي' }
-    ],
     reverseGame: [
-        { question: 'تفكيك عكسي لكلمة (سماء):', answer: 'يامس' }
-    ],
-    wouldYouRather: [
-        { question: 'لو خيروك: تنضم لفيلق الاستطلاع 🐎 أو تنضم لفيلق الشرطة العسكرية 🛡️؟' }
+        { question: 'تفكيك عكسي لكلمة (سماء):', answer: 'يامس' },
+        { question: 'تفكيك عكسي لكلمة (قمر):', answer: 'رمق' }
     ],
     quotes: [
-        '“إن لم تقاتل، فلن تفوز بشيء أبداً!” - إيرين ييغر'
+        "“إن لم تقاتل، فلن تفوز بشيء أبداً!” - إيرين ييغر",
+        "“القوة ليست بكل شيء، بل الإرادة هي التي تصنع المعجزات.”"
     ]
 };
 
@@ -230,10 +225,10 @@ function startTimedGame(from, sock, gameType, categoryObj, timeoutSec = 30) {
     }, timeoutSec * 1000);
 
     const item = categoryObj[Math.floor(Math.random() * categoryObj.length)];
-    let promptText = `🎯 *فعالية تفاعلية (الوقت: ${timeoutSec} ثانية):*\n\n${item.question}`;
+    let promptText = `🎯 *فعالية تفاعلية (الوقت: ${timeoutSec} ثانية):*\n\n${item.question || item}`;
 
     sock.sendMessage(from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: gameType, answer: item.answer, category: categoryObj, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: gameType, answer: item.answer || item, category: categoryObj, timer: timer, msgId: sent.key.id };
     });
 }
 
@@ -488,7 +483,7 @@ async function startBot() {
                         }
                         return;
                     } else {
-                        await sock.sendMessage(from, { text: `❌ *إجابة خاطئة* @${sender.split('@')[0]}`, mentions: [sender] }, { quoted: msg });
+                        await sock.sendMessage(from, { text: `❌ *إجابة خاطئة* @${sender.split('@')[0]}\n💡 *الجواب الصحيح هو:* \`${game.answer}\``, mentions: [sender] }, { quoted: msg });
                         return;
                     }
                 }
@@ -721,17 +716,78 @@ async function startBot() {
         }
 
         if (activeGames[from]) {
-            if (['صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز'].includes(cmdBase)) {
+            if (['صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك'].includes(cmdBase)) {
                 return sock.sendMessage(from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` });
             }
         }
 
-        if (cmd === 'صراحة') { startTimedGame(from, sock, 'truth', gamesData.truth, 30); return; }
-        if (cmd === 'تحدي') { startTimedGame(from, sock, 'challenge', gamesData.challenge, 30); return; }
+        // --- أوامر الزواج والطلاق المخصصة ---
+        if (cmd === 'زواج') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.زواج @العروس` (قم بعمل منشن للشخص المراد زواجه منك)' });
+            if (targetUser === sender) return sock.sendMessage(from, { text: '❌ لا يمكنك الزواج من نفسك يا أسطورة!' });
+
+            if (!marriages[from]) marriages[from] = {};
+            marriages[from][sender] = targetUser; // صاحب المنشن هو العريس والمنشن هو العروس
+
+            return sock.sendMessage(from, { text: `💍 *بارك الله لهما وعليهما:* تم زواج العريس @${sender.split('@')[0]} من العروس @${targetUser.split('@')[0]} بنجاح! 💖✨`, mentions: [sender, targetUser] });
+        }
+
+        if (cmd === 'طلاق') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.طلاق @العروس`' });
+
+            if (!marriages[from] || marriages[from][sender] !== targetUser) {
+                return sock.sendMessage(from, { text: `❌ ليس هنالك شيء بينهم أصلاً لكي يتم طلاقهما!`, mentions: [sender, targetUser] }, { quoted: msg });
+            }
+
+            delete marriages[from][sender];
+            return sock.sendMessage(from, { text: `💔 للأسف تم الطلاق بالثلاثة بين العريس @${sender.split('@')[0]} والعروس @${targetUser.split('@')[0]}، كل واحد بطريقه!`, mentions: [sender, targetUser] });
+        }
+
+        if (cmd === 'صراحة') {
+            try {
+                const meta = await sock.groupMetadata(from);
+                const participants = meta.participants.map(p => p.id);
+                const randomUser = participants[Math.floor(Math.random() * participants.length)];
+                const qText = gamesData.truthQuestions[Math.floor(Math.random() * gamesData.truthQuestions.length)];
+                return sock.sendMessage(from, { text: `💬 *لعبة صراحة عشوائية لـ @${randomUser.split('@')[0]}:*\n\n${qText}`, mentions: [randomUser] });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `💬 *لعبة صراحة:* ما هو أقوى موقف سويته وتندمت عليه؟` });
+            }
+        }
+
+        if (cmd === 'تحدي') {
+            try {
+                const meta = await sock.groupMetadata(from);
+                const participants = meta.participants.map(p => p.id);
+                const randomUser = participants[Math.floor(Math.random() * participants.length)];
+                const tText = gamesData.challengeTasks[Math.floor(Math.random() * gamesData.challengeTasks.length)];
+                return sock.sendMessage(from, { text: `🔥 *تحدي جديد موجه إلى @${randomUser.split('@')[0]}:*\n\n${tText}`, mentions: [randomUser] });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `🔥 *تحدي:* قم بإرسال ايموجي 🦅 في الشات حالاً!` });
+            }
+        }
+
+        if (cmd === 'حرف') {
+            const letters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];
+            const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+            return sock.sendMessage(from, { text: `🔠 *لعبة الحرف الأنمي:*\n\nالحرف المطلوب: [ *${randomLetter}* ]\n⏳ يجب على الأعضاء كتابة 3 أسماء شخصيات انمي تبدأ بهذا الحرف بسرعة!` });
+        }
+
+        if (cmd === 'خيروك' || cmd === 'لوخيروك') {
+            const item = gamesData.truth[Math.floor(Math.random() * gamesData.truth.length)];
+            return sock.sendMessage(from, { text: `❓ *لعبة لو خيروك:*\n\n${item}` });
+        }
+
+        if (cmd === 'حكمة') {
+            const quote = gamesData.quotes[Math.floor(Math.random() * gamesData.quotes.length)];
+            return sock.sendMessage(from, { text: `📜 *حكمة / مقولة أسطورية:*\n\n${quote}` });
+        }
+
         if (cmd === 'اكمل') { startTimedGame(from, sock, 'complete', gamesData.complete, 30); return; }
         if (cmd === 'رتب') { startNextSameGame(from, sock, 'arrange', gamesData.arrange); return; }
         if (cmd === 'خمن') { startTimedGame(from, sock, 'guess', gamesData.guess, 30); return; }
-        if (cmd === 'حرف') { startTimedGame(from, sock, 'letterGame', gamesData.letterGame, 30); return; }
         if (cmd === 'عكس') { startNextSameGame(from, sock, 'reverseGame', gamesData.reverseGame); return; }
 
         if (cmd === 'كرة_قدم' || cmd === 'مباريات' || cmd === 'نتائج' || cmd === 'بطولات' || cmd === 'ترتيب' || cmd === 'هداف') {
@@ -816,20 +872,6 @@ async function startBot() {
             return sock.sendMessage(from, { text: `😈 مقلب اليوم: ارسل لأصدقائك في المجموعة (أنا راح أترك الواتساب نهائياً).` });
         }
 
-        if (cmd === 'زواج') {
-            try {
-                const meta = await sock.groupMetadata(from);
-                const mems = meta.participants;
-                const p1 = mems[Math.floor(Math.random() * mems.length)].id;
-                const p2 = mems[Math.floor(Math.random() * mems.length)].id;
-                return sock.sendMessage(from, { text: `💍 *بارك الله لهما وعليهما:* تم زواج العضو @${p1.split('@')[0]} من العضو @${p2.split('@')[0]} بنجاح! 💖`, mentions: [p1, p2] });
-            } catch (e) {
-                return sock.sendMessage(from, { text: `💍 مبروك الزواج السعيد!` });
-            }
-        }
-        if (cmd === 'طلاق') {
-            return sock.sendMessage(from, { text: `💔 للأسف تم الطلاق بالثلاثة، كل واحد بطريقه!` });
-        }
         if (cmd === 'غزل') {
             return sock.sendMessage(from, { text: `🌹 أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي!` });
         }
@@ -969,14 +1011,6 @@ async function startBot() {
         if (cmdBase === 'تفكيك') { startNextSameGame(from, sock, 'disassemble', gamesData.disassemble); return; }
         if (cmdBase === 'كتابه' || cmdBase === 'كتابة') { startNextSameGame(from, sock, 'typing', gamesData.typing); return; }
         if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startNextSameGame(from, sock, 'riddle', gamesData.riddles); return; }
-        if (cmdBase === 'خيروك' || cmdBase === 'لوخيروك') {
-            const item = gamesData.wouldYouRather[Math.floor(Math.random() * gamesData.wouldYouRather.length)];
-            return sock.sendMessage(from, { text: `❓ *لعبة لو خيروك:*\n\n${item.question}` });
-        }
-        if (cmdBase === 'حكمة') {
-            const quote = gamesData.quotes[Math.floor(Math.random() * gamesData.quotes.length)];
-            return sock.sendMessage(from, { text: `📜 *حكمة / مقولة أسطورية:*\n\n${quote}` });
-        }
 
         if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase === 'الأغنياء') {
             const sortedUsers = Object.keys(userPoints).sort((a, b) => (userPoints[b] || 0) - (userPoints[a] || 0)).slice(0, 5);
@@ -1044,7 +1078,7 @@ async function startBot() {
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
             
-            // الاستمارة بالحرف والنص والصياغة المطلوبة تماماً
+            // الاستمارة المطلوبة حرفياً عند طلب أمر .بوت
             const botWelcomeText = `
 🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭* 🍷
 
@@ -1071,65 +1105,11 @@ async function startBot() {
 `.trim();
 
             const botPp = await getBotProfilePic(sock);
-            const mediaMessage = await prepareWAMessageMedia({ image: { url: botPp } }, { upload: sock.waUploadToServer });
-
-            const sections = [
-                {
-                    title: "💚 الأقسام الأساسية",
-                    rows: [
-                        { title: "✿ 🛡️ ⦅ الحماية ⦆", rowId: `.1`, description: "عرض أوامر الحماية" },
-                        { title: "✿ 🎉 ⦅ الترفيه ⦆", rowId: `.2`, description: "عرض أوامر الترفيه" },
-                        { title: "✿ 💳 ⦅ البنك ⦆", rowId: `.3`, description: "عرض أوامر البنك" },
-                        { title: "✿ ⚽ ⦅ الرياضة ⦆", rowId: `.4`, description: "عرض أوامر الرياضة" },
-                        { title: "✿ 🤖 ⦅ الذكاء الاصطناعي ⦆", rowId: `.5`, description: "عرض أوامر الـ AI" },
-                        { title: "✿ 🧠 ⦅ الأسئلة ⦆", rowId: `.6`, description: "عرض أوامر الأسئلة" },
-                        { title: "✿ 🕌 ⦅ اسلامي ⦆", rowId: `.7`, description: "عرض أوامر اسلامي" }
-                    ]
-                },
-                {
-                    title: "💛 الأقسام الأخرى والطلبات",
-                    rows: [
-                        { title: "✿ 😂 ⦅ الضحك ⦆", rowId: `.8`, description: "عرض أوامر الضحك" },
-                        { title: "✿ 👥 ⦅ المجموعات ⦆", rowId: `.9`, description: "عرض أوامر المجموعات" },
-                        { title: "✿ 📥 ⦅ الطلبات ⦆", rowId: `.13`, description: "عرض أوامر قسم الطلبات والتحميل" },
-                        { title: "✿ ♟️ ⦅ المطور ⦆", rowId: `.10`, description: "عرض أوامر المطور" },
-                        { title: "✿ ⚡ ⦅ الادارة ⦆", rowId: `.11`, description: "عرض أوامر الادارة" },
-                        { title: "✿ 🔍 ⦅ الكشف ⦆", rowId: `.12`, description: "عرض أوامر الكشف" }
-                    ]
-                }
-            ];
-
-            let messageContent = generateWAMessageFromContent(from, {
-                viewOnceMessage: {
-                    message: {
-                        interactiveMessage: {
-                            header: { hasMediaAttachment: true, imageMessage: mediaMessage.imageMessage },
-                            body: { text: botWelcomeText },
-                            footer: { text: DEVELOPER_NAME },
-                            nativeFlowMessage: {
-                                buttons: [
-                                    {
-                                        name: "single_select",
-                                        buttonParamsJson: JSON.stringify({
-                                            title: "❄️ قائمة الأوامر ❄️",
-                                            sections: sections
-                                        })
-                                    },
-                                    {
-                                        name: "cta_url",
-                                        buttonParamsJson: JSON.stringify({
-                                            display_text: "🕊️ قناة المطور",
-                                            url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d"
-                                        })
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }, { userJid: sock.user.id, quoted: msg });
-
-            await sock.relayMessage(from, messageContent.message, { messageId: messageContent.key.id });
+            try {
+                await sock.sendMessage(from, { image: { url: botPp }, caption: botWelcomeText, mentions: [sender] });
+            } catch (e) {
+                await sock.sendMessage(from, { text: botWelcomeText });
+            }
             return;
         }
 
@@ -1268,7 +1248,7 @@ async function startBot() {
 > 📖 \`.قرآن\` ↞ آية قرآنية عشوائية
 > 📜 \`.آية\` ↞ تفسير مختصر
 > 🕋 \`.سورة\` ↞ معلومات السور
-> 🤲 \`.دعاء\` ↞ دعاء عشوائي
+> 🤲 \`.دعاء\` دعاء عشوائي
 > 📿 \`.ذكر\` ↞ ذكر مبارك
 > ☪️ \`.حديث\` ↞ حديث نبوي شريف
 > 🌙 \`.أذكار\` ↞ أذكار الصباح والمساء`;
@@ -1297,8 +1277,8 @@ async function startBot() {
         if (cmdBase === '9') {
             const groupExtText = `👥 *9. المجموعات:*
 
-> 💍 \`.زواج\` ↞ زواج أعضاء المجموعة
-> 💔 \`.طلاق\` ↞ الانفصال بين الزوجين
+> 💍 \`.زواج @العضو\` ↞ زواج العريس من العروس
+> 💔 \`.طلاق @العضو\` ↞ طلاق العريس من العروس
 > 🌹 \`.غزل @منشن\` ↞ غزل أعضاء
 > 💞 \`.ثنائي\` ↞ اختيار ثنائي عشوائي
 > 👑 \`.ملك_المجموعة\` ↞ اختيار ملك الجروب
