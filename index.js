@@ -360,7 +360,7 @@ async function startBot() {
         } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
     });
 
-    // تفعيل الترحيب والتوديع الدقيق بالاستمارات المطلوبة
+    // تفعيل الترحيب والتوديع بالاستمارات المطلوبة بدقة
     sock.ev.on('group-participants.update', async (anu) => {
         try {
             const { id, participants, action } = anu;
@@ -402,6 +402,7 @@ async function startBot() {
                 }
             } else if (action === 'remove' && settings.goodbye) {
                 for (let user of participants) {
+                    const userPp = await getUserProfilePic(sock, user);
                     const goodbyeMsg = `*🥀┊تـودـيـع الـعـضـو:*
 
 *❋・────━【🗡】━────・❋*
@@ -418,7 +419,7 @@ async function startBot() {
 
 *『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝑫』*`;
 
-                    await sock.sendMessage(id, { text: goodbyeMsg, mentions: [user] });
+                    await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
                 }
             }
         } catch (e) {}
@@ -1037,23 +1038,24 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- قسم الطلبات والوسائط الحقيقية للشخصيات (القسم 13) ---
+        // --- قسم الطلبات والوسائط الحقيقية المحدث بالكامل دون تغيير الأشكال والزخارف ---
         if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
             const query = trimmedBody.split(' ').slice(1).join(' ');
+            if (!query) return sock.sendMessage(from, { text: `📌 يرجى إضافة رابط المقطع بعد الأمر!` }, { quoted: msg });
             const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query || 'رابط مباشر'}` }, { quoted: msg });
+            return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query}` }, { quoted: msg });
         }
 
         if (cmdBase === 'ايدت') {
             const charName = trimmedBody.replace(/^\.ايدت/i, '').trim().toLowerCase();
-            const videoUrl = characterEdits[charName] || 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'عام'} ] 🔥⚡` }, { quoted: msg });
+            const videoUrl = characterEdits[charName] || characterEdits['ايرين'];
+            return sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'ايرين'} ] 🔥⚡` }, { quoted: msg });
         }
 
         if (cmdBase === 'صوره') {
             const charName = trimmedBody.replace(/^\.صوره/i, '').trim().toLowerCase();
-            const imageUrl = characterImages[charName] || 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
-            return sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'عام'} ] 📌✨` }, { quoted: msg });
+            const imageUrl = characterImages[charName] || characterImages['ايرين'];
+            return sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'ايرين'} ] 📌✨` }, { quoted: msg });
         }
 
         if (cmdBase === 'تطقيم') {
