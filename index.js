@@ -22,7 +22,7 @@ let dailyRewards = {};
 let mutedUsers = {}; 
 let userMessagesCount = {};
 let groupSettings = {}; 
-let marriages = {}; // سجل الزيجات للمجموعات
+let marriages = {}; // سجل الزيجات
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -64,11 +64,12 @@ const gamesData = {
         'كيلوا', 'غون', 'ايتاشي', 'مادارا', 'ليفاي', 'ميكاسا', 'أرمين', 'شانكس', 'جوجو', 'كانيكي'
     ],
     riddles: [
-        { question: 'من هو بطل أنمي هجوم العمالقة؟', answer: 'ايرين' },
-        { question: 'من هو ملك القراصنة المستقبلي؟', answer: 'لوفي' },
-        { question: 'من هو النينجا الأقوى في قرية الورق؟', answer: 'ناروتو' },
-        { question: 'من هو سياف القرية الماهر؟', answer: 'زورو' },
-        { question: 'من هو العملاق الأفضل بفيلق الاستطلاع؟', answer: 'ليفاي' }
+        { question: 'حزورة: من هو بطل أنمي هجوم العمالقة؟', answer: 'ايرين' },
+        { question: 'حزورة: من هو ملك القراصنة المستقبلي؟', answer: 'لوفي' },
+        { question: 'حزورة: من هو النينجا الأقوى في قرية الورق؟', answer: 'ناروتو' },
+        { question: 'حزورة: من هو سياف القرية الماهر؟', answer: 'زورو' },
+        { question: 'حزورة: من هو العملاق الأفضل بفيلق الاستطلاع؟', answer: 'ليفاي' },
+        { question: 'حزورة: ما هو اسم السيف الأسطوري لزورو؟', answer: 'وادو إيتشيمونجي' }
     ],
     sports: [
         { question: 'من هو اللاعب الحاصل على أكبر عدد من الكرات الذهبية؟', answer: 'ميسي' }
@@ -116,7 +117,12 @@ const gamesData = {
     ],
     complete: [
         { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' },
-        { question: 'أكمل المثل: الجار قبل ...', answer: 'الدار' }
+        { question: 'أكمل المثل: الجار قبل ...', answer: 'الدار' },
+        { question: 'أكمل المثل: الصبر مفتاح ...', answer: 'الفرج' },
+        { question: 'أكمل المثل: من حفر حفراً لأخيه ...', answer: 'وقع فيها' },
+        { question: 'أكمل المثل: عصفور باليد خير من ...', answer: 'عشرة على الشجرة' },
+        { question: 'أكمل المثل: الطيور على ...',- answer: 'أشكالها تقع' },
+        { question: 'أكمل المثل: ابن الوز ...', answer: عوام' }
     ],
     arrange: [
         { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' },
@@ -149,6 +155,7 @@ const validCommands = [
     'حجرة', 'حجر', 'توقع', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء',
     'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
     'صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'انسحب',
+    'زواج', 'طلاق',
     'المطور', 'مطور', 'الادارة', 'الاداره',
     'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
     'اضف_انذار', 'ازل_انذار', 'عدد_الانذارات',
@@ -158,7 +165,7 @@ const validCommands = [
     'سؤال', 'سؤال_ذكاء', 'صح_او_خطأ', 'ثقافة', 'جغرافيا', 'علوم', 'تاريخ', 'سؤال_ديني', 'مسابقة', 'اختبرني',
     'قرآن', 'آية', 'سورة', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'قبلة', 'استغفار', 'تذكير',
     'نكتة', 'ضحكني', 'مهرج', 'فضيحة', 'مين_الأكثر', 'ماذا_لو', 'رعب', 'قول', 'مقلب',
-    'زواج', 'طلاق', 'غزل', 'ثنائي',
+    'غزل', 'ثنائي',
     'ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة',
     'رسائلي', 'رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'نشاطي', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
     'تعطيل_البوتات', 'تعطيل بوتات',
@@ -478,7 +485,7 @@ async function startBot() {
                         delete activeGames[from];
                         await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
                         
-                        if (['disassemble', 'typing', 'riddle', 'arrange', 'letterGame', 'reverseGame'].includes(type) && cat) {
+                        if (['disassemble', 'typing', 'riddle', 'arrange', 'letterGame', 'reverseGame', 'complete'].includes(type) && cat) {
                             setTimeout(() => startNextSameGame(from, sock, type, cat), 1000);
                         }
                         return;
@@ -716,19 +723,19 @@ async function startBot() {
         }
 
         if (activeGames[from]) {
-            if (['صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك'].includes(cmdBase)) {
+            if (['صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'زواج', 'طلاق'].includes(cmdBase)) {
                 return sock.sendMessage(from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` });
             }
         }
 
-        // --- أوامر الزواج والطلاق المخصصة ---
+        // --- أوامر الزواج والطلاق الرسمية في قسم الترفيه ---
         if (cmd === 'زواج') {
             const targetUser = getTargetUser(msg);
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.زواج @العروس` (قم بعمل منشن للشخص المراد زواجه منك)' });
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.زواج @العروس` (صاحب المنشن هو العريس والشخص المنشن هو العروس)' });
             if (targetUser === sender) return sock.sendMessage(from, { text: '❌ لا يمكنك الزواج من نفسك يا أسطورة!' });
 
             if (!marriages[from]) marriages[from] = {};
-            marriages[from][sender] = targetUser; // صاحب المنشن هو العريس والمنشن هو العروس
+            marriages[from][sender] = targetUser;
 
             return sock.sendMessage(from, { text: `💍 *بارك الله لهما وعليهما:* تم زواج العريس @${sender.split('@')[0]} من العروس @${targetUser.split('@')[0]} بنجاح! 💖✨`, mentions: [sender, targetUser] });
         }
@@ -789,6 +796,7 @@ async function startBot() {
         if (cmd === 'رتب') { startNextSameGame(from, sock, 'arrange', gamesData.arrange); return; }
         if (cmd === 'خمن') { startTimedGame(from, sock, 'guess', gamesData.guess, 30); return; }
         if (cmd === 'عكس') { startNextSameGame(from, sock, 'reverseGame', gamesData.reverseGame); return; }
+        if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startTimedGame(from, sock, 'riddles', gamesData.riddles, 30); return; }
 
         if (cmd === 'كرة_قدم' || cmd === 'مباريات' || cmd === 'نتائج' || cmd === 'بطولات' || cmd === 'ترتيب' || cmd === 'هداف') {
             startTimedGame(from, sock, 'sports', gamesData.sports, 30);
@@ -1010,7 +1018,6 @@ async function startBot() {
 
         if (cmdBase === 'تفكيك') { startNextSameGame(from, sock, 'disassemble', gamesData.disassemble); return; }
         if (cmdBase === 'كتابه' || cmdBase === 'كتابة') { startNextSameGame(from, sock, 'typing', gamesData.typing); return; }
-        if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startNextSameGame(from, sock, 'riddle', gamesData.riddles); return; }
 
         if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase === 'الأغنياء') {
             const sortedUsers = Object.keys(userPoints).sort((a, b) => (userPoints[b] || 0) - (userPoints[a] || 0)).slice(0, 5);
@@ -1166,6 +1173,8 @@ async function startBot() {
 
 > ❓ \`.خيروك\` ↞ أسئلة لو خيروك
 > 📜 \`.حكمة\` ↞ مقولة أسطورية
+> 💍 \`.زواج @العضو\` ↞ زواج العريس من العروس
+> 💔 \`.طلاق @العضو\` ↞ طلاق العريس من العروس
 > 🧩 \`.تفكيك\` ↞ تفكيك أنمي (+10 نقاط)
 > ✍️ \`.كتابه\` ↞ سرعة كتابة (+10 نقاط)
 > 💡 \`.حزورة\` ↞ لغز أنمي (+10 نقاط)
@@ -1277,8 +1286,8 @@ async function startBot() {
         if (cmdBase === '9') {
             const groupExtText = `👥 *9. المجموعات:*
 
-> 💍 \`.زواج @العضو\` ↞ زواج العريس من العروس
-> 💔 \`.طلاق @العضو\` ↞ طلاق العريس من العروس
+> 💍 \`.زواج @العضو\` ↞ زواج العريس بالعروس
+> 💔 \`.طلاق @العضو\` ↞ طلاق العريس بالعروس
 > 🌹 \`.غزل @منشن\` ↞ غزل أعضاء
 > 💞 \`.ثنائي\` ↞ اختيار ثنائي عشوائي
 > 👑 \`.ملك_المجموعة\` ↞ اختيار ملك الجروب
