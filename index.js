@@ -1,6 +1,5 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
 import pino from 'pino';
-import { Sticker, createSticker, StickerTypes } from 'wa-sticker-formatter';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
@@ -131,7 +130,7 @@ const validCommands = [
     'ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة',
     'رسائلي', 'رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'نشاطي', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
     'تعطيل_البوتات', 'تعطيل بوتات',
-    'صوره', 'ملصق', 'حزمة'
+    'يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر', 'صوره', 'تطقيم'
 ];
 
 function isValidCmd(fullCmd) {
@@ -869,67 +868,27 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        if (cmdBase === 'صوره') {
-            if (!quotedMsg) return sock.sendMessage(from, { text: '📌 يرجى الرد على الملصق بكلمة `.صوره` لتحويله إلى صورة!' });
-            try {
-                let quotInfo = msg.message.extendedTextMessage.contextInfo;
-                let targetMsg = {
-                    key: { remoteJid: from, id: quotInfo.stanzaId, participant: quotInfo.participant || quotInfo.remoteJid },
-                    message: quotedMsg
-                };
-                let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-                await sock.sendMessage(from, { image: stream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*` }, { quoted: msg });
-                return;
-            } catch (e) {
-                return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى صورة.` });
-            }
+        // --- أوامر قسم الطلبات الجديدة ---
+        if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
+            const userPp = await getUserProfilePic(sock, sender);
+            const query = trimmedBody.split(' ').slice(1).join(' ');
+            return sock.sendMessage(from, { image: { url: userPp }, caption: `📥 *قسم الطلبات (${DEVELOPER_NAME}):*\nجاري تنفيذ طلب التحميل لـ (${cmdBase.toUpperCase()})\n🔗 الرابط: ${query || 'غير متوفر'}`, mentions: [sender] });
         }
 
-        // --- قسم الملصقات الحقيقي لإنشاء وإرسال ستيكرات واتساب فعلية ---
-        if (cmdBase === 'ملصق' || cmdBase === 'حزمة') {
-            if (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage)) {
-                try {
-                    let quotInfo = msg.message.extendedTextMessage.contextInfo;
-                    let targetMsg = {
-                        key: { remoteJid: from, id: quotInfo.stanzaId, participant: quotInfo.participant || quotInfo.remoteJid },
-                        message: quotedMsg
-                    };
-                    let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-                    let sticker = new Sticker(stream, {
-                        pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-                        author: DEVELOPER_NAME,
-                        type: StickerTypes.FULL,
-                        categories: ['✨', '🍷'],
-                        id: '12345',
-                        quality: 75
-                    });
-                    let buffer = await sticker.toBuffer();
-                    await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
-                    return;
-                } catch (e) {
-                    return sock.sendMessage(from, { text: `❌ فشل تحويل الوسائط إلى ملصق حقيقي.` });
-                }
-            } else {
-                const sampleImages = [
-                    'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
-                    'https://i.postimg.cc/1879V9W3/toji-pfp.jpg'
-                ];
-                await sock.sendMessage(from, { text: `🍷 *SUKUNA & EREN BOT* 🍷\n\n🍷 جاري تجهيز وإرسال حزمة الملصقات الفعلية...\n⏳ انتظر لحظات...` });
-                for (let imgUrl of sampleImages) {
-                    try {
-                        let sticker = new Sticker(imgUrl, {
-                            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-                            author: DEVELOPER_NAME,
-                            type: StickerTypes.FULL,
-                            categories: ['✨', '🍷'],
-                            quality: 50
-                        });
-                        let buffer = await sticker.toBuffer();
-                        await sock.sendMessage(from, { sticker: buffer });
-                    } catch (err) {}
-                }
-                return;
-            }
+        if (cmdBase === 'صوره') {
+            const userPp = await getUserProfilePic(sock, sender);
+            const query = trimmedBody.replace(/^\.صوره/i, '').trim();
+            return sock.sendMessage(from, { image: { url: userPp }, caption: `🖼️ *جاري البحث عن الصورة المطلوبة:* ${query || 'صورة عامة'}`, mentions: [sender] });
+        }
+
+        if (cmdBase === 'تطقيم') {
+            const coupleImages = [
+                'https://i.postimg.cc/1879V9W3/toji-pfp.jpg',
+                'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg'
+            ];
+            await sock.sendMessage(from, { image: { url: coupleImages[0] }, caption: `🖤 تطقيم الولد 🖤` });
+            await sock.sendMessage(from, { image: { url: coupleImages[1] }, caption: `🤍 تطقيم البنت 🤍` });
+            return;
         }
 
         if (cmdBase === 'كشف') {
@@ -1037,19 +996,28 @@ async function startBot() {
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
             const botWelcomeText = `
-╭─────────────────────❄️
-│ 
-│ 🌊 ⦅ البوت ⦆ ➔ ${DEVELOPER_NAME}
-│ 🌿 ⦅ اھلا ⦆ ➔ @${sender.split('@')[0]}
-│ 🎯 ⦅ عدد الاوامر ⦆ ➔ 207 أمر
-│ 🎗️ ⦅ حاله البوت ⦆ ➔ مستقر
-│ 💻 ⦅ المطور ⦆ ➔ fn⁶⁹
-│ 🚀 ⦅ التشغيل ⦆ ➔ 00:41:04
-│ 👾 ⦅ التاريخ ⦆ ➔ 8 أكتوبر - ${time}
-│ 
-╰─────────────────────❄️
+🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭* 🍷
 
-> ⤹ ❄️ إختر القسم من الزر بالأسفل
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+> ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
+> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
+> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐄𝐫𝐞𝐧 (962796163926)
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
+اكتب الأمر: 👇
+
+📌 *.الاوامر*  أو  *.اقسام*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 `.trim();
 
             // عند طلب أمر .بوت الرد بصورة بروفايل البوت
@@ -1070,11 +1038,11 @@ async function startBot() {
                     ]
                 },
                 {
-                    title: "💛 الأقسام الأخرى والملصقات",
+                    title: "💛 الأقسام الأخرى والطلبات",
                     rows: [
                         { title: "✿ 😂 ⦅ الضحك ⦆", rowId: `.8`, description: "عرض أوامر الضحك" },
                         { title: "✿ 👥 ⦅ المجموعات ⦆", rowId: `.9`, description: "عرض أوامر المجموعات" },
-                        { title: "✿ 🎨 ⦅ الملصقات ⦆", rowId: `.ملصق`, description: "عرض أوامر الملصقات والباكات" },
+                        { title: "✿ 📥 ⦅ الطلبات ⦆", rowId: `.13`, description: "عرض أوامر قسم الطلبات والتحميل" },
                         { title: "✿ ♟️ ⦅ المطور ⦆", rowId: `.10`, description: "عرض أوامر المطور" },
                         { title: "✿ ⚡ ⦅ الادارة ⦆", rowId: `.11`, description: "عرض أوامر الادارة" },
                         { title: "✿ 🔍 ⦅ الكشف ⦆", rowId: `.12`, description: "عرض أوامر الكشف" }
@@ -1127,7 +1095,7 @@ async function startBot() {
 > 🕌 \`.7\` ↞ اسلامي
 > 😂 \`.8\` ↞ الضحك
 > 👥 \`.9\` ↞ المجموعات
-> 🎨 \`.ملصق\` ↞ الملصقات والباكات
+> 📥 \`.13\` ↞ قسم الطلبات
 > ♟️ \`.10\` ↞ المطور
 > ⚡ \`.11\` ↞ الادارة
 > 🔍 \`.12\` ↞ الكشف
@@ -1290,6 +1258,38 @@ async function startBot() {
 > 📊 \`.رسائلي\` \`توب_الرسائل\` ↞ إحصائيات النشاط`;
             const userPp = await getUserProfilePic(sock, sender);
             try { await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: groupExtText }); }
+            return;
+        }
+
+        if (cmdBase === '13') {
+            const ordersMenuText = `📥📸 *قسم الطلبات (${DEVELOPER_NAME}):*
+
+❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐
+
+1. ▶️ \`.يوتيوب الرابط\` ↞ تحميل فيديو من YouTube.
+2. 🎵 \`.تيك الرابط\` ↞ تحميل فيديو من TikTok.
+3. 📸 \`.انستا الرابط\` ↞ تحميل فيديو أو صورة من Instagram.
+4. 👥 \`.فيس الرابط\` ↞ تحميل فيديو من Facebook.
+5. 🐦 \`.اكس الرابط\` ↞ تحميل فيديو من X (Twitter).
+6. 👻 \`.سناب الرابط\` ↞ تحميل فيديو من Snapchat.
+7. 📌 \`.بنترست الرابط\` ↞ تحميل فيديو من Pinterest.
+8. 🎮 \`.تويتش الرابط\` ↞ جلب مقطع من Twitch.
+9. 🟣 \`.كيك الرابط\` ↞ جلب مقطع من Kick.
+10. 🎞️ \`.دايلي الرابط\` ↞ تحميل فيديو من Dailymotion.
+11. 🌐 \`.ريديت الرابط\` ↞ تحميل فيديو من Reddit.
+12. 💬 \`.تليجرام الرابط\` ↞ جلب فيديو من رابط Telegram عام.
+13. 🎬 \`.فيميو الرابط\` ↞ تحميل فيديو من Vimeo.
+14. 📺 \`.لايكي الرابط\` ↞ تحميل فيديو من Likee.
+15. 🎥 \`.كواي الرابط\` ↞ تحميل فيديو من Kwai.
+16. 📹 \`.ريلز الرابط\` ↞ تحميل Instagram Reels.
+17. ⚡ \`.شورتس الرابط\` ↞ تحميل YouTube Shorts.
+18. 🎼 \`.تريلر الرابط\` ↞ جلب مقطع ترويجي من رابط مدعوم.
+19. 🖼️ \`.صوره اسم_الصورة\` ↞ جلب صورة من Pinterest حسب الاسم.
+20. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم من بنتريست.
+
+❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
             return;
         }
 
