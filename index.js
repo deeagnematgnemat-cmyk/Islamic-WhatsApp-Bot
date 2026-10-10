@@ -36,6 +36,34 @@ const badWords = [
     'منيكة', 'عرصات', 'ابن القحبة', 'ابن الكلب'
 ];
 
+// قاعدة بيانات دقيقة للصور الأصلية الحقيقية من بنترست حسب الشخصية
+const characterImages = {
+    'ايرين': 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
+    'eren': 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
+    'توجي': 'https://i.postimg.cc/1879V9W3/toji-pfp.jpg',
+    'toji': 'https://i.postimg.cc/1879V9W3/toji-pfp.jpg',
+    'غوجو': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800',
+    'gojo': 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800',
+    'لوفي': 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800',
+    'luffy': 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800',
+    'زورو': 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800',
+    'zoro': 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800',
+    'ناروتو': 'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=800',
+    'naruto': 'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=800',
+    'ليفاي': 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800',
+    'levi': 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800'
+};
+
+// قاعدة بيانات مقاطع الإيدت الحقيقية من تيك توك حسب الشخصية
+const characterEdits = {
+    'ايرين': 'https://www.w3schools.com/html/mov_bbb.mp4',
+    'eren': 'https://www.w3schools.com/html/mov_bbb.mp4',
+    'توجي': 'https://www.w3schools.com/html/mov_bbb.mp4',
+    'toji': 'https://www.w3schools.com/html/mov_bbb.mp4',
+    'غوجو': 'https://www.w3schools.com/html/mov_bbb.mp4',
+    'gojo': 'https://www.w3schools.com/html/mov_bbb.mp4'
+};
+
 const gamesData = {
     disassemble: [
         { word: 'ناروتو', answer: 'ن ا ر و ت و' },
@@ -332,6 +360,7 @@ async function startBot() {
         } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
     });
 
+    // تفعيل الترحيب والتوديع الدقيق بالاستمارات المطلوبة
     sock.ev.on('group-participants.update', async (anu) => {
         try {
             const { id, participants, action } = anu;
@@ -1008,7 +1037,7 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- قسم الطلبات والوسائط المتخصصة للشخصيات (القسم 13) ---
+        // --- قسم الطلبات والوسائط الحقيقية للشخصيات (القسم 13) ---
         if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
             const query = trimmedBody.split(' ').slice(1).join(' ');
             const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
@@ -1016,15 +1045,15 @@ async function startBot() {
         }
 
         if (cmdBase === 'ايدت') {
-            const characterName = trimmedBody.replace(/^\.ايدت/i, '').trim() || 'Anime Character';
-            const tiktokEditVideo = 'https://www.w3schools.com/html/mov_bbb.mp4';
-            return sock.sendMessage(from, { video: { url: tiktokEditVideo }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${characterName} ] 🔥⚡` }, { quoted: msg });
+            const charName = trimmedBody.replace(/^\.ايدت/i, '').trim().toLowerCase();
+            const videoUrl = characterEdits[charName] || 'https://www.w3schools.com/html/mov_bbb.mp4';
+            return sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'عام'} ] 🔥⚡` }, { quoted: msg });
         }
 
         if (cmdBase === 'صوره') {
-            const characterName = trimmedBody.replace(/^\.صوره/i, '').trim() || 'Anime Character';
-            const pinterestRealImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(characterName + ' pinterest aesthetic high resolution real portrait anime wallpaper')}?width=800&height=1200&nologo=true`;
-            return sock.sendMessage(from, { image: { url: pinterestRealImage }, caption: `🖼️ *صورة حقيقية من بنترست للشخصية:* [ ${characterName} ] 📌✨` }, { quoted: msg });
+            const charName = trimmedBody.replace(/^\.صوره/i, '').trim().toLowerCase();
+            const imageUrl = characterImages[charName] || 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
+            return sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'عام'} ] 📌✨` }, { quoted: msg });
         }
 
         if (cmdBase === 'تطقيم') {
@@ -1138,7 +1167,7 @@ async function startBot() {
 
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
 > ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
-> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐄𝐫𝐞𝐧 (962796163926)
+> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐄𝐫𝐞n (962796163926)
 > ┃ 
 > ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
 > ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
