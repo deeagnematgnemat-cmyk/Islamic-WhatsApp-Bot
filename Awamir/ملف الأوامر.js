@@ -1,446 +1,475 @@
-import { generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys'
-import process from 'process'
-
-let handler = async (m, { conn, usedPrefix, command, text }) => {
-  // 1. حساب وقت التشغيل والتاريخ
-  let uptime = process.uptime()
-  let h = Math.floor(uptime / 3600)
-  let m_time = Math.floor((uptime % 3600) / 60)
-  let s = Math.floor(uptime % 60)
-  let uptimeStr = `${h < 10 ? '0' + h : h}:${m_time < 10 ? '0' + m_time : m_time}:${s < 10 ? '0' + s : s}`
-
-  let d = new Date()
-  let locale = 'ar'
-  let date = d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
-  let time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-
-  // 2. معالجة الأوامر الفرعية للرد بقوائم الأقسام عند الاختيار من القائمة
-  if (text) {
-    let sectionMenu = ''
-    switch (text.toLowerCase()) {
-      case 'download':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 📥 ⦅ قسم التحميل ⦆
-◣─────────────────────❄️
-
- 📌 .تيكتوك <رابط> (تحميل من تيكتوك)
- 📌 .انستا <رابط> (تحميل من انستغرام)
- 📌 .فيسبوك <رابط> (تحميل من فيسبوك)
- 📌 .تويتر <رابط> (تحميل من تويتر/X)
- 📌 .يوتيوب <رابط> (تحميل فيديو يوتيوب)
- 📌 .صوت <اسم/رابط> (تحميل مقطع صوتي)
- 📌 .اغنية <اسم الاغنية> (بحث وتحميل اغاني)
- 📌 .جودة <رابط> (تحميل فيديو بجودة عالية)
- 📌 .ميديافاير <رابط> (تحميل ملفات ميديا فاير)
- 📌 .ساوندكلاود <رابط> (تحميل من ساوند كلاود)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'group':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🍃 ⦅ قسم المجموعات ⦆
-◣─────────────────────❄️
-
- 📌 .منشن (منشن لجميع أعضاء المجموعة)
- 📌 .مخفي <نص> (منشن مخفي لجميع الأعضاء)
- 📌 .طرد @عضو (طرد عضو من المجموعة)
- 📌 .اضافة <رقم> (إضافة عضو للمجموعة)
- 📌 .ترقية @عضو (إعطاء رتبة ادمن)
- 📌 .إعفاء @عضو (سحب رتبة الادمن)
- 📌 .الرابط (سحب رابط المجموعة)
- 📌 .إعادة (تغيير رابط المجموعة)
- 📌 .اغلاق (إغلاق الدردشة للادمن فقط)
- 📌 .فتح (فتح الدردشة للجميع)
- 📌 .تغيير_الاسم <الاسم> (تغيير اسم المجموعة)
- 📌 .تغيير_الوصف <الوصف> (تغيير وصف المجموعة)
- 📌 .تثبيت / .الغاء_التثبيت (تثبيت رسائل)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'sticker':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🎨 ⦅ قسم الملصقات ⦆
-◣─────────────────────❄️
-
- 📌 .ملصق / .سبيكر (تحويل صورة/فيديو لملصق)
- 📌 .سرقة <اسم الحزمة> (تغيير حقوق الملصق)
- 📌 .لصورة (تحويل الملصق إلى صورة)
- 📌 .لفيديو (تحويل الملصق المتحرك لفيديو)
- 📌 .دائري (صنع ملصق دائري)
- 📌 .نص_ملصق <نص> (كتابة نص على ملصق)
- 📌 .ملصق_اموجي <إيموجي> (تحويل إيموجي لملصق)
- 📌 .بحث_ملصقات <اسم> (البحث عن حزم ملصقات)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'owner':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 👑 ⦅ قسم المطورين ⦆
-◣─────────────────────❄️
-
- 📌 .انضم <رابط> (إدخال البوت لمجموعة)
- 📌 .غادر (إخراج البوت من المجموعة)
- 📌 .حظر @عضو (حظر مستخدم من البوت)
- 📌 .الغاء_الحظر @عضو (فك حظر مستخدم)
- 📌 .اذاعة <نص> (إرسال إذاعة لجميع الخاص/المجموعات)
- 📌 .تحديث (تحديث البوت تلقائياً)
- 📌 .إعادة_تشغيل (إعادة تشغيل البوت)
- 📌 .وضع_الخاص / .وضع_العام (تغيير وضع البوت)
- 📌 .وضع_الصيانة (تفعيل صيانة البوت)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'examples':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ ❇️ ⦅ قسم الأمثلة والتعليمات ⦆
-◣─────────────────────❄️
-
- 📌 .طريقة_الاستخدام (شرح كيفية استخدام البوت)
- 📌 .مثال_تحميل (طريقة تحميل مقاطع وحالات)
- 📌 .مثال_ملصق (كيفية صنع ملصق احترافي)
- 📌 .مثال_ادمن (كيفية التحكم بالمجموعات)
- 📌 .مثال_ذكاء (طريقة التحدث مع الذكاء الاصطناعي)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'tools':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ ⚒️ ⦅ قسم الأدوات ⦆
-◣─────────────────────❄️
-
- 📌 .اختصار <رابط> (اختصار رابط طويل)
- 📌 .ترجمة <رمز_اللغة> <النص> (ترجمة النصوص)
- 📌 .طقس <اسم_المدينة> (معرفة حالة الطقس)
- 📌 .حاسبة <معادلة> (آلة حاسبة رياضية)
- 📌 .وهمي <رقم> (إنشاء بريد/معلومات وهمية)
- 📌 .تحويل_عملات <مبلغ> <من> <إلى> (تحويل العملات)
- 📌 .قراءة_نص (استخراج النص من الصورة OCR)
- 📌 .تجميع_ملفات (تجميع صور بملف PDF)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'search':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🔍 ⦅ قسم البحث ⦆
-◣─────────────────────❄️
-
- 📌 .جوجل <بحث> (البحث في جوجل)
- 📌 .ويكيبيديا <موضوع> (البحث في ويكيبيديا)
- 📌 .صور <اسم> (البحث عن صور جودة عالية)
- 📌 .بينتريست <اسم> (البحث في Pinterest)
- 📌 .يوتيوب_بحث <نص> (البحث عن فيديوهات يوتيوب)
- 📌 .معاني <كلمة> (معجم المعاني العربية)
- 📌 .تطبيق <اسم> (البحث عن تطبيقات APK)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'admin':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🛡️ ⦅ قسم الإشراف والآمان ⦆
-◣─────────────────────❄️
-
- 📌 .مضاد_الروابط (تفعيل/تعطيل طرد من يرسل رابط)
- 📌 .مضاد_الوهمي (تفعيل طرد الأرقام الغريبة)
- 📌 .مضاد_الشتائم (تفعيل فلترة النصوص المسيئة)
- 📌 .الترحيب (تفعيل/تعطيل رسالة الترحيب)
- 📌 .المغادرة (تفعيل/تعطيل رسالة المغادرة)
- 📌 .مضاد_السبام (منع التكرار والسبام)
- 📌 .تحذير @عضو (إعطاء تحذير لعضو)
- 📌 .الغاء_تحذير @عضو (إلغاء تحذير عضو)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'games':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🎮 ⦅ قسم الألعاب والترفيه ⦆
-◣─────────────────────❄️
-
- 📌 .حزر (لعبة التخمين)
- 📌 .عواصم (لعبة معرفة العواصم)
- 📌 .اعلام (لعبة معرفة أعلَام الدول)
- 📌 .امثال (لعبة إكمال الأمثال)
- 📌 .كت_تويت (أسئلة صراحة وفعاليات)
- 📌 .لو_خيروك (لعبة لو خيروك)
- 📌 .تفكيك <كلمة> (لعبة تفكيك الكلمات)
- 📌 .ترتيب <كلمة> (لعبة ترتيب الحروف)
- 📌 .تأسيس (لعبة تأسيس الأسئلة)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'gif':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🎬 ⦅ قسم الصور المتحركة GIF ⦆
-◣─────────────────────❄️
-
- 📌 .جيف_انمي <اسم> (البحث عن صور انمي متحركة)
- 📌 .جيف_ضحك (صور متحركة مضحكة)
- 📌 .جيف_ردة_فعل (Gifs ردود فعل)
- 📌 .تحويل_جيف (تحويل فيديو قصير لـ GIF)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'system':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🏛️ ⦅ قسم النظام والحالة ⦆
-◣─────────────────────❄️
-
- 📌 .فحص / .بينج (فحص سرعة استجابة البوت)
- 📌 .الحالة (عرض حالة البوت والسيرفر)
- 📌 .السرعة (عرض سرعة المعالجة والرام)
- 📌 .وقت_التشغيل (معرفة مدة عمل البوت)
- 📌 .المعلومات (بيانات عن الإصدار والمكتبة)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'ai':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🤖 ⦅ قسم الذكاء الاصطناعي ⦆
-◣─────────────────────❄️
-
- 📌 .جيبيتي <سؤال> (التحدث مع ChatGPT)
- 📌 .ذكاء <سؤال> (الاستفسار والبحث الذكي)
- 📌 .ارسم <وصف الصورة> (توليد صور بالذكاء الاصطناعي)
- 📌 .تخيل <وصف> (تخيل ورسم صور عالية الدقة)
- 📌 .تحسين (تحسين جودة الصور الضبابية)
- 📌 .ازالة_الخلفية (إزالة خلفية الصور تلقائياً)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'subbots':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🟢 ⦅ قسم البوتات الفرعية ⦆
-◣─────────────────────❄️
-
- 📌 .ربط (إنشاء بوت فرعي جديد برقمك)
- 📌 .البوتات (عرض قائمة البوتات الفرعية المتصلة)
- 📌 .حذف_بوت (إيقاف وحذف البوت الفرعي الخاص بك)
- 📌 .كود (طلب كود اقتران لبوت فرعي)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'info':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ ℹ️ ⦅ قسم معلومات البوت ⦆
-◣─────────────────────❄️
-
- 📌 .المطور (عرض رقم وبيانات مطور البوت)
- 📌 .القناة (رابط القناة الرسمية للبوت)
- 📌 .الدعم (رابط مجموعة الدعم الفني)
- 📌 .الشروط (قوانين وشروط استخدام البوت)
- 📌 .التبرع (طرق دعم البوت)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'titles':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🏷️ ⦅ قسم الألقاب والترتيب ⦆
-◣─────────────────────❄️
-
- 📌 .لقبي (عرض لقبك ومستواك الحالي)
- 📌 .لقب @عضو <اللقب> (تعيين لقب شخصي)
- 📌 .توب (عرض قائمة أعلى الأعضاء تفاعلاً)
- 📌 .مستواي (عرض عدد نقاط الخبرة واللفل)
- 📌 .الألقاب (عرض جميع الألقاب المتاحة)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'logos':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🎨 ⦅ قسم اللوجوهات التصميم ⦆
-◣─────────────────────❄️
-
- 📌 .لوجو_نار <الاسم> (تصميم شعار ناري)
- 📌 .لوجو_ذهبي <الاسم> (تصميم شعار ذهبي احترافي)
- 📌 .لوجو_3d <الاسم> (تصميم اسم ثلاثي الأبعاد)
- 📌 .لوجو_انمي <الاسم> (تصميم شعار انمي)
- 📌 .لوجو_نيون <الاسم> (تصميم شعار مضيء)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'audio':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🎙️ ⦅ قسم تغيير الأصوات ⦆
-◣─────────────────────❄️
-
- 📌 .عميق (تعديل الصوت ليصبح عميقاً)
- 📌 .سريع (تسريع مقطع الصوت)
- 📌 .بطيء (تبطيء الصوت)
- 📌 .سنجاب (تغيير الصوت لصوت سنجاب)
- 📌 .روبوت (تحويل الصوت لصوت آلي)
- 📌 .صدى (إضافة تأثير الصدى)
- 📌 .عكس (عكس اتجاه الصوت)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      case 'other':
-        sectionMenu = `
-◣─────────────────────❄️
-  ✿ 🌹 ⦅ قسم الأوامر الأخرى ⦆
-◣─────────────────────❄️
-
- 📌 .قرآن (استماع وتصفح سور القرآن الكريم)
- 📌 .حديث (عرض أحاديث نبوية شريفة)
- 📌 .اذكار (أذكار الصباح والمساء والسبحة)
- 📌 .اقتباس (اقتباسات وحكم)
- 📌 .شعر (أبيات شعرية عربية)
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`
-        break
-
-      default:
-        sectionMenu = `*[ ⚠️ ] القسم المطلوب غير موجود!*`
-    }
-    return m.reply(sectionMenu)
-  }
-
-  // 3. جلب صورة بروفايل البوت لإرسالها فوق الاستمارة الرئيسية
-  let pp
-  try {
-    pp = await conn.profilePictureUrl(conn.user.jid, 'image')
-  } catch (e) {
-    pp = 'https://telegra.ph/file/24168283e387114b09b50.jpg'
-  }
-
-  // 4. نص الاستمارة الرئيسية المطابق للصور تماماً
-  let caption = `
-◣─────────────────────❄️
-◣───────────────────🍃
-
-│ ═ 🔮 : البوت ➔ 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-│ 🔱
-│ ═ 🍃 : اهلا ➔ @${m.sender.split('@')[0]}
-│ ═ 🎯 : عدد الاوامر ➔ 207 أمر
-│ ═ 🎗️ : حالة البوت ➔ مستقر
-│ ═ 🥷 : المطور ➔ 962796163926
-│ ═ 🚀 : التشغيل ➔ ${uptimeStr}
-│ ═ 👾 : التاريخ ➔ ${date} - ${time}
-
-◣─────────────────────❄️
-◣───────────────────🍃
-
-│ إختر القسم من الزر بالأسفل
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 🔱
-`.trim()
-
-  // 5. إعداد القائمة المنسدلة التفاعلية بالأقسام
-  const sections = [
-    {
-      title: "💚 الأقسام الأساسية",
-      rows: [
-        { title: "✿ 📥 ⦅ التحميل ⦆", rowId: `${usedPrefix}menu download`, description: "عرض أوامر قسم التحميل" },
-        { title: "✿ 🍃 ⦅ المجموعات ⦆", rowId: `${usedPrefix}menu group`, description: "عرض أوامر قسم المجموعات" },
-        { title: "✿ 🎨 ⦅ الملصقات ⦆", rowId: `${usedPrefix}menu sticker`, description: "عرض أوامر قسم الملصقات" },
-        { title: "✿ 👑 ⦅ المطورين ⦆", rowId: `${usedPrefix}menu owner`, description: "عرض أوامر قسم المطورين" },
-        { title: "✿ ❇️ ⦅ امثله ⦆", rowId: `${usedPrefix}menu examples`, description: "عرض أوامر قسم امثله" },
-        { title: "✿ ⚒️ ⦅ الادوات ⦆", rowId: `${usedPrefix}menu tools`, description: "عرض أوامر قسم الادوات" },
-        { title: "✿ 🔍 ⦅ البحث ⦆", rowId: `${usedPrefix}menu search`, description: "عرض أوامر قسم البحث" },
-        { title: "✿ 🛡️ ⦅ الادمن ⦆", rowId: `${usedPrefix}menu admin`, description: "عرض أوامر قسم الادمن" }
-      ]
-    },
-    {
-      title: "💛 الألعاب والنظام",
-      rows: [
-        { title: "✿ 🎮 ⦅ الالعاب ⦆", rowId: `${usedPrefix}menu games`, description: "عرض أوامر قسم الالعاب" },
-        { title: "✿ 🎬 ⦅ الجيف ⦆", rowId: `${usedPrefix}menu gif`, description: "عرض أوامر قسم الجيف" },
-        { title: "✿ 🏛️ ⦅ النظام ⦆", rowId: `${usedPrefix}menu system`, description: "عرض أوامر قسم النظام" },
-        { title: "✿ 🤖 ⦅ الذكاء الاصطناعي ⦆", rowId: `${usedPrefix}menu ai`, description: "عرض أوامر قسم الذكاء الاصطناعي" },
-        { title: "✿ 🟢 ⦅ الب-وتات الفرعي ⦆", rowId: `${usedPrefix}menu subbots`, description: "عرض أوامر قسم الب-وتات الفرعي" },
-        { title: "✿ ℹ️ ⦅ معلومات البوت ⦆", rowId: `${usedPrefix}menu info`, description: "عرض أوامر قسم معلومات البوت" },
-        { title: "✿ 🏷️ ⦅ القاب ⦆", rowId: `${usedPrefix}menu titles`, description: "عرض أوامر قسم القاب" },
-        { title: "✿ 🎨 ⦅ اللوجوهات ⦆", rowId: `${usedPrefix}menu logos`, description: "عرض أوامر قسم اللوجوهات" },
-        { title: "✿ 🎙️ ⦅ تغير الاصوات ⦆", rowId: `${usedPrefix}menu audio`, description: "عرض أوامر قسم تغير الاصوات" },
-        { title: "✿ 🌹 ⦅ أخرى ⦆", rowId: `${usedPrefix}menu other`, description: "عرض أوامر قسم أخرى" }
-      ]
-    }
-  ]
-
-  // 6. تجهيز وإرسال الرسالة التفاعلية
-  let mediaMessage = await prepareWAMessageMedia({ image: { url: pp } }, { upload: conn.waUploadToServer })
-
-  let msg = generateWAMessageFromContent(m.chat, {
-    viewOnceMessage: {
-      message: {
-        interactiveMessage: {
-          header: {
-            hasMediaAttachment: true,
-            imageMessage: mediaMessage.imageMessage
-          },
-          body: {
-            text: caption
-          },
-          footer: {
-            text: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』"
-          },
-          nativeFlowMessage: {
-            buttons: [
-              {
-                name: "single_select",
-                buttonParamsJson: JSON.stringify({
-                  title: "❄️ قائمة الأوامر ❄️",
-                  sections: sections
-                })
-              },
-              {
-                name: "cta_url",
-                buttonParamsJson: JSON.stringify({
-                  display_text: "🕊️ قناة المطور",
-                  url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d"
-                })
-              },
-              {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                  display_text: "🤖 الحصول علي بوت مجاني",
-                  id: `${usedPrefix}menu subbots`
-                })
-              }
-            ]
-          }
-        }
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1';
+import './config.js';
+import {createRequire} from 'module';
+import path, {join} from 'path';
+import {fileURLToPath, pathToFileURL} from 'url';
+import {platform} from 'process';
+import * as ws from 'ws';
+import {readdirSync, statSync, unlinkSync, existsSync, readFileSync, rmSync, watch, stat} from 'fs';
+import os from 'os';
+import cp, {spawn} from 'child_process';
+import yargs from 'yargs';
+import lodash from 'lodash';
+import chalk from 'chalk';
+import syntaxerror from 'syntax-error';
+import {tmpdir} from 'os';
+import {format} from 'util';
+import P from 'pino';
+import pino from 'pino';
+import Pino from 'pino';
+import {Boom} from '@hapi/boom';
+import {makeWASocket, protoType, serialize} from './lib/simple.js';
+import {Low, JSONFile} from 'lowdb';
+import {mongoDB, mongoDBV2} from './lib/mongoDB.js';
+import store from './lib/store.js';
+const {proto} = (await import('@whiskeysockets/baileys')).default;
+const baileysImport = await import('@whiskeysockets/baileys');
+const {DisconnectReason, useMultiFileAuthState, MessageRetryMap, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser} = baileysImport;
+const PHONENUMBER_MCC = baileysImport.PHONENUMBER_MCC || {};
+import readline from 'readline';
+import NodeCache from 'node-cache';
+const {CONNECTING} = ws;
+const {chain} = lodash;
+const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
+
+let stopped = null;
+
+protoType();
+serialize();
+
+global.__filename = function filename(pathURL = import.meta.url, rmPrefix = platform !== 'win32') {
+  return rmPrefix ? /file:\/\/\//.test(pathURL) ? fileURLToPath(pathURL) : pathURL : pathToFileURL(pathURL).toString();
+}; global.__dirname = function dirname(pathURL) {
+  return path.dirname(global.__filename(pathURL, true));
+}; global.__require = function require(dir = import.meta.url) {
+  return createRequire(dir);
+};
+
+global.API = (name, path = '/', query = {}, apikeyqueryname) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({...query, ...(apikeyqueryname ? {[apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name]} : {})})) : '');
+
+global.timestamp = {start: new Date};
+global.videoList = [];
+global.videoListXXX = [];
+
+const __dirname = global.__dirname(import.meta.url);
+
+global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse());
+global.prefix = new RegExp('^[' + (opts['prefix'] || '*/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.\\-.@').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']');
+
+global.db = new Low(/https?:\/\//.test(opts['db'] || '') ? new cloudDBAdapter(opts['db']) : new JSONFile(`${opts._[0] ? opts._[0] + '_' : ''}database.json`));
+
+global.DATABASE = global.db; 
+global.loadDatabase = async function loadDatabase() {
+  if (global.db.READ) {
+    return new Promise((resolve) => setInterval(async function() {
+      if (!global.db.READ) {
+        clearInterval(this);
+        resolve(global.db.data == null ? global.loadDatabase() : global.db.data);
       }
-    }
-  }, { userJid: conn.user.jid, quoted: m })
+    }, 1 * 1000));
+  }
+  if (global.db.data !== null) return;
+  global.db.READ = true;
+  await global.db.read().catch(console.error);
+  global.db.READ = null;
+  global.db.data = {
+    users: {},
+    chats: {},
+    stats: {},
+    msgs: {},
+    sticker: {},
+    settings: {},
+    ...(global.db.data || {}),
+  };
+  global.db.chain = chain(global.db.data);
+};
+loadDatabase();
 
-  await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
+global.chatgpt = new Low(new JSONFile(path.join(__dirname, '/db/chatgpt.json')));
+global.loadChatgptDB = async function loadChatgptDB() {
+  if (global.chatgpt.READ) {
+    return new Promise((resolve) =>
+      setInterval(async function() {
+        if (!global.chatgpt.READ) {
+          clearInterval(this);
+          resolve( global.chatgpt.data === null ? global.loadChatgptDB() : global.chatgpt.data );
+        }
+      }, 1 * 1000));
+  }
+  if (global.chatgpt.data !== null) return;
+  global.chatgpt.READ = true;
+  await global.chatgpt.read().catch(console.error);
+  global.chatgpt.READ = null;
+  global.chatgpt.data = {
+    users: {},
+    ...(global.chatgpt.data || {}),
+  };
+  global.chatgpt.chain = lodash.chain(global.chatgpt.data);
+};
+loadChatgptDB();
+
+global.authFile = `MidSession`;
+const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFile);
+const msgRetryCounterMap = (MessageRetryMap) => { };
+const msgRetryCounterCache = new NodeCache()
+const {version} = await fetchLatestBaileysVersion();
+let phoneNumber = global.botnumber || "962795106901";
+
+const pairingCode = true
+const useMobile = process.argv.includes("--mobile")
+
+const connectionOptions = {
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: false, 
+        mobile: useMobile, 
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, Pino({ level: "fatal" }).child({ level: "fatal" })),
+        },
+        markOnlineOnConnect: true, 
+        generateHighQualityLinkPreview: true, 
+        getMessage: async (clave) => {
+            let jid = jidNormalizedUser(clave.remoteJid)
+            let msg = await store.loadMessage(jid, clave.id)
+            return msg?.message || ""
+        },
+        msgRetryCounterCache,
+        msgRetryCounterMap,
+        defaultQueryTimeoutMs: undefined,   
+        version
+};
+
+global.conn = makeWASocket(connectionOptions);
+
+let pairingCodeRequested = false;
+
+conn.isInit = false;
+conn.well = false;
+conn.logger.info(`[ ℹ️ ] Cargando...\n`);
+
+if (!opts['test']) {
+  if (global.db) {
+    setInterval(async () => {
+      if (global.db.data) await global.db.write();
+      if (opts['autocleartmp'] && (global.support || {}).find) {
+        const tmp = [os.tmpdir(), 'tmp', 'jadibts'];
+        tmp.forEach((filename) => cp.spawn('find', [filename, '-amin', '3', '-type', 'f', '-delete']));
+      }
+    }, 30 * 1000);
+  }
 }
 
-handler.help = ['menu', 'اوامر', 'الاوامر']
-handler.tags = ['main']
-handler.command = /^(menu|اوامر|الاوامر|أوامر|أوامري)$/i
+if (opts['server']) (await import('./server.js')).default(global.conn, PORT);
 
-export default handler
+function clearTmp() {
+  const tmp = [join(__dirname, './tmp')];
+  const filename = [];
+  tmp.forEach((dirname) => {
+    if (existsSync(dirname)) {
+      readdirSync(dirname).forEach((file) => filename.push(join(dirname, file)));
+    }
+  });
+  return filename.map((file) => {
+    const stats = statSync(file);
+    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 3)) return unlinkSync(file);
+    return false;
+  });
+}
+
+function purgeSession() {
+let prekey = []
+if (!existsSync("./MidSession")) return;
+let directorio = readdirSync("./MidSession")
+let filesFolderPreKeys = directorio.filter(file => {
+return file.startsWith('pre-key-')
+})
+prekey = [...prekey, ...filesFolderPreKeys]
+filesFolderPreKeys.forEach(files => {
+unlinkSync(`./MidSession/${files}`)
+})
+} 
+
+function purgeSessionSB() {
+try {
+if (!existsSync('./jadibts/')) return;
+let listaDirectorios = readdirSync('./jadibts/');
+let SBprekey = []
+listaDirectorios.forEach(directorio => {
+if (statSync(`./jadibts/${directorio}`).isDirectory()) {
+let DSBPreKeys = readdirSync(`./jadibts/${directorio}`).filter(fileInDir => {
+return fileInDir.startsWith('pre-key-')
+})
+SBprekey = [...SBprekey, ...DSBPreKeys]
+DSBPreKeys.forEach(fileInDir => {
+unlinkSync(`./jadibts/${directorio}/${fileInDir}`)
+})
+}
+})
+if (SBprekey.length === 0) return;
+} catch (err) {
+console.log(chalk.bold.red(`[ ℹ️ ] Algo salio mal durante la eliminación, archivos no eliminados`))
+}}
+
+function purgeOldFiles() {
+const directories = ['./MidSession/', './jadibts/']
+const oneHourAgo = Date.now() - (60 * 60 * 1000)
+directories.forEach(dir => {
+if (!existsSync(dir)) return;
+readdirSync(dir, (err, files) => {
+if (err) throw err
+files.forEach(file => {
+const filePath = path.join(dir, file)
+stat(filePath, (err, stats) => {
+if (err) throw err;
+if (stats.isFile() && stats.mtimeMs < oneHourAgo && file !== 'creds.json') { 
+unlinkSync(filePath, err => {  
+if (err) throw err
+console.log(chalk.bold.green(`Archivo ${file} borrado con éxito`))
+})
+} else {  
+console.log(chalk.bold.red(`Archivo ${file} no borrado` + err))
+} }) }) }) })
+}
+
+async function connectionUpdate(update) {
+  const {connection, lastDisconnect, isNewLogin, qr} = update;
+  stopped = connection;
+  global.stopped = connection;
+  if (isNewLogin) conn.isInit = true;
+
+  if (pairingCode && !conn.authState.creds.registered && !pairingCodeRequested) {
+    pairingCodeRequested = true;
+    setTimeout(async () => {
+      try {
+        let numeroTelefono = phoneNumber.replace(/[^0-9]/g, '');
+        let codigo = await conn.requestPairingCode(numeroTelefono);
+        codigo = codigo?.match(/.{1,4}/g)?.join("-") || codigo;
+        console.log(chalk.black(chalk.bgGreen(`Su código de emparejamiento: `)), chalk.black(chalk.white(codigo)));
+      } catch (e) {
+        console.error('Error al solicitar código de emparejamiento:', e);
+        pairingCodeRequested = false;
+      }
+    }, 6000);
+  }
+
+  const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode;
+  if (code && code !== DisconnectReason.loggedOut && conn?.ws.socket == null) {
+    await global.reloadHandler(true).catch(console.error);
+    global.timestamp.connect = new Date;
+  }
+  if (global.db.data == null) loadDatabase();
+  if (update.qr != 0 && update.qr != undefined) {
+    console.log(chalk.yellow('[ ℹ️ ] Escanea el código QR o introduce el código de emparejamiento en WhatsApp.'));
+  }
+  if (connection == 'open') {
+    console.log(chalk.yellow('[ ℹ️ ] Conectado correctamente.'));
+  }
+let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+if (connection === 'close') {
+    pairingCodeRequested = false;
+    if (reason === DisconnectReason.badSession) {
+        conn.logger.error(`[ ⚠ ] Sesión incorrecta, por favor elimina la carpeta ${global.authFile} y escanea nuevamente.`);
+    } else if (reason === DisconnectReason.connectionClosed) {
+        conn.logger.warn(`[ ⚠ ] Conexión cerrada, reconectando...`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.connectionLost) {
+        conn.logger.warn(`[ ⚠ ] Conexión perdida con el servidor, reconectando...`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.connectionReplaced) {
+        conn.logger.error(`[ ⚠ ] Conexión reemplazada, se ha abierto otra nueva sesión. Por favor, cierra la sesión actual primero.`);
+    } else if (reason === DisconnectReason.loggedOut) {
+        conn.logger.error(`[ ⚠ ] Conexion cerrada, por favor elimina la carpeta ${global.authFile} y escanea nuevamente.`);
+    } else if (reason === DisconnectReason.restartRequired) {
+        conn.logger.info(`[ ⚠ ] Reinicio necesario, reinicie el servidor si presenta algún problema.`);
+        await global.reloadHandler(true).catch(console.error);
+    } else if (reason === DisconnectReason.timedOut) {
+        conn.logger.warn(`[ ⚠ ] Tiempo de conexión agotado, reconectando...`);
+        await global.reloadHandler(true).catch(console.error);
+    } else {
+        conn.logger.warn(`[ ⚠ ] Razón de desconexión desconocida. ${reason || ''}: ${connection || ''}`);
+        await global.reloadHandler(true).catch(console.error);
+    }
+}
+}
+
+process.on('uncaughtException', console.error);
+
+let isInit = true;
+let handler = await import('./handler.js');
+global.reloadHandler = async function(restatConn) {
+  try {
+    const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error);
+    if (Object.keys(Handler || {}).length) handler = Handler;
+  } catch (e) {
+    console.error(e);
+  }
+  if (restatConn) {
+    const oldChats = global.conn.chats;
+    try {
+      global.conn.ws.close();
+    } catch { }
+    conn.ev.removeAllListeners();
+    global.conn = makeWASocket(connectionOptions, {chats: oldChats});
+    isInit = true;
+  }
+  if (!isInit) {
+    conn.ev.off('messages.upsert', conn.handler);
+    conn.ev.off('group-participants.update', conn.participantsUpdate);
+    conn.ev.off('groups.update', conn.groupsUpdate);
+    conn.ev.off('message.delete', conn.onDelete);
+    conn.ev.off('call', conn.onCall);
+    conn.ev.off('connection.update', conn.connectionUpdate);
+    conn.ev.off('creds.update', conn.credsUpdate);
+  }
+
+  conn.welcome = '👋 ¡Bienvenido/a!\n@user';
+  conn.bye = '👋 ¡Hasta luego!\n@user';
+  conn.spromote = '*[ ℹ️ ] @user Fue promovido a administrador.*';
+  conn.sdemote = '*[ ℹ️ ] @user Fue degradado de administrador.*';
+  conn.sDesc = '*[ ℹ️ ] La descripción del grupo ha sido modificada.*';
+  conn.sSubject = '*[ ℹ️ ] El nombre del grupo ha sido modificado.*';
+  conn.sIcon = '*[ ℹ️ ] Se ha cambiado la foto de perfil del grupo.*';
+  conn.sRevoke = '*[ ℹ️ ] El enlace de invitación al grupo ha sido restablecido.*';
+
+  conn.handler = handler.handler.bind(global.conn);
+  conn.participantsUpdate = handler.participantsUpdate.bind(global.conn);
+  conn.groupsUpdate = handler.groupsUpdate.bind(global.conn);
+  conn.onDelete = handler.deleteUpdate.bind(global.conn);
+  conn.onCall = handler.callUpdate.bind(global.conn);
+  conn.connectionUpdate = connectionUpdate.bind(global.conn);
+  conn.credsUpdate = saveCreds.bind(global.conn, true);
+
+  conn.ev.on('messages.upsert', conn.handler);
+  conn.ev.on('group-participants.update', conn.participantsUpdate);
+  conn.ev.on('groups.update', conn.groupsUpdate);
+  conn.ev.on('message.delete', conn.onDelete);
+  conn.ev.on('call', conn.onCall);
+  conn.ev.on('connection.update', conn.connectionUpdate);
+  conn.ev.on('creds.update', conn.credsUpdate);
+  isInit = false;
+  return true;
+};
+
+// **محرك مسح شامل وعميق لجميع مجلدات وملفات الأوامر**
+const pluginFolders = [
+  join(__dirname, './Awamir'),
+  join(__dirname, './Awamir/index'),
+  join(__dirname, './plugins')
+];
+const pluginFilter = (filename) => /\.js$/.test(filename);
+global.plugins = {};
+
+async function scanAndLoadPlugins(folder) {
+  if (!existsSync(folder)) return;
+  for (const filename of readdirSync(folder)) {
+    const fullPath = join(folder, filename);
+    if (statSync(fullPath).isDirectory()) {
+      await scanAndLoadPlugins(fullPath);
+    } else if (pluginFilter(filename)) {
+      try {
+        const file = global.__filename(fullPath);
+        const module = await import(file);
+        global.plugins[filename] = module.default || module;
+      } catch (e) {
+        conn.logger.error(e);
+        delete global.plugins[filename];
+      }
+    }
+  }
+}
+
+async function filesInit() {
+  for (const folder of pluginFolders) {
+    await scanAndLoadPlugins(folder);
+  }
+}
+
+filesInit().then((_) => console.log(chalk.greenBright(`[ ℹ️ ] Cargados ${Object.keys(global.plugins).length} comandos correctamente.`))).catch(console.error);
+
+global.reload = async (_ev, filename) => {
+  if (pluginFilter(filename)) {
+    for (const folder of pluginFolders) {
+      const dir = global.__filename(join(folder, filename), true);
+      if (existsSync(dir)) {
+        const err = syntaxerror(readFileSync(dir), filename, {
+          sourceType: 'module',
+          allowAwaitOutsideFunction: true,
+        });
+        if (err) conn.logger.error(`syntax error while loading '${filename}'\n${format(err)}`);
+        else {
+          try {
+            const module = (await import(`${global.__filename(dir)}?update=${Date.now()}`));
+            global.plugins[filename] = module.default || module;
+          } catch (e) {
+            conn.logger.error(`error require plugin '${filename}\n${format(e)}'`);
+          } finally {
+            global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
+          }
+        }
+        break;
+      }
+    }
+  }
+};
+Object.freeze(global.reload);
+
+for (const folder of pluginFolders) {
+  if (existsSync(folder)) watch(folder, global.reload);
+}
+
+await global.reloadHandler();
+
+async function _quickTest() {
+  const test = await Promise.all([
+    spawn('ffmpeg'),
+    spawn('ffprobe'),
+    spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-filter_complex', 'color', '-frames:v', '1', '-f', 'webp', '-']),
+    spawn('convert'),
+    spawn('magick'),
+    spawn('gm'),
+    spawn('find', ['--version']),
+  ].map((p) => {
+    return Promise.race([
+      new Promise((resolve) => {
+        p.on('close', (code) => {
+          resolve(code !== 127);
+        });
+      }),
+      new Promise((resolve) => {
+        p.on('error', (_) => resolve(false));
+      })]);
+  }));
+  const [ffmpeg, ffprobe, ffmpegWebp, convert, magick, gm, find] = test;
+  const s = global.support = {ffmpeg, ffprobe, ffmpegWebp, convert, magick, gm, find};
+  Object.freeze(global.support);
+}
+
+setInterval(async () => {
+  if (stopped === 'close' || !conn || !conn.user) return;
+  const a = await clearTmp();
+}, 180000);
+
+setInterval(async () => {
+  if (stopped === 'close' || !conn || !conn.user) return;
+  await purgeSession();
+}, 1000 * 60 * 60);
+
+setInterval(async () => {
+  if (stopped === 'close' || !conn || !conn.user) return;
+  await purgeSessionSB();
+}, 1000 * 60 * 60);
+
+setInterval(async () => {
+  if (stopped === 'close' || !conn || !conn.user) return;
+  await purgeOldFiles();
+}, 1000 * 60 * 60);
+
+function clockString(ms) {
+  const d = isNaN(ms) ? '--' : Math.floor(ms / 86400000);
+  const h = isNaN(ms) ? '--' : Math.floor(ms / 3600000) % 24;
+  const m = isNaN(ms) ? '--' : Math.floor(ms / 60000) % 60;
+  const s = isNaN(ms) ? '--' : Math.floor(ms / 1000) % 60;
+  return [d, 'd ️', h, 'h ', m, 'm ', s, 's '].map((v) => v.toString().padStart(2, 0)).join('');
+}
+_quickTest().catch(console.error);
