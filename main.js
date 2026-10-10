@@ -126,7 +126,7 @@ const connectionOptions = {
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false, 
         mobile: useMobile, 
-        browser: ['Chrome (Linux)', '', ''],
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, Pino({ level: "fatal" }).child({ level: "fatal" })),
@@ -146,17 +146,7 @@ const connectionOptions = {
 
 global.conn = makeWASocket(connectionOptions);
 
-    if (pairingCode && !conn.authState.creds.registered) {
-        if (useMobile) throw new Error('No se puede usar un código de emparejamiento con la API móvil')
-
-        let numeroTelefono = phoneNumber.replace(/[^0-9]/g, '')
-
-        setTimeout(async () => {
-            let codigo = await conn.requestPairingCode(numeroTelefono)
-            codigo = codigo?.match(/.{1,4}/g)?.join("-") || codigo
-            console.log(chalk.black(chalk.bgGreen(`Su código de emparejamiento: `)), chalk.black(chalk.white(codigo)))
-        }, 3000)
-    }
+let pairingCodeRequested = false;
 
 conn.isInit = false;
 conn.well = false;
@@ -176,25 +166,6 @@ if (!opts['test']) {
 
 if (opts['server']) (await import('./server.js')).default(global.conn, PORT);
 
-
-/* Y ese fue el momazo mas bueno del mundo
-        Aunque no dudara tan solo un segundo
-        Mas no me arrepiento de haberme reido
-        Por que la grasa es un sentimiento
-        Y ese fue el momazo mas bueno del mundo
-        Aunque no dudara tan solo un segundo
-        que me arrepiento de ser un grasoso
-        Por que la grasa es un sentimiento
-        - El waza 👻👻👻👻 (Aiden)            
-
-   Yo tambien se hacer momazos Aiden...
-        ahi te va el ajuste de los borrados
-        inteligentes de las sesiones y de los sub-bot
-        By (Rey Endymion 👺👍🏼) 
-
-   Ninguno es mejor que tilin god
-        - atte: sk1d             */
-
 function clearTmp() {
   const tmp = [join(__dirname, './tmp')];
   const filename = [];
@@ -205,7 +176,7 @@ function clearTmp() {
   });
   return filename.map((file) => {
     const stats = statSync(file);
-    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 3)) return unlinkSync(file); // 3 minutes
+    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 3)) return unlinkSync(file);
     return false;
   });
 }
@@ -215,7 +186,7 @@ let prekey = []
 if (!existsSync("./MidSession")) return;
 let directorio = readdirSync("./MidSession")
 let filesFolderPreKeys = directorio.filter(file => {
-return file.startsWith('pre-key-') /*|| file.startsWith('session-') || file.startsWith('sender-') || file.startsWith('app-') */
+return file.startsWith('pre-key-')
 })
 prekey = [...prekey, ...filesFolderPreKeys]
 filesFolderPreKeys.forEach(files => {
@@ -231,7 +202,7 @@ let SBprekey = []
 listaDirectorios.forEach(directorio => {
 if (statSync(`./jadibts/${directorio}`).isDirectory()) {
 let DSBPreKeys = readdirSync(`./jadibts/${directorio}`).filter(fileInDir => {
-return fileInDir.startsWith('pre-key-') /*|| fileInDir.startsWith('app-') || fileInDir.startsWith('session-')*/
+return fileInDir.startsWith('pre-key-')
 })
 SBprekey = [...SBprekey, ...DSBPreKeys]
 DSBPreKeys.forEach(fileInDir => {
@@ -239,7 +210,7 @@ unlinkSync(`./jadibts/${directorio}/${fileInDir}`)
 })
 }
 })
-if (SBprekey.length === 0) return; //console.log(chalk.cyanBright(`=> No hay archivos por eliminar.`))
+if (SBprekey.length === 0) return;
 } catch (err) {
 console.log(chalk.bold.red(`[ ℹ️ ] Algo salio mal durante la eliminación, archivos no eliminados`))
 }}
@@ -266,10 +237,26 @@ console.log(chalk.bold.red(`Archivo ${file} no borrado` + err))
 }
 
 async function connectionUpdate(update) {
-  const {connection, lastDisconnect, isNewLogin} = update;
+  const {connection, lastDisconnect, isNewLogin, qr} = update;
   stopped = connection;
   global.stopped = connection;
   if (isNewLogin) conn.isInit = true;
+
+  if (pairingCode && !conn.authState.creds.registered && !pairingCodeRequested) {
+    pairingCodeRequested = true;
+    setTimeout(async () => {
+      try {
+        let numeroTelefono = phoneNumber.replace(/[^0-9]/g, '');
+        let codigo = await conn.requestPairingCode(numeroTelefono);
+        codigo = codigo?.match(/.{1,4}/g)?.join("-") || codigo;
+        console.log(chalk.black(chalk.bgGreen(`Su código de emparejamiento: `)), chalk.black(chalk.white(codigo)));
+      } catch (e) {
+        console.error('Error al solicitar código de emparejamiento:', e);
+        pairingCodeRequested = false;
+      }
+    }, 6000);
+  }
+
   const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode;
   if (code && code !== DisconnectReason.loggedOut && conn?.ws.socket == null) {
     await global.reloadHandler(true).catch(console.error);
@@ -284,6 +271,7 @@ async function connectionUpdate(update) {
   }
 let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
 if (connection === 'close') {
+    pairingCodeRequested = false;
     if (reason === DisconnectReason.badSession) {
         conn.logger.error(`[ ⚠ ] Sesión incorrecta, por favor elimina la carpeta ${global.authFile} y escanea nuevamente.`);
     } else if (reason === DisconnectReason.connectionClosed) {
