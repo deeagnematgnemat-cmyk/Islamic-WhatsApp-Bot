@@ -22,7 +22,7 @@ let dailyRewards = {};
 let mutedUsers = {}; 
 let userMessagesCount = {};
 let groupSettings = {}; 
-let marriages = {}; // سجل الزيجات
+let marriages = {}; 
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -121,8 +121,8 @@ const gamesData = {
         { question: 'أكمل المثل: الصبر مفتاح ...', answer: 'الفرج' },
         { question: 'أكمل المثل: من حفر حفراً لأخيه ...', answer: 'وقع فيها' },
         { question: 'أكمل المثل: عصفور باليد خير من ...', answer: 'عشرة على الشجرة' },
-        { question: 'أكمل المثل: الطيور على ...',- answer: 'أشكالها تقع' },
-        { question: 'أكمل المثل: ابن الوز ...', answer: عوام' }
+        { question: 'أكمل المثل: الطيور على ...', answer: 'أشكالها تقع' },
+        { question: 'أكمل المثل: ابن الوز ...', answer: 'عوام' }
     ],
     arrange: [
         { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' },
@@ -485,7 +485,7 @@ async function startBot() {
                         delete activeGames[from];
                         await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
                         
-                        if (['disassemble', 'typing', 'riddle', 'arrange', 'letterGame', 'reverseGame', 'complete'].includes(type) && cat) {
+                        if (['disassemble', 'typing', 'riddles', 'arrange', 'letterGame', 'reverseGame', 'complete'].includes(type) && cat) {
                             setTimeout(() => startNextSameGame(from, sock, type, cat), 1000);
                         }
                         return;
@@ -728,7 +728,6 @@ async function startBot() {
             }
         }
 
-        // --- أوامر الزواج والطلاق الرسمية في قسم الترفيه ---
         if (cmd === 'زواج') {
             const targetUser = getTargetUser(msg);
             if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.زواج @العروس` (صاحب المنشن هو العريس والشخص المنشن هو العروس)' });
@@ -966,7 +965,6 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- أوامر قسم الطلبات الجديدة ---
         if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {
             const userPp = await getUserProfilePic(sock, sender);
             const query = trimmedBody.split(' ').slice(1).join(' ');
@@ -1085,7 +1083,6 @@ async function startBot() {
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
             
-            // الاستمارة المطلوبة حرفياً عند طلب أمر .بوت
             const botWelcomeText = `
 🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭* 🍷
 
