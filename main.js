@@ -363,23 +363,30 @@ global.reloadHandler = async function(restatConn) {
   return true;
 };
 
-const pluginFolder = global.__dirname(join(__dirname, './Awamir/index'));
+// **تصحيح مسار مجلد الأوامر المباشر**
+const pluginFolder = join(__dirname, './plugins');
 const pluginFilter = (filename) => /\.js$/.test(filename);
 global.plugins = {};
-async function filesInit() {
-  if (!existsSync(pluginFolder)) return;
-  for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
-    try {
-      const file = global.__filename(join(pluginFolder, filename));
-      const module = await import(file);
-      global.plugins[filename] = module.default || module;
-    } catch (e) {
-      conn.logger.error(e);
-      delete global.plugins[filename];
+
+async function filesInit(folder = pluginFolder) {
+  if (!existsSync(folder)) return;
+  for (const filename of readdirSync(folder)) {
+    const subfolderPath = join(folder, filename);
+    if (statSync(subfolderPath).isDirectory()) {
+      await filesInit(subfolderPath);
+    } else if (pluginFilter(filename)) {
+      try {
+        const file = global.__filename(subfolderPath);
+        const module = await import(file);
+        global.plugins[filename] = module.default || module;
+      } catch (e) {
+        conn.logger.error(e);
+        delete global.plugins[filename];
+      }
     }
   }
 }
-filesInit().then((_) => Object.keys(global.plugins)).catch(console.error);
+filesInit().then((_) => console.log(chalk.greenBright(`[ ℹ️ ] Cargados ${Object.keys(global.plugins).length} comandos correctamente.`))).catch(console.error);
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
