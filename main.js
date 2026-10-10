@@ -344,14 +344,6 @@ global.reloadHandler = async function(restatConn) {
   conn.connectionUpdate = connectionUpdate.bind(global.conn);
   conn.credsUpdate = saveCreds.bind(global.conn, true);
 
-  const currentDateTime = new Date();
-  const messageDateTime = new Date(conn.ev);
-  if (currentDateTime >= messageDateTime) {
-    const chats = Object.entries(conn.chats).filter(([jid, chat]) => !jid.endsWith('@g.us') && chat.isChats).map((v) => v[0]);
-  } else {
-    const chats = Object.entries(conn.chats).filter(([jid, chat]) => !jid.endsWith('@g.us') && chat.isChats).map((v) => v[0]);
-  }
-
   conn.ev.on('messages.upsert', conn.handler);
   conn.ev.on('group-participants.update', conn.participantsUpdate);
   conn.ev.on('groups.update', conn.groupsUpdate);
@@ -363,20 +355,20 @@ global.reloadHandler = async function(restatConn) {
   return true;
 };
 
-// **تصحيح مسار مجلد الأوامر المباشر**
-const pluginFolder = join(__dirname, './plugins');
+// **تحميل متكامل ومرن لكافة مجلدات الأوامر والملحقات**
+const pluginFolders = [join(__dirname, './plugins'), join(__dirname, './Awamir'), join(__dirname, './Awamir/index')];
 const pluginFilter = (filename) => /\.js$/.test(filename);
 global.plugins = {};
 
-async function filesInit(folder = pluginFolder) {
+async function scanAndLoadPlugins(folder) {
   if (!existsSync(folder)) return;
   for (const filename of readdirSync(folder)) {
-    const subfolderPath = join(folder, filename);
-    if (statSync(subfolderPath).isDirectory()) {
-      await filesInit(subfolderPath);
+    const fullPath = join(folder, filename);
+    if (statSync(fullPath).isDirectory()) {
+      await scanAndLoadPlugins(fullPath);
     } else if (pluginFilter(filename)) {
       try {
-        const file = global.__filename(subfolderPath);
+        const file = global.__filename(fullPath);
         const module = await import(file);
         global.plugins[filename] = module.default || module;
       } catch (e) {
@@ -386,38 +378,48 @@ async function filesInit(folder = pluginFolder) {
     }
   }
 }
+
+async function filesInit() {
+  for (const folder of pluginFolders) {
+    await scanAndLoadPlugins(folder);
+  }
+}
+
 filesInit().then((_) => console.log(chalk.greenBright(`[ ℹ️ ] Cargados ${Object.keys(global.plugins).length} comandos correctamente.`))).catch(console.error);
 
 global.reload = async (_ev, filename) => {
   if (pluginFilter(filename)) {
-    const dir = global.__filename(join(pluginFolder, filename), true);
-    if (filename in global.plugins) {
-      if (existsSync(dir)) conn.logger.info(` updated plugin - '${filename}'`);
-      else {
-        conn.logger.warn(`deleted plugin - '${filename}'`);
-        return delete global.plugins[filename];
-      }
-    } else conn.logger.info(`new plugin - '${filename}'`);
-    const err = syntaxerror(readFileSync(dir), filename, {
-      sourceType: 'module',
-      allowAwaitOutsideFunction: true,
-    });
-    if (err) conn.logger.error(`syntax error while loading '${filename}'\n${format(err)}`);
-    else {
-      try {
-        const module = (await import(`${global.__filename(dir)}?update=${Date.now()}`));
-        global.plugins[filename] = module.default || module;
-      } catch (e) {
-        conn.logger.error(`error require plugin '${filename}\n${format(e)}'`);
-      } finally {
-        global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
+    for (const folder of pluginFolders) {
+      const dir = global.__filename(join(folder, filename), true);
+      if (existsSync(dir)) {
+        const err = syntaxerror(readFileSync(dir), filename, {
+          sourceType: 'module',
+          allowAwaitOutsideFunction: true,
+        });
+        if (err) conn.logger.error(`syntax error while loading '${filename}'\n${format(err)}`);
+        else {
+          try {
+            const module = (await import(`${global.__filename(dir)}?update=${Date.now()}`));
+            global.plugins[filename] = module.default || module;
+          } catch (e) {
+            conn.logger.error(`error require plugin '${filename}\n${format(e)}'`);
+          } finally {
+            global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
+          }
+        }
+        break;
       }
     }
   }
 };
 Object.freeze(global.reload);
-if (existsSync(pluginFolder)) watch(pluginFolder, global.reload);
+
+for (const folder of pluginFolders) {
+  if (existsSync(folder)) watch(folder, global.reload);
+}
+
 await global.reloadHandler();
+
 async function _quickTest() {
   const test = await Promise.all([
     spawn('ffmpeg'),
@@ -442,22 +444,27 @@ async function _quickTest() {
   const s = global.support = {ffmpeg, ffprobe, ffmpegWebp, convert, magick, gm, find};
   Object.freeze(global.support);
 }
+
 setInterval(async () => {
   if (stopped === 'close' || !conn || !conn.user) return;
   const a = await clearTmp();
 }, 180000);
+
 setInterval(async () => {
   if (stopped === 'close' || !conn || !conn.user) return;
   await purgeSession();
 }, 1000 * 60 * 60);
+
 setInterval(async () => {
   if (stopped === 'close' || !conn || !conn.user) return;
   await purgeSessionSB();
 }, 1000 * 60 * 60);
+
 setInterval(async () => {
   if (stopped === 'close' || !conn || !conn.user) return;
   await purgeOldFiles();
 }, 1000 * 60 * 60);
+
 function clockString(ms) {
   const d = isNaN(ms) ? '--' : Math.floor(ms / 86400000);
   const h = isNaN(ms) ? '--' : Math.floor(ms / 3600000) % 24;
