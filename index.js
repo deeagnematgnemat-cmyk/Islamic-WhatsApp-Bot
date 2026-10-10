@@ -1,5 +1,5 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
-const pino = require('pino');
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import pino from 'pino';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
@@ -935,7 +935,6 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- قسم الملصقات الجديد تماماً كما طلبته والظاهر في الصور ---
         if (cmdBase === 'صوره') {
             if (!quotedMsg) return sock.sendMessage(from, { text: '📌 يرجى الرد على الملصق بكلمة `.صوره` لتحويله إلى صورة!' });
             try {
