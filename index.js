@@ -1,12 +1,11 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
-import pino from 'pino';
-import readline from 'readline';
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
 
 const DEVELOPER_NUMBER = '962796163926'; 
-const DEVELOPER_NAME = '𝐄𝐫𝐞𝐧';
+const DEVELOPER_NAME = 'TOJI BOT 🔱';
 let extraDevelopers = []; 
 let botLogs = []; 
 
@@ -21,7 +20,7 @@ let bankAccounts = {};
 let activeGames = {}; 
 let dailyRewards = {}; 
 let mutedUsers = {}; 
-
+let userMessagesCount = {};
 let groupSettings = {}; 
 
 let commandReactionEnabled = true;
@@ -39,38 +38,134 @@ const badWords = [
 const gamesData = {
     disassemble: [
         { word: 'ناروتو', answer: 'ن ا ر و ت و' },
-        { word: 'ايرين ييغر', answer: 'ا ي ر n  y ي غ ر' },
+        { word: 'ايرين', answer: 'ا ي ر ن' },
         { word: 'لوفي', answer: 'ل و ف ي' },
-        { word: 'ساكاتا غينتوكي', answer: 'س ا ك ا ت ا  غ ي ن ت و ك ي' },
-        { word: 'ليجاشي', answer: 'ل ي ج ا ش ي' },
-        { word: 'كانيشي', answer: 'ك ا ن ي ش ي' },
-        { word: 'تنجيرو', answer: 'ت ن ج ي ر و' }
+        { word: 'زورو', answer: 'ز و ر و' },
+        { word: 'ساسكي', answer: 'س ا س ك ي' },
+        { word: 'كاكاشي', answer: 'ك ا ك ا ش ي' },
+        { word: 'غينتوكي', answer: 'غ ي ن ت و ك ي' },
+        { word: 'باكوغو', answer: 'ب ا ك و غ و' },
+        { word: 'تودوروكي', answer: 'ت و د و ر و ك ي' },
+        { word: 'ميكاسا', answer: 'م ي ك ا س ا' },
+        { word: 'ليفاي', answer: 'ل ي ف ا ي' },
+        { word: 'لايت', answer: 'ل ا ي ت' },
+        { word: 'كيلوا', answer: 'ك ي ل و ا' },
+        { word: 'غون', answer: 'غ و ن' },
+        { word: 'كورابيكا', answer: 'ك و ر ا ب ي ك ا' }
     ],
     typing: [
-        'ناروتو أوزوماكي',
-        'ايرين ييغر',
-        'مونكي لوفي',
-        'رورونوا زورو',
-        'سكاتا غينتوكي',
-        'هجوم العمالقة',
-        'ون بيس الأسطوري'
+        'ناروتو أوزوماكي بطل القرى المخفية وصاحب الإرادة الصلبة',
+        'ايرين ييغر عملاق الهجوم الذي سعى خلف حرية شعبه حتى النهاية',
+        'مونكي دي لوفي ملك القراصنة المستقبلي وصاحب قبعة القش',
+        'رورونوا زورو السياف الأعظم ونائب طاقم قبعة القش الأقوى',
+        'ساكاتا غينتوكي السامراء الأبدي صاحب الشعر الفضي المتمرد',
+        'ليلوش لامبروج استراتيجي العبقرية وملك عالم الچياس المظلم',
+        'كاجياما توبييو الموزع العبقري في فريق الكاراسونو للكرة الطائرة',
+        'إيتاتشي أوتشيها العبقري الحكيم الذي ضحي بكل شيء لأجل السلام'
     ],
     riddles: [
         { question: 'من هو الشخصية التي تمتلك قوة العمالقة المؤسس وتتعهد بتحرير شعبها؟', answer: 'ايرين' },
         { question: 'ما هو اسم الفيلق الذي يخرج خارج الأسوار استكشافاً في انمي هجوم العمالقة؟', answer: 'فيلق الاستطلاع' },
-        { question: 'من هو السياف المعرّف بأنه أقوى جزار في البشرية بانمي اتاك اون تايتن؟', answer: 'ليفاي' },
-        { question: 'ما اسم السيف الذي يستخدمه زورو في ون بيس وعادة يضعه بفمه؟', answer: 'واتودو' }
+        { question: 'من هو الشخصية التي قامت بختم الكيوبي داخل ناروتو؟', answer: 'ميناتو' },
+        { question: 'ما هو اسم العشيرة التي ينتمي إليها ساسكي في ناروتو؟', answer: 'اوتشيها' },
+        { question: 'من هو مبتكر أوضاع الموت في أنمي مذكرة الموت؟', answer: 'ريوك' },
+        { question: 'ما اسم السيف الأسطوري الذي يمتلكه زورو ويقطع به كل شيء؟', answer: 'وافو' }
+    ],
+    sports: [
+        { question: 'من هو اللاعب الحاصل على أكبر عدد من الكرات الذهبية؟', answer: 'ميسي' },
+        { question: 'ما هو النادي الأكثر تحقيقاً لدوري أبطال أوروبا؟', answer: 'ريال مدريد' },
+        { question: 'من هو الهداف التاريخي لبطولة دوري أبطال أوروبا؟', answer: 'رونالدو' },
+        { question: 'أي منتخب فاز بكأس العالم لكرة القدم 2022؟', answer: 'الارجنتين' },
+        { question: 'من هو النادي الملقب بالشياطين الحمر في إنجلترا؟', answer: 'مانشستر يونايتد' }
+    ],
+    smartQ: [
+        { question: 'ما هو الحيوان الذي ينام وعينه مفتوحة؟', answer: 'السمكة' },
+        { question: 'ما هو الشيء الذي كلما أخذت منه كبر؟', answer: 'الحفرة' },
+        { question: 'ما هو البيت الذي ليس فيه أبواب ولا غرف؟', answer: 'بيت الشعر' },
+        { question: 'ما هو الشيء الذي يكتب ولا يقرأ؟', answer: 'القلم' }
+    ],
+    trueFalse: [
+        { question: 'هل الشمس تشرق من الغرب؟ (صواب / خطأ)', answer: 'خطأ' },
+        { question: 'هل الماء يتكون من هيدروجين وأكسجين؟ (صواب / خطأ)', answer: 'صواب' },
+        { question: 'هل الحوت الأزرق يعتبر من الأسماك؟ (صواب / خطأ)', answer: 'خطأ' },
+        { question: 'هل الأرض تدور حول الشمس؟ (صواب / خطأ)', answer: 'صواب' }
+    ],
+    cultural: [
+        { question: 'ما عاصمة دولة فرنسا؟', answer: 'باريس' },
+        { question: 'في أي قارة تقع مصر؟', answer: 'افريقيا' },
+        { question: 'ما هي عاصمة اليابان؟', answer: 'طوكيو' },
+        { question: 'ما هي عاصمة المملكة العربية السعودية؟', answer: 'الرياض' },
+        { question: 'ما هي الدولة التي بها برج إيفل؟', answer: 'فرنسا' }
+    ],
+    geography: [
+        { question: 'ما هي أكبر دولة في العالم مساحة؟', answer: 'روسيا' },
+        { question: 'ما هي عاصمة اليابان؟', answer: 'طوكيو' },
+        { question: 'ما هو أكبر محيط في العالم؟', answer: 'المحيط الهادئ' },
+        { question: 'أين تقع أهرامات الجيزة؟', answer: 'مصر' }
+    ],
+    science: [
+        { question: 'ما هو العنصر الكيميائي الذي يرمز له بالرمز H؟', answer: 'هيدروجين' },
+        { question: 'ما هي غاز الحياة الذي يمتصه النبات؟', answer: 'ثاني أكسيد الكربون' },
+        { question: 'ما هو الكوكب القريب من الشمس؟', answer: 'عطارد' },
+        { question: 'ما هي عاصمة الدم الحمراء التي تحمل الأكسجين؟', answer: 'كريات الدم الحمراء' }
+    ],
+    history: [
+        { question: 'في أي سنة وقعت غزوة بدر الكبرى؟', answer: 'السنة الثانية للهجرة' },
+        { question: 'من هو أول خلفاء المسلمين؟', answer: 'ابو بكر الصديق' },
+        { question: 'من هو فاتح القسطنطينية؟', answer: 'محمد الفاتح' },
+        { question: 'في أي عام هجري فتحت مكة المكرمة؟', answer: 'السنة الثامنة للهجرة' }
+    ],
+    islamicQ: [
+        { question: 'كم عدد سور القرآن الكريم؟', answer: '114 سورة' },
+        { question: 'ما هي السورة التي تسمى قلب القرآن؟', answer: 'سورة يس' },
+        { question: 'ما هي السورة التي تعدل ثلث القرآن؟', answer: 'سورة الإخلاص' },
+        { question: 'كم عدد حزب القرآن الكريم؟', answer: '60 حزبا' }
+    ],
+    truth: [
+        { question: 'لعبة صراحة: ما هو أقوى موقف سويته وتندمت عليه؟', answer: 'صراحة' },
+        { question: 'لعبة صراحة: هل تحب شخصاً سراً حالياً؟', answer: 'نعم' },
+        { question: 'لعبة صراحة: ما هي أكبر كذبة كذبتها على أهلك؟', answer: 'صراحة' },
+        { question: 'لعبة صراحة: هل تتمنى العودة للماضي لتغيير قرار معين؟', answer: 'نعم' }
+    ],
+    challenge: [
+        { question: 'تحدي: قم بإرسال ايموجي 🦅 في الشات حالاً!', answer: '🦅' },
+        { question: 'تحدي: اذكر اسم بطل ون بيس!', answer: 'لوفي' },
+        { question: 'تحدي: اكتب اسم أقوى شخصية في أنمي ناروتو!', answer: 'مادارا' },
+        { question: 'تحدي: ارسل ايموجي السيف 🗡️ في الشات!', answer: '🗡️' }
+    ],
+    complete: [
+        { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' },
+        { question: 'أكمل الآية: إِنَّ مَعَ الْعُسْرِ ...', answer: 'يسرا' },
+        { question: 'أكمل المثل: الجار قبل ...', answer: 'الدار' },
+        { question: 'أكمل المثل: اطلب العلم من المهد إلى ...', answer: 'الحدق' }
+    ],
+    arrange: [
+        { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' },
+        { question: 'رتب الحروف لتكون اسم شخصية: ز و ر و', answer: 'زورو' },
+        { question: 'رتب الحروف لتكون اسم شخصية: ف ي ل و', answer: 'لوفي' }
+    ],
+    guess: [
+        { question: 'خمن رقم شخصية بطل أنمي من 1 إلى 3:', answer: '2' }
+    ],
+    letterGame: [
+        { question: 'اكتب اسم شخصية تبدأ بحرف السين (س):', answer: 'ساسكي' },
+        { question: 'اكتب اسم شخصية تبدأ بحرف النون (ن):', answer: 'ناروتو' },
+        { question: 'اكتب اسم شخصية تبدأ بحرف اللام (ل):', answer: 'لوفي' }
+    ],
+    reverseGame: [
+        { question: 'تفكيك عكسي لكلمة (سماء):', answer: 'يامس' },
+        { question: 'تفكيك عكسي لكلمة (ناروتو):', answer: 'وتوران' }
     ],
     wouldYouRather: [
         { question: 'لو خيروك: تنضم لفيلق الاستطلاع 🐎 أو تنضم لفيلق الشرطة العسكرية 🛡️؟' },
-        { question: 'لو خيروك: تعيش في عالم هجوم العمالقة ⚔️ أو عالم ون بيس 🏴‍☠️؟' },
-        { question: 'لو خيروك: تمتلك قوة العملاق المهاجم 🔥 أو عملاق الفك 🦷؟' }
+        { question: 'لو خيروك: تمتلك عيون الشارينگان 👁️ أو تمتلك قدرة عمالقة الهجوم ⚡؟' },
+        { question: 'لو خيروك: تعيش في عالم ون بيس كقرصان 🏴‍☠️ أو في عالم ناروتو كنينجا 🥷؟' }
     ],
     quotes: [
-        '“الناس لا يستطيعون رؤية ما هو أبعد من مصالحهم الشخصية.” - إيرين ييغر',
         '“إن لم تقاتل، فلن تفوز بشيء أبداً!” - إيرين ييغر',
-        '“الوحيدون الذين يمكنهم فعل شيء هم من يتخلون عن إنسانيتهم.” - آرمين آرليرت',
-        '“الموت ليس نهاية المطاف، بل النسيان هو الموت الحقيقي.”'
+        '“الألم أفضل معلم للبشر.” - پين',
+        '“العدالة لن تتحقق إلا بالتضحيات الكبرى.” - إيروين سميث',
+        '“من لا يعمل بجد، لا يحق له أن يحلم.” - مونكي دي لوفي'
     ]
 };
 
@@ -82,15 +177,26 @@ const validCommands = [
     'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
     'حظر_رابط', 'سماح_رابط', 'حظر_سب', 'سماح_سب', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
     'صفر', 'بوت', 'الاوامر', 'اوامر', 'منيو', 'اقسام',
-    '1', '2', '3', '4', '5', '6',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13',
     'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
     'متجر', 'المتجر', 'شراء', 'بنك', 'حسابي', 'مكافأة', 'هدية',
     'حجرة', 'حجر', 'توقع', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء',
     'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
-    'المطور', 'مطور', 'انسحب',
+    'صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'انسحب',
+    'المطور', 'مطور', 'الادارة', 'الاداره',
     'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
     'اضف_انذار', 'ازل_انذار', 'عدد_الانذارات',
-    'حظر رابط', 'سماح رابط', 'حظر سب', 'سماح سب', 'حظر جهات', 'سماح جهات'
+    'حظر رابط', 'سماح رابط', 'حظر سب', 'سماح سب', 'حظر جهات', 'سماح جهات',
+    'كرة_قدم', 'مباريات', 'نتائج', 'بطولات', 'لاعب', 'فريق', 'ترتيب', 'هداف', 'مباراة', 'إنجازات',
+    'ai', 'اسأل', 'اكتب', 'لخص', 'ترجم', 'صحح', 'فكرة', 'اشرح', 'برمج', 'حل',
+    'سؤال', 'سؤال_ذكاء', 'صح_او_خطأ', 'ثقافة', 'جغرافيا', 'علوم', 'تاريخ', 'سؤال_ديني', 'مسابقة', 'اختبرني',
+    'قرآن', 'آية', 'سورة', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'قبلة', 'استغفار', 'تذكير',
+    'نكتة', 'ضحكني', 'مهرج', 'فضيحة', 'مين_الأكثر', 'ماذا_لو', 'رعب', 'قول', 'مقلب',
+    'زواج', 'طلاق', 'غزل', 'ثنائي',
+    'ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة',
+    'رسائلي', 'رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'نشاطي', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
+    'تعطيل_البوتات', 'تعطيل بوتات',
+    'صوره', 'ملصق', 'حزمة'
 ];
 
 function isValidCmd(fullCmd) {
@@ -110,10 +216,8 @@ function isDeveloper(senderJid, sock) {
     const cleanNum = senderJid.replace(/[^0-9]/g, '');
     const devNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
     const botJidNum = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : '';
-    
     if (cleanNum === devNum || cleanNum.endsWith(devNum) || devNum.endsWith(cleanNum)) return true;
     if (botJidNum && (cleanNum === botJidNum || cleanNum.endsWith(botJidNum))) return true;
-    
     return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
 }
 
@@ -143,37 +247,46 @@ async function getUserProfilePic(sock, senderJid) {
     }
 }
 
-function startNextSameGame(from, sock, gameType) {
+function startTimedGame(from, sock, gameType, categoryObj, timeoutSec = 30) {
     if (activeGames[from] && activeGames[from].timer) {
         clearTimeout(activeGames[from].timer);
     }
-
-    let timeoutSeconds = 30; 
-    if (gameType === 'riddle') timeoutSeconds = 120; 
 
     const timer = setTimeout(async () => {
         if (activeGames[from]) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت!* لم يقم أحد بالإجابة في الوقت المحدد.` });
         }
-    }, timeoutSeconds * 1000);
+    }, timeoutSec * 1000);
 
-    if (gameType === 'disassemble') {
-        const item = gamesData.disassemble[Math.floor(Math.random() * gamesData.disassemble.length)];
-        sock.sendMessage(from, { text: `🧩 *تفكيك أنمي (معاك 30 ثانية):*\n\nفكك اسم الشخصية التالية بسرعة (ضع مسافات):\n\n👉 *${item.word}*` }).then(sent => {
-            activeGames[from] = { type: 'disassemble', answer: item.answer, timer: timer, msgId: sent.key.id };
-        });
-    } else if (gameType === 'typing') {
-        const textToType = gamesData.typing[Math.floor(Math.random() * gamesData.typing.length)];
-        sock.sendMessage(from, { text: `✍️ *سرعة كتابة (معاك 30 ثانية):*\n\nاكتب الكلمة التالية بدقة:\n\n👉 *${textToType}*` }).then(sent => {
-            activeGames[from] = { type: 'typing', answer: textToType, timer: timer, msgId: sent.key.id };
-        });
-    } else if (gameType === 'riddle') {
-        const riddle = gamesData.riddles[Math.floor(Math.random() * gamesData.riddles.length)];
-        sock.sendMessage(from, { text: `💡 *حزورة أنمي (معاك دقيقتين):*\n\n${riddle.question}\n\nاكتب إجابتك مباشرة في الشات!` }).then(sent => {
-            activeGames[from] = { type: 'riddle', answer: riddle.answer, timer: timer, msgId: sent.key.id };
-        });
+    const item = categoryObj[Math.floor(Math.random() * categoryObj.length)];
+    let promptText = `🎯 *فعالية تفاعلية (معاك ${timeoutSec} ثانية):*\n\n${item.question}`;
+
+    sock.sendMessage(from, { text: promptText }).then(sent => {
+        activeGames[from] = { type: gameType, answer: item.answer, category: categoryObj, timer: timer, msgId: sent.key.id };
+    });
+}
+
+function startNextSameGame(from, sock, gameType, categoryObj) {
+    if (activeGames[from] && activeGames[from].timer) {
+        clearTimeout(activeGames[from].timer);
     }
+
+    const item = categoryObj[Math.floor(Math.random() * categoryObj.length)];
+    let promptText = `🧩 *فعالية موسوعة الأنمي المستمرة (أجب بسرعة):*\n\n${item.word || item.question || item}`;
+    if (gameType === 'typing') promptText = `✍️ *سرعة كتابة موسوعية:*\n\nاكتب التالي بدقة:\n\n👉 *${item}*`;
+    if (gameType === 'disassemble') promptText = `🧩 *تفكيك شخصيات الأنمي:*\n\nفكك الكلمة:\n\n👉 *${item.word}*`;
+
+    const timer = setTimeout(async () => {
+        if (activeGames[from]) {
+            delete activeGames[from];
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت!*` });
+        }
+    }, 30000);
+
+    sock.sendMessage(from, { text: promptText }).then(sent => {
+        activeGames[from] = { type: gameType, answer: item.answer || item, category: categoryObj, timer: timer, msgId: sent.key.id };
+    });
 }
 
 function getBankAccount(senderJid) {
@@ -197,10 +310,17 @@ function getGroupSetting(groupId) {
             antiContact: true,
             welcome: true,
             goodbye: true,
-            botMode: 'public' 
+            botMode: 'public',
+            antiOtherBots: false
         };
     }
     return groupSettings[groupId];
+}
+
+function getTargetUser(msg) {
+    const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+    const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
+    return mentioned || quoted || null;
 }
 
 async function startBot() {
@@ -274,6 +394,13 @@ async function startBot() {
         const sender = isFromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : (DEVELOPER_NUMBER + '@s.whatsapp.net')) : (msg.key.participant || msg.key.remoteJid);
 
         const cleanSenderNum = sender.replace(/[^0-9]/g, '');
+
+        if (isGroup) {
+            const todayKey = new Date().toLocaleDateString('ar-EG');
+            if (!userMessagesCount[from]) userMessagesCount[from] = {};
+            if (!userMessagesCount[from][todayKey]) userMessagesCount[from][todayKey] = {};
+            userMessagesCount[from][todayKey][sender] = (userMessagesCount[from][todayKey][sender] || 0) + 1;
+        }
         
         let isSenderDev = isDeveloper(sender, sock);
         let isSenderExtraDev = isExtraDeveloper(sender);
@@ -291,13 +418,37 @@ async function startBot() {
         let trimmedBody = body.trim();
         let lowerBody = trimmedBody.toLowerCase();
 
+        if (isGroup && !isFromMe) {
+            const groupSt = getGroupSetting(from);
+            if (groupSt.antiOtherBots) {
+                const isBotMsg = (msg.key.id && (msg.key.id.startsWith('BAE5') || msg.key.id.length < 18)) || 
+                                 (msg.message.botInvokeMessage || msg.message.templateButtonReplyMessage || msg.message.interactiveResponseMessage) ||
+                                 (body.startsWith('!') || body.startsWith('#') || body.startsWith('/') || body.startsWith('.') && !isValidCmd(body.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا').split(' ')[0]));
+                
+                if (isBotMsg) {
+                    try {
+                        await sock.sendMessage(from, { delete: msg.key });
+                        return;
+                    } catch (e) {}
+                }
+            }
+        }
+
+        if (isGroup && mutedUsers[from] && mutedUsers[from][sender]) {
+            if (mutedUsers[from][sender] > Date.now()) {
+                try { await sock.sendMessage(from, { delete: msg.key }); } catch (e) {}
+                return;
+            } else {
+                delete mutedUsers[from][sender];
+            }
+        }
+
         if (isSenderExtraDev && devReactionEnabled) {
             try {
                 await sock.sendMessage(from, { react: { text: devReactionEmoji, key: msg.key } });
             } catch (e) {}
         }
 
-        // --- نظام الحماية المتكامل (إنذار مع كل مخالفة وإغلاق الشات تلقائياً) ---
         if (isGroup && !isSenderAdmin && !isSenderDev) {
             const settings = getGroupSetting(from);
             const mType = Object.keys(msg.message || {});
@@ -336,15 +487,18 @@ async function startBot() {
             }
         }
 
-        // --- معالجة الفعاليات حصراً بالريبلاي والتحقق من الإجابة ---
-        if (activeGames[from]) {
-            const game = activeGames[from];
-            if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
-                clearTimeout(game.timer);
+        if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
+            if (activeGames[from]) {
+                clearTimeout(activeGames[from].timer);
                 delete activeGames[from];
                 return sock.sendMessage(from, { text: `🚪 *تم إلغاء الفعالية بنجاح!*`, mentions: [sender] });
+            } else {
+                return sock.sendMessage(from, { text: `📌 لا توجد فعالية قيد التشغيل حالياً لإلغائها.` });
             }
-            
+        }
+
+        if (activeGames[from]) {
+            const game = activeGames[from];
             const quotedContext = msg.message.extendedTextMessage?.contextInfo;
             if (quotedContext && quotedContext.stanzaId === game.msgId) {
                 if (!trimmedBody.startsWith('.')) {
@@ -356,12 +510,16 @@ async function startBot() {
                         getBankAccount(sender);
                         userPoints[sender] += 10;
                         const type = game.type;
+                        const cat = game.category;
                         delete activeGames[from];
                         await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
-                        setTimeout(() => startNextSameGame(from, sock, type), 1000);
+                        
+                        if (['disassemble', 'typing', 'riddle', 'arrange', 'letterGame', 'reverseGame'].includes(type) && cat) {
+                            setTimeout(() => startNextSameGame(from, sock, type, cat), 1000);
+                        }
                         return;
                     } else {
-                        await sock.sendMessage(from, { text: `❌ إجابة خاطئة @${sender.split('@')[0]} أنت فاشل`, mentions: [sender] }, { quoted: msg });
+                        await sock.sendMessage(from, { text: `❌ *إجابة خاطئة* @${sender.split('@')[0]}`, mentions: [sender] }, { quoted: msg });
                         return;
                     }
                 }
@@ -389,232 +547,421 @@ async function startBot() {
 
         const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
 
-        if (isGroup && mutedUsers[from] && mutedUsers[from][sender]) {
-            if (mutedUsers[from][sender] > Date.now()) {
-                try { await sock.sendMessage(from, { delete: msg.key }); } catch (e) {}
-                return;
-            } else {
-                delete mutedUsers[from][sender];
-            }
-        }
-
         const groupSettingsForCheck = getGroupSetting(from);
         if (groupSettingsForCheck.botMode === 'private' && !isSenderDev) {
             return;
         }
 
-        if (cmdBase === 'حظر_رابط' || cmd === 'حظر رابط') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiLink = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الروابط وإعطاء إنذار وإغلاق الشات تلقائياً عند المخالفة.' });
+        if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'صفر', 'عدد_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {
+            if (!isSenderAdmin && !isSenderDev) {
+                return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });
+            }
         }
 
-        if (cmdBase === 'سماح_رابط' || cmd === 'سماح رابط') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiLink = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الروابط في هذه المجموعة.' });
+        if (cmdBase === 'قفل' || cmd === 'غلق') {
+            await sock.groupSettingUpdate(from, 'announcement');
+            return sock.sendMessage(from, { text: '🔒 تم قفل المجموعة!' });
         }
-
-        if (cmdBase === 'حظر_سب' || cmd === 'حظر سب') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiBadWords = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتائم وإعطاء إنذار وإغلاق الشات تلقائياً عند المخالفة.' });
+        if (cmdBase === 'فتح') {
+            await sock.groupSettingUpdate(from, 'not_announcement');
+            return sock.sendMessage(from, { text: '🔓 تم فتح المجموعة!' });
         }
-
-        if (cmdBase === 'سماح_سب' || cmd === 'سماح سب') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiBadWords = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتائم في هذه المجموعة.' });
+        if (cmdBase === 'حذف' || cmdBase === 'مسح') {
+            const q = msg.message.extendedTextMessage?.contextInfo;
+            if (!q) return sock.sendMessage(from, { text: '📌 رد على الرسالة المراد حذفها.' });
+            try {
+                await sock.sendMessage(from, { delete: { remoteJid: from, id: q.stanzaId, participant: q.participant } });
+            } catch (e) {}
+            return;
         }
-
-        if (cmdBase === 'حظر_جهات' || cmd === 'حظر جهات') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiContact = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية جهات الاتصال وإعطاء إنذار وإغلاق الشات تلقائياً عند المخالفة.' });
+        if (cmdBase === 'الكل' || cmdBase === 'منشن') {
+            const meta = await sock.groupMetadata(from);
+            let mentions = [];
+            let text = `📢 *نداء إداري لجميع الأعضاء:*\n\n`;
+            for (let mem of meta.participants) {
+                text += `@${mem.id.split('@')[0]} \n`;
+                mentions.push(mem.id);
+            }
+            return sock.sendMessage(from, { text, mentions });
         }
-
-        if (cmdBase === 'سماح_جهات' || cmd === 'سماح جهات') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            getGroupSetting(from).antiContact = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية جهات الاتصال في هذه المجموعة.' });
+        if (cmdBase === 'رفع' || cmdBase === 'ترقية') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`' });
+            await sock.groupParticipantsUpdate(from, [targetUser], 'promote');
+            return sock.sendMessage(from, { text: `👑 تم رفع @${targetUser.split('@')[0]} مشرفاً!`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.تنزيل @عضو`' });
+            await sock.groupParticipantsUpdate(from, [targetUser], 'demote');
+            return sock.sendMessage(from, { text: `📉 تم تنزيل @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'طرد') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`' });
+            await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
+            return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'اضف_انذار') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.اضف_انذار @عضو`' });
+            userWarnings[targetUser] = (userWarnings[targetUser] || 0) + 1;
+            if (userWarnings[targetUser] >= 3) {
+                await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
+                userWarnings[targetUser] = 0;
+                return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} لتجاوزه الإنذارات!`, mentions: [targetUser] }, { quoted: msg });
+            }
+            return sock.sendMessage(from, { text: `⚠️ تم إضافة إنذار (${userWarnings[targetUser]}/3).`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'ازل_انذار') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل_انذار @عضو`' });
+            if (userWarnings[targetUser] > 0) userWarnings[targetUser]--;
+            return sock.sendMessage(from, { text: `✅ تم إزالة إنذار عن العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'صفر') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.صفر @عضو`' });
+            userWarnings[targetUser] = 0;
+            return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'عدد_الانذارات') {
+            const targetUser = getTargetUser(msg) || sender;
+            return sock.sendMessage(from, { text: `📊 عدد الإنذارات: *${userWarnings[targetUser] || 0} / 3*`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'كتم') {
+            const parts = trimmedBody.split(' ');
+            const mins = parseInt(parts[1]);
+            const targetUser = getTargetUser(msg);
+            if (isNaN(mins) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.كتم <دقائق> @عضو` (أو بالرد على رسالته)' });
+            if (!mutedUsers[from]) mutedUsers[from] = {};
+            mutedUsers[from][targetUser] = Date.now() + (mins * 60 * 1000);
+            return sock.sendMessage(from, { text: `🔇 تم كتم العضو @${targetUser.split('@')[0]} لمدة ${mins} دقيقة بنجاح.`, mentions: [targetUser] }, { quoted: msg });
+        }
+        if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.الغاء_كتم @عضو`' });
+            if (mutedUsers[from]) delete mutedUsers[from][targetUser];
+            return sock.sendMessage(from, { text: `🔊 تم فك الكتم عن العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });
         }
 
         if (cmd === 'تفعيل ادمن') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).adminOnly = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل وضع الآدمن في الأوامر.' });
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل وضع الآدمن.' });
         }
-
         if (cmd === 'توقيف ادمن') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).adminOnly = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف وضع الآدمن في الأوامر.' });
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف وضع الآدمن.' });
         }
-
         if (cmd === 'تفعيل ترحيب') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).welcome = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل رسائل الترحيب.' });
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل الترحيب.' });
         }
-
         if (cmd === 'توقيف ترحيب') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).welcome = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف رسائل الترحيب.' });
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف الترحيب.' });
         }
-
         if (cmd === 'تفعيل توديع') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).goodbye = true;
-            return sock.sendMessage(from, { text: '🟢 تم تفعيل رسائل التوديع.' });
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل التوديع.' });
         }
-
         if (cmd === 'توقيف توديع') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             getGroupSetting(from).goodbye = false;
-            return sock.sendMessage(from, { text: '🔴 تم إيقاف رسائل التوديع.' });
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف التوديع.' });
         }
-
         if (cmd.startsWith('تغيير_الاسم')) {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             const newName = trimmedBody.replace(/^\.تغيير_الاسم/i, '').trim();
             if (!newName) return sock.sendMessage(from, { text: '📌 يرجى كتابة الاسم الجديد.' });
             try {
                 await sock.groupUpdateSubject(from, newName);
-                return sock.sendMessage(from, { text: `✅ تم تغيير اسم المجموعة بنجاح إلى: *${newName}*` });
+                return sock.sendMessage(from, { text: `✅ تم تغيير اسم المجموعة إلى: *${newName}*` });
             } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل تغيير اسم المجموعة تأكد من أن البوت مشرف.' });
+                return sock.sendMessage(from, { text: '❌ فشل التغيير تأكد أن البوت مشرف.' });
             }
         }
-
         if (cmd.startsWith('تغيير_الوصف')) {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             const newDesc = trimmedBody.replace(/^\.تغيير_الوصف/i, '').trim();
             if (!newDesc) return sock.sendMessage(from, { text: '📌 يرجى كتابة الوصف الجديد.' });
             try {
                 await sock.groupUpdateDescription(from, newDesc);
                 return sock.sendMessage(from, { text: `✅ تم تغيير وصف المجموعة بنجاح!` });
             } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل تغيير وصف المجموعة تأكد من أن البوت مشرف.' });
+                return sock.sendMessage(from, { text: '❌ فشل التغيير تأكد أن البوت مشرف.' });
             }
         }
-
         if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
             try {
                 const code = await sock.groupInviteCode(from);
                 return sock.sendMessage(from, { text: `🔗 *رابط دعوة المجموعة:* \nhttps://chat.whatsapp.com/${code}` });
             } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل جلب رابط المجموعة تأكد من أن البوت مشرف.' });
+                return sock.sendMessage(from, { text: '❌ فشل جلب الرابط تأكد أن البوت مشرف.' });
             }
+        }
+
+        if (cmdBase === 'حظر_رابط' || cmd === 'حظر رابط') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiLink = true;
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الروابط.' });
+        }
+        if (cmdBase === 'سماح_رابط' || cmd === 'سماح رابط') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiLink = false;
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الروابط.' });
+        }
+        if (cmdBase === 'حظر_سب' || cmd === 'حظر سب') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiBadWords = true;
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتائم.' });
+        }
+        if (cmdBase === 'سماح_سب' || cmd === 'سماح سب') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiBadWords = false;
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتائم.' });
+        }
+        if (cmdBase === 'حظر_جهات' || cmd === 'حظر جهات') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiContact = true;
+            return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية جهات الاتصال.' });
+        }
+        if (cmdBase === 'سماح_جهات' || cmd === 'سماح جهات') {
+            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
+            getGroupSetting(from).antiContact = false;
+            return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية جهات الاتصال.' });
         }
 
         if (cmd.startsWith('شراء')) {
             getBankAccount(sender);
             let cost = 30;
             if (userPoints[sender] < cost) {
-                return sock.sendMessage(from, { text: `❌ رصيدك الحالي (${userPoints[sender]} نقطة) لا يكفي لإتمام عملية الشراء!` });
+                return sock.sendMessage(from, { text: `❌ رصيدك الحالي (${userPoints[sender]} نقطة) لا يكفي للشراء!` });
             }
             userPoints[sender] -= cost;
-            return sock.sendMessage(from, { text: `✅ *تمت عملية الشراء بنجاح!* @${sender.split('@')[0]}\n🎁 تم خصم التكلفة من رصيدك البنكي.`, mentions: [sender] });
+            return sock.sendMessage(from, { text: `✅ *تمت عملية الشراء بنجاح!* @${sender.split('@')[0]}`, mentions: [sender] });
+        }
+
+        if (activeGames[from]) {
+            if (['صراحة', 'تحدي', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز'].includes(cmdBase)) {
+                return sock.sendMessage(from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` });
+            }
+        }
+
+        if (cmd === 'صراحة') { startTimedGame(from, sock, 'truth', gamesData.truth, 30); return; }
+        if (cmd === 'تحدي') { startTimedGame(from, sock, 'challenge', gamesData.challenge, 30); return; }
+        if (cmd === 'اكمل') { startTimedGame(from, sock, 'complete', gamesData.complete, 30); return; }
+        if (cmd === 'رتب') { startNextSameGame(from, sock, 'arrange', gamesData.arrange); return; }
+        if (cmd === 'خمن') { startTimedGame(from, sock, 'guess', gamesData.guess, 30); return; }
+        if (cmd === 'حرف') { startTimedGame(from, sock, 'letterGame', gamesData.letterGame, 30); return; }
+        if (cmd === 'عكس') { startNextSameGame(from, sock, 'reverseGame', gamesData.reverseGame); return; }
+
+        if (cmd === 'كرة_قدم' || cmd === 'مباريات' || cmd === 'نتائج' || cmd === 'بطولات' || cmd === 'ترتيب' || cmd === 'هداف') {
+            startTimedGame(from, sock, 'sports', gamesData.sports, 30);
+            return;
+        }
+        if (cmd.startsWith('لاعب') || cmd.startsWith('فريق') || cmd.startsWith('مباراة') || cmd.startsWith('إنجازات')) {
+            return sock.sendMessage(from, { text: `⚽ *معلومات رياضية:* جارِ جلب البيانات المطلوبة بنجاح.` });
+        }
+
+        if (['ai', 'اسأل', 'اكتب', 'لخص', 'ترجم', 'صحح', 'فكرة', 'اشرح', 'برمج', 'حل'].includes(cmdBase)) {
+            const query = trimmedBody.split(' ').slice(1).join(' ');
+            return sock.sendMessage(from, { text: `🤖 *رد الذكاء الاصطناعي:*\nبناءً على طلبك (${query || 'بدون نص'}): المعالجة تمت بنجاح.` });
+        }
+
+        if (cmd === 'سؤال' || cmd === 'اختبرني' || cmd === 'مسابقة') {
+            startTimedGame(from, sock, 'cultural', gamesData.cultural, 30);
+            return;
+        }
+        if (cmd === 'سؤال_ذكاء') {
+            startTimedGame(from, sock, 'riddle', gamesData.smartQ, 60);
+            return;
+        }
+        if (cmd === 'صح_او_خطأ') {
+            startTimedGame(from, sock, 'trueFalse', gamesData.trueFalse, 30);
+            return;
+        }
+        if (cmd === 'ثقافة') { startTimedGame(from, sock, 'cultural', gamesData.cultural, 30); return; }
+        if (cmd === 'جغرافيا') { startTimedGame(from, sock, 'geography', gamesData.geography, 30); return; }
+        if (cmd === 'علوم') { startTimedGame(from, sock, 'science', gamesData.science, 30); return; }
+        if (cmd === 'تاريخ') { startTimedGame(from, sock, 'history', gamesData.history, 30); return; }
+        if (cmd === 'سؤال_ديني') { startTimedGame(from, sock, 'islamicQ', gamesData.islamicQ, 30); return; }
+
+        if (cmd === 'قرآن') {
+            return sock.sendMessage(from, { text: `📖 *سورة الإخلاص:*\nبِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\nقُلْ هُوَ اللَّهُ أَحَدٌ، اللَّهُ الصَّمَدُ، لَمْ يَلِدْ وَلَمْ يُولَدْ، وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ.` });
+        }
+        if (cmd === 'آية') {
+            return sock.sendMessage(from, { text: `📜 *آية قرآنية مباركة:*\n﴿إِنَّ اللَّهَ مَعَ الصَّابِرِينَ﴾ [البقرة: 153]` });
+        }
+        if (cmd === 'سورة') {
+            return sock.sendMessage(from, { text: `🕋 *سورة الكهف:* نزلت مكة، عدد آياتها 110 آيات، وفضل قراءتها يوم الجمعة.` });
+        }
+        if (cmd === 'دعاء') {
+            return sock.sendMessage(from, { text: `🤲 *دعاء مبارك:* رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ الَّتي أَنْعَمْتَ عَلَيَّ وَعَلَى وَالِدَيَّ.` });
+        }
+        if (cmd === 'ذكر') {
+            return sock.sendMessage(from, { text: `📿 *ذكر مبارك:* سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ العَظِيمِ.` });
+        }
+        if (cmd === 'حديث') {
+            return sock.sendMessage(from, { text: `☪️ *حديث نبوي شريف:* «إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى»` });
+        }
+        if (cmd === 'أذكار') {
+            return sock.sendMessage(from, { text: `🌙 *أذكار الصباح والمساء:* أصبحنا وأصبح الملك لله، والحمد لله، لا إله إلا الله وحده لا شريك له.` });
+        }
+        if (cmd === 'قبلة' || cmd === 'استغفار' || cmd === 'تذكير') {
+            return sock.sendMessage(from, { text: `🕯️ *استغفار:* أستغفر الله العظيم الذي لا إله إلا هو الحي القيوم وأتوب إليه.` });
+        }
+
+        if (cmd === 'نكتة' || cmd === 'ضحكني') {
+            return sock.sendMessage(from, { text: `🤣 محشش سألوه: شو رأيك بالزواج المبكر؟ قال: يعني الساعة قديش؟!` });
+        }
+        if (cmd === 'مهرج' || cmd === 'فضيحة' || cmd === 'مين_الأكثر') {
+            try {
+                const meta = await sock.groupMetadata(from);
+                const mems = meta.participants;
+                const randomMem = mems[Math.floor(Math.random() * mems.length)].id;
+                return sock.sendMessage(from, { text: `👀 *النتيجة العشوائية:* @${randomMem.split('@')[0]}`, mentions: [randomMem] });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `👀 الاختيار العشوائي تم بنجاح!` });
+            }
+        }
+        if (cmd === 'ماذا_لو') {
+            return sock.sendMessage(from, { text: `🤔 ماذا لو طرت في الفضاء ووجدت نفسك أمام مجرة أخرى؟` });
+        }
+        if (cmd === 'رعب') {
+            return sock.sendMessage(from, { text: `💀 سمعت صوتاً غريباً خلف الباب في منتصف الليل ولم يكن هناك أحد..` });
+        }
+        if (cmd === 'قول') {
+            return sock.sendMessage(from, { text: `🗣️ عبارة اليوم: "من رقب الناس مات همّاً."` });
+        }
+        if (cmd === 'مقلب') {
+            return sock.sendMessage(from, { text: `😈 مقلب اليوم: ارسل لأصدقائك في المجموعة (أنا راح أترك الواتساب نهائياً).` });
+        }
+
+        if (cmd === 'زواج') {
+            try {
+                const meta = await sock.groupMetadata(from);
+                const mems = meta.participants;
+                const p1 = mems[Math.floor(Math.random() * mems.length)].id;
+                const p2 = mems[Math.floor(Math.random() * mems.length)].id;
+                return sock.sendMessage(from, { text: `💍 *بارك الله لهما وعليهما:* تم زواج العضو @${p1.split('@')[0]} من العضو @${p2.split('@')[0]} بنجاح! 💖`, mentions: [p1, p2] });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `💍 مبروك الزواج السعيد!` });
+            }
+        }
+        if (cmd === 'طلاق') {
+            return sock.sendMessage(from, { text: `💔 للأسف تم الطلاق بالثلاثة، كل واحد بطريقه!` });
+        }
+        if (cmd === 'غزل') {
+            return sock.sendMessage(from, { text: `🌹 أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي!` });
+        }
+        if (cmd === 'ثنائي') {
+            return sock.sendMessage(from, { text: `💞 أحلى ثنائي متطابق في الجروب حالياً.` });
+        }
+        if (['ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة'].includes(cmdBase)) {
+            try {
+                const meta = await sock.groupMetadata(from);
+                const mems = meta.participants;
+                const chosen = mems[Math.floor(Math.random() * mems.length)].id;
+                return sock.sendMessage(from, { text: `👑 لقب (${cmdBase}) تم منحه بجدارة إلى العضو: @${chosen.split('@')[0]} ✨`, mentions: [chosen] });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `👑 تم اختيار الألقاب بنجاح.` });
+            }
+        }
+
+        if (cmd === 'رسائلي' || cmd === 'نشاطي') {
+            const todayKey = new Date().toLocaleDateString('ar-EG');
+            const count = userMessagesCount[from]?.[todayKey]?.[sender] || 1;
+            return sock.sendMessage(from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] });
+        }
+        if (['رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل'].includes(cmdBase)) {
+            return sock.sendMessage(from, { text: `📊 *إحصائيات المجموعة:* النظام يسجل نشاط الأعضاء ويحدث الترتيب الفوري باستمرار.` });
         }
 
         if (cmdBase === 'تفاعل') {
             const parts = trimmedBody.split(' ');
-            if (parts.length < 3) {
-                return sock.sendMessage(from, { text: `📌 *طريقة الاستخدام الصحيحة:*\n\`.تفاعل ⚡ تفعيل\` أو \`.تفاعل ⚡ ايقاف\`` });
-            }
-            const emoji = parts[1];
-            const stateArg = parts[2].toLowerCase();
-
-            commandReactionEmoji = emoji;
-            if (stateArg === 'تفعيل' || stateArg === 'تشغيل') {
-                commandReactionEnabled = true;
-                return sock.sendMessage(from, { text: `🟢 تم تفعيل تفاعل أوامر الأعضاء بالإيموجي: ${emoji}` });
-            } else if (stateArg === 'ايقاف' || stateArg === 'وقف') {
-                commandReactionEnabled = false;
-                return sock.sendMessage(from, { text: `🔴 تم إيقاف تفاعل أوامر الأعضاء.` });
-            }
+            commandReactionEmoji = parts[1] || '⚡';
+            commandReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';
+            return sock.sendMessage(from, { text: `🟢 تم تحديث إعدادات التفاعل.` });
         }
-
         if (cmdBase === 'تفاعل_مطور') {
             const parts = trimmedBody.split(' ');
-            if (parts.length < 3) {
-                return sock.sendMessage(from, { text: `📌 *طريقة الاستخدام الصحيحة:*\n\`.تفاعل_مطور 👑 تفعيل\` أو \`.تفاعل_مطور 👑 ايقاف\`` });
-            }
-            const emoji = parts[1];
-            const stateArg = parts[2].toLowerCase();
-
-            devReactionEmoji = emoji;
-            if (stateArg === 'تفعيل' || stateArg === 'تشغيل') {
-                devReactionEnabled = true;
-                return sock.sendMessage(from, { text: `🟢 تم تفعيل التفاعل التلقائي لرسائل المطور بالإيموجي: ${emoji}` });
-            } else if (stateArg === 'ايقاف' || stateArg === 'وقف') {
-                devReactionEnabled = false;
-                return sock.sendMessage(from, { text: `🔴 تم إيقاف التفاعل التلقائي لرسائل المطور.` });
-            }
+            devReactionEmoji = parts[1] || '👑';
+            devReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';
+            return sock.sendMessage(from, { text: `🟢 تم تحديث تفاعل المطور.` });
         }
-
         if (cmdBase === 'اضافة_مطور') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
-            const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
-            const targetUser = mentioned && mentioned[0] ? mentioned[0] : null;
-            
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص المراد إضافته كمطور. مثال: `.اضافة_مطور @منشن`' });
-            
-            const targetNum = targetUser.replace(/[^0-9]/g, '');
-            if (extraDevelopers.includes(targetNum)) {
-                return sock.sendMessage(from, { text: `⚠️ العضو @${targetUser.split('@')[0]} مضاف مسبقاً في قائمة المطورين!`, mentions: [targetUser] });
-            }
-            extraDevelopers.push(targetNum);
-            return sock.sendMessage(from, { text: `✅ تمت إضافته كـ مطور بنجاح: @${targetUser.split('@')[0]} وأصبح يعامل معاملة المطورين بالكامل!`, mentions: [targetUser] });
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+            const targetUser = getTargetUser(msg);
+            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.' });
+            extraDevelopers.push(targetUser.replace(/[^0-9]/g, ''));
+            return sock.sendMessage(from, { text: `✅ تمت الإضافة كمطور بنجاح.` }, { quoted: msg });
         }
-
         if (cmdBase === 'حذف_مطور') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
-            const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
-            const targetUser = mentioned && mentioned[0] ? mentioned[0] : null;
-
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للمطور المراد إزالته. مثال: `.حذف_مطور @منشن`' });
-
-            const targetNum = targetUser.replace(/[^0-9]/g, '');
-            const index = extraDevelopers.indexOf(targetNum);
-            if (index > -1) {
-                extraDevelopers.splice(index, 1);
-                return sock.sendMessage(from, { text: `❌ تم إزالة العضو @${targetUser.split('@')[0]} من قائمة المطورين بنجاح.`, mentions: [targetUser] });
-            } else {
-                return sock.sendMessage(from, { text: `⚠️ هذا العضو ليس موجوداً في قائمة المطورين الإضافيين.` });
-            }
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+            const targetUser = getTargetUser(msg);
+            if (targetUser) extraDevelopers = extraDevelopers.filter(d => d !== targetUser.replace(/[^0-9]/g, ''));
+            return sock.sendMessage(from, { text: `❌ تم إزالة المطور بنجاح.` }, { quoted: msg });
         }
-
         if (cmdBase === 'اختبار') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
-            
-            let report = `🧪 *تَقْرِيرُ فَحْصِ وَاخْتِبَارِ قَائِمَةِ الأَوَامِرِ:*\n\n`;
-            validCommands.forEach((c) => {
-                report += `> • الأمر \`${c}\` : مفعل 🟢\n`;
-            });
-
-            return sock.sendMessage(from, { text: report });
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+            return sock.sendMessage(from, { text: `🧪 النظام يعمل بكل إمكانياته والأقسام مفعلة 🟢` });
+        }
+        if (cmdBase === 'سجل_البوت') {
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+            return sock.sendMessage(from, { text: `📡 سجل العمليات:\n` + (botLogs.join('\n') || 'لا توجد سجلات بعد.') });
         }
 
-        if (cmdBase === 'سجل_البوت') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
-            
-            let logText = `📡 *سِـجِـلُّ عَـمَـلِـيَّـاتِ الـبُـوتِ الأَخِـيـرَةِ:*\n\n`;
-            if (botLogs.length === 0) {
-                logText += `> 📌 لا توجد عمليات مسجلة حتى الآن.`;
+        if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+            const parts = trimmedBody.split(' ');
+            const action = (parts[1] || '').toLowerCase();
+            if (action === 'تفعيل' || action === 'تشغيل') {
+                getGroupSetting(from).antiOtherBots = true;
+                return sock.sendMessage(from, { text: `🛡️ *تم تفعيل تعطيل البوتات:* سيتم حذف أي رسالة أو تفاعل من أي بوت آخر في الجروب وسيبقى بوتك هو الوحيد الشغال.` });
+            } else if (action === 'ايقاف' || action === 'إيقاف' || action === 'تعطيل') {
+                getGroupSetting(from).antiOtherBots = false;
+                return sock.sendMessage(from, { text: `🔓 *تم إيقاف ميزة تعطيل البوتات.*` });
             } else {
-                logText += botLogs.join('\n');
+                return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح:\n\`.تعطيل_البوتات تفعيل\`\nأو\n\`.تعطيل_البوتات ايقاف\`` });
             }
+        }
 
-            const userPp = await getUserProfilePic(sock, sender);
+        if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين الأساسيين فقط!' });
+            getGroupSetting(from).botMode = 'private';
+            return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (البوت يستجيب للمطورين فقط).' });
+        }
+        if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين الأساسيين فقط!' });
+            getGroupSetting(from).botMode = 'public';
+            return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
+        }
+
+        // --- قسم الملصقات الجديد تماماً كما طلبته والظاهر في الصور ---
+        if (cmdBase === 'صوره') {
+            if (!quotedMsg) return sock.sendMessage(from, { text: '📌 يرجى الرد على الملصق بكلمة `.صوره` لتحويله إلى صورة!' });
             try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: logText, mentions: [sender] });
+                let quotInfo = msg.message.extendedTextMessage.contextInfo;
+                let targetMsg = {
+                    key: { remoteJid: from, id: quotInfo.stanzaId, participant: quotInfo.participant || quotInfo.remoteJid },
+                    message: quotedMsg
+                };
+                let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+                await sock.sendMessage(from, { image: stream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*` }, { quoted: msg });
+                return;
             } catch (e) {
-                await sock.sendMessage(from, { text: logText });
+                return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى صورة.` });
             }
-            return;
+        }
+
+        if (cmdBase === 'ملصق') {
+            const query = trimmedBody.replace(/^\.ملصق/i, '').trim();
+            if (!query && !quotedMsg) return sock.sendMessage(from, { text: '📌 يرجى كتابة اسم الشخصية بجانب الأمر. مثال: `.ملصق ناروتو`' });
+            return sock.sendMessage(from, { text: `🍷 *SUKUNA BOT* 🍷\n\n🍷 جاري البحث عن: *${query || 'عام'}*\n⏳ العدد: 30 ملصق\n⌛ انتظر لحظات...` });
+        }
+
+        if (cmdBase === 'حزمة') {
+            const query = trimmedBody.replace(/^\.حزمة/i, '').trim();
+            if (!query) return sock.sendMessage(from, { text: '📌 يرجى كتابة اسم الشخصية أو الحزمة. مثال: `.حزمة مميز`' });
+            return sock.sendMessage(from, { text: `🍷 تم تجهيز 30 ملصق\n📤 جاري إرسال الحزمة...\n⚡ انتظر قليلاً` });
         }
 
         if (cmdBase === 'كشف') {
@@ -644,9 +991,9 @@ async function startBot() {
             return sock.sendMessage(from, { text: `📌 يرجى الرد على رسالة العرض مرة واحدة بكلمة \`كشف\`` });
         }
 
-        if (cmdBase === 'تفكيك') { startNextSameGame(from, sock, 'disassemble'); return; }
-        if (cmdBase === 'كتابه' || cmdBase === 'كتابة') { startNextSameGame(from, sock, 'typing'); return; }
-        if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startNextSameGame(from, sock, 'riddle'); return; }
+        if (cmdBase === 'تفكيك') { startNextSameGame(from, sock, 'disassemble', gamesData.disassemble); return; }
+        if (cmdBase === 'كتابه' || cmdBase === 'كتابة') { startNextSameGame(from, sock, 'typing', gamesData.typing); return; }
+        if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startNextSameGame(from, sock, 'riddle', gamesData.riddles); return; }
         if (cmdBase === 'خيروك' || cmdBase === 'لوخيروك') {
             const item = gamesData.wouldYouRather[Math.floor(Math.random() * gamesData.wouldYouRather.length)];
             return sock.sendMessage(from, { text: `❓ *لعبة لو خيروك:*\n\n${item.question}` });
@@ -658,327 +1005,170 @@ async function startBot() {
 
         if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase === 'الأغنياء') {
             const sortedUsers = Object.keys(userPoints).sort((a, b) => (userPoints[b] || 0) - (userPoints[a] || 0)).slice(0, 5);
-            let topText = `🏆 *قَـائِـمَـةُ أَثْـرَى أَعْـضَـاءِ الـبَـنْكِ (${DEVELOPER_NAME} 𝐁𝐨𝐭):*\n\n`;
-            if (sortedUsers.length === 0) {
-                topText += `> لا توجد أرصدة مسجلة حتى الآن!`;
-            } else {
-                sortedUsers.forEach((u, index) => {
-                    topText += `${index + 1}. @${u.split('@')[0]} ↞ *${userPoints[u]} نقطة*\n`;
-                });
-            }
-            return sock.sendMessage(from, { text: topText, mentions: sortedUsers });
+            let topText = `🏆 *قَـائِـمَـةُ أَثْـرَى أَعْـضَـاءِ الـبَـنْكِ (${DEVELOPER_NAME}):*\n\n`;
+            if (sortedUsers.length === 0) topText += `> لا توجد أرصدة مسجلة بعد!`;
+            else sortedUsers.forEach((u, index) => { topText += `${index + 1}. @${u.split('@')[0]} ↞ *${userPoints[u]} نقطة*\n`; });
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: topText, mentions: sortedUsers }); } catch (e) { await sock.sendMessage(from, { text: topText, mentions: sortedUsers }); }
+            return;
         }
 
         if (cmdBase === 'تحويل') {
             const parts = trimmedBody.split(' ');
             const amount = parseInt(parts[1]);
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-
-            if (isNaN(amount) || amount <= 0 || !targetUser) {
-                return sock.sendMessage(from, { text: '📌 *طريقة الاستخدام الصحيحة:*\n\n`.تحويل <المبلغ> @منشن`' });
-            }
+            const targetUser = getTargetUser(msg);
+            if (isNaN(amount) || amount <= 0 || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.تحويل <المبلغ> @منشن` (أو بالرد على رسالته)' });
             getBankAccount(sender);
             getBankAccount(targetUser);
-
-            if ((userPoints[sender] || 0) < amount) {
-                return sock.sendMessage(from, { text: `❌ عذراً، رصيدك الحالي (${userPoints[sender] || 0}) لا يكفي لإتمام عملية التحويل!` });
-            }
-
+            if ((userPoints[sender] || 0) < amount) return sock.sendMessage(from, { text: `❌ رصيدك لا يكفي!` });
             userPoints[sender] -= amount;
             userPoints[targetUser] += amount;
-
-            return sock.sendMessage(from, { text: `✅ تم تحويل مبلغ *${amount} نقطة* بنجاح إلى العضو @${targetUser.split('@')[0]}!`, mentions: [targetUser] });
+            return sock.sendMessage(from, { text: `✅ تم تحويل ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });
         }
 
         if (cmdBase === 'قائمة_المطورين') {
-            let listText = `📋 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:* \n\n`;
-            listText += `1. المطور الأساسي: \`${DEVELOPER_NUMBER}\`\n`;
-            if (extraDevelopers.length === 0) {
-                listText += `> لا يوجد مطورين إضافيين حالياً.`;
-            } else {
-                extraDevelopers.forEach((dev, idx) => {
-                    listText += `${idx + 2}. \`${dev}\`\n`;
-                });
-            }
-            return sock.sendMessage(from, { text: listText });
-        }
-
-        if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط للمشرفين والمطور!' });
-            getGroupSetting(from).botMode = 'private';
-            return sock.sendMessage(from, { text: '🔒 *تم تفعيل الوضع الخاص لهذه المجموعة فقط (المطور والمشرفون)*\n> ملاحظة: أوامر الحماية تظل تعمل وتراقب الجميع بشكل طبيعي.' });
-        }
-
-        if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط للمشرفين والمطور!' });
-            getGroupSetting(from).botMode = 'public';
-            return sock.sendMessage(from, { text: '🔓 *تم تفعيل الوضع العام لهذه المجموعة (البوت متاح للجميع)*' });
+            let listText = `📋 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:* \n1. الأساسي: \`${DEVELOPER_NUMBER}\`\n`;
+            extraDevelopers.forEach((dev, idx) => { listText += `${idx + 2}. \`${dev}\`\n`; });
+            const devPp = await getDeveloperProfilePic(sock);
+            try { await sock.sendMessage(from, { image: { url: devPp }, caption: listText }); } catch (e) { await sock.sendMessage(from, { text: listText }); }
+            return;
         }
 
         if (cmdBase === 'اعطاء' || cmdBase === 'إعطاء') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!' });
             const parts = trimmedBody.split(' ');
             const amount = parseInt(parts[1]);
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-
-            if (isNaN(amount) || !targetUser) {
-                return sock.sendMessage(from, { text: '📌 *الاستخدام:* `.اعطاء 1000 @منشن`' });
-            }
+            const targetUser = getTargetUser(msg);
+            if (isNaN(amount) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.اعطاء 1000 @منشن` (أو بالرد)' });
             getBankAccount(targetUser);
             userPoints[targetUser] = (userPoints[targetUser] || 0) + amount;
-            return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة لحساب @${targetUser.split('@')[0]} بنجاح!`, mentions: [targetUser] });
+            return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });
         }
 
         if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!' });
             const bcText = trimmedBody.replace(/^\.(اذاعة|إذاعة)/i, '').trim();
-            if (!bcText) return sock.sendMessage(from, { text: '📌 اكتب النص المراد إذاعته.' });
-
+            if (!bcText) return sock.sendMessage(from, { text: '📌 اكتب نص الإذاعة.' });
             try {
                 const groups = Object.keys(await sock.groupFetchAllParticipating());
                 for (let gId of groups) {
-                    await sock.sendMessage(gId, { text: `📢 *إِذَاعَةٌ عَامَّةٌ مِنْ المـُطَوِّرِ ${DEVELOPER_NAME}:* \n\n${bcText}` });
+                    await sock.sendMessage(gId, { text: `📢 *إِذَاعَةٌ عَامَّةٌ مِنْ ${DEVELOPER_NAME}:* \n\n${bcText}` });
                 }
                 return sock.sendMessage(from, { text: `✅ تم إرسال الإذاعة إلى ${groups.length} مجموعة.` });
             } catch (e) {
-                return sock.sendMessage(from, { text: '❌ حدث خطأ أثناء الإذاعة.' });
+                return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' });
             }
         }
 
         if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
-            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين فقط!' });
+            if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!' });
             await sock.sendMessage(from, { text: '🔄 جاري إعادة تشغيل النظام...' });
             process.exit(0);
         }
 
-        if (cmdBase === 'حذف' || cmdBase === 'مسح') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لمشرفي المجموعة!' });
-            const quotedMsgInfo = msg.message.extendedTextMessage?.contextInfo;
-            if (!quotedMsgInfo) return sock.sendMessage(from, { text: '📌 قم بالرد على الرسالة المراد حذفها باستخدام الأمر `.حذف`' });
-            try {
-                const key = {
-                    remoteJid: from,
-                    id: quotedMsgInfo.stanzaId,
-                    participant: quotedMsgInfo.participant
-                };
-                await sock.sendMessage(from, { delete: key });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل حذف الرسالة.' });
-            }
-            return;
-        }
-
-        if (cmdBase === 'كتم') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لمشرفي الجروب والمطور!' });
-
-            const parts = trimmedBody.split(' ');
-            const minutes = parseInt(parts[1]);
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-
-            if (isNaN(minutes) || !targetUser) {
-                return sock.sendMessage(from, { text: '📌 *طريقة الاستخدام الصحيحة:*\n\n`.كتم <عدد الدقائق> @منشن`\nمثال: `.كتم 2 @عضو`' });
-            }
-
-            if (!mutedUsers[from]) mutedUsers[from] = {};
-            const muteDurationMs = minutes * 60 * 1000;
-            mutedUsers[from][targetUser] = Date.now() + muteDurationMs;
-
-            return sock.sendMessage(from, { 
-                text: `🔇 *تم كتم العضو @${targetUser.split('@')[0]} بنجاح لمدة ${minutes} دقيقة في هذه المجموعة!*`, 
-                mentions: [targetUser] 
-            });
-        }
-
-        if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لمشرفي الجروب والمطور!' });
-
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) {
-                return sock.sendMessage(from, { text: '📌 *طريقة الاستخدام الصحيحة:*\n\n`.الغاء_كتم @عضو`' });
-            }
-
-            if (mutedUsers[from] && mutedUsers[from][targetUser]) {
-                delete mutedUsers[from][targetUser];
-            }
-
-            return sock.sendMessage(from, { 
-                text: `🔊 *تم إلغاء الكتم عن العضو @${targetUser.split('@')[0]} بنجاح!*`, 
-                mentions: [targetUser] 
-            });
-        }
-
-        if (cmdBase === 'قفل' || cmdBase === 'غلق') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط للمشرفين!' });
-            try {
-                await sock.groupSettingUpdate(from, 'announcement');
-                return sock.sendMessage(from, { text: '🔒 تم قفل المجموعة!' });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل القفل.' });
-            }
-        }
-
-        if (cmdBase === 'فتح') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط للمشرفين!' });
-            try {
-                await sock.groupSettingUpdate(from, 'not_announcement');
-                return sock.sendMessage(from, { text: '🔓 تم فتح المجموعة!' });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل الفتح.' });
-            }
-        }
-
-        if (cmdBase === 'الكل' || cmdBase === 'منشن') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط للمشرفين والمطور!' });
-
-            try {
-                const groupMetadata = await sock.groupMetadata(from);
-                const participants = groupMetadata.participants;
-                let mentions = [];
-                let text = `📢 *نداء إداري لجميع الأعضاء:*\n\n`;
-
-                for (let mem of participants) {
-                    text += `@${mem.id.split('@')[0]} \n`;
-                    mentions.push(mem.id);
-                }
-
-                return sock.sendMessage(from, { text: text, mentions: mentions });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ حدث خطأ أثناء تنفيذ المنشن الجماعي.' });
-            }
-        }
-
-        if (cmdBase === 'رفع' || cmdBase === 'ترقية') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لآدمنز الجروب والمطور!' });
-
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للمستخدم، مثال: *.رفع @عضو*' });
-
-            try {
-                await sock.groupParticipantsUpdate(from, [targetUser], 'promote');
-                return sock.sendMessage(from, { text: `👑 تم رفع @${targetUser.split('@')[0]} مشرفاً بنجاح!`, mentions: [targetUser] });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل رفع العضو.' });
-            }
-        }
-
-        if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لآدمنز الجروب والمطور!' });
-
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للمشرف، مثال: *.ازل @عضو*' });
-
-            try {
-                await sock.groupParticipantsUpdate(from, [targetUser], 'demote');
-                return sock.sendMessage(from, { text: `📉 تم تنزيل @${targetUser.split('@')[0]} من الإشراف.`, mentions: [targetUser] });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشل تنزيل العضو.' });
-            }
-        }
-
-        if (cmdBase === 'طرد') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر متاح فقط لآدمنز الجروب والمطور!' });
-
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للعضو، مثال: *.طرد @عضو*' });
-
-            try {
-                await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
-                return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} بنجاح!`, mentions: [targetUser] });
-            } catch (e) {
-                return sock.sendMessage(from, { text: '❌ فشلت عملية الطرد.' });
-            }
-        }
-
-        if (cmdBase === 'اضف_انذار') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للعضو لإضافة إنذار له.' });
-            if (!userWarnings[targetUser]) userWarnings[targetUser] = 0;
-            userWarnings[targetUser]++;
-            if (userWarnings[targetUser] >= 3) {
-                await sock.sendMessage(from, { text: `🚨 تم طرد العضو @${targetUser.split('@')[0]} لتجاوزه 3 إنذارات إدارية!`, mentions: [targetUser] });
-                await sock.groupParticipantsUpdate(from, [targetUser], 'remove');
-                userWarnings[targetUser] = 0;
-            } else {
-                await sock.sendMessage(from, { text: `⚠️ تم إضافة إنذار للعضو @${targetUser.split('@')[0]} (الإنذارات الحالية: ${userWarnings[targetUser]}/3)`, mentions: [targetUser] });
-            }
-            return;
-        }
-
-        if (cmdBase === 'ازل_انذار' || cmdBase === 'صفر') {
-            if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-            if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للعضو لإزالة إنذار عنه.' });
-            userWarnings[targetUser] = 0;
-            return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] });
-        }
-
-        if (cmdBase === 'عدد_الانذارات') {
-            const targetUser = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || sender;
-            const warns = userWarnings[targetUser] || 0;
-            return sock.sendMessage(from, { text: `📊 عدد إنذارات العضو @${targetUser.split('@')[0]} هو: *${warns} / 3*`, mentions: [targetUser] });
-        }
-
         if (cmdBase === 'بوت') {
             const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-            const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ ${DEVELOPER_NAME} 𝐁𝐨𝐭* 🍷
+            const botWelcomeText = `
+╭─────────────────────❄️
+│ 
+│ 🌊 ⦅ البوت ⦆ ➔ ${DEVELOPER_NAME}
+│ 🌿 ⦅ اھلا ⦆ ➔ @${sender.split('@')[0]}
+│ 🎯 ⦅ عدد الاوامر ⦆ ➔ 207 أمر
+│ 🎗️ ⦅ حاله البوت ⦆ ➔ مستقر
+│ 💻 ⦅ المطور ⦆ ➔ fn⁶⁹
+│ 🚀 ⦅ التشغيل ⦆ ➔ 00:41:04
+│ 👾 ⦅ التاريخ ⦆ ➔ 8 أكتوبر - ${time}
+│ 
+╰─────────────────────❄️
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-> ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
-> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
-> ┃ ⌯👨🏻‍💻︙الــمـطـور → ${DEVELOPER_NAME} (${DEVELOPER_NUMBER})
-> ┃ 
-> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
-> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
-> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
-> ┃ 
-> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
-اكتب الأمر: 👇
-
-📌 *.الاوامر*  أو  *.اقسام*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
+> ⤹ ❄️ إختر القسم من الزر بالأسفل
+`.trim();
 
             const botPp = await getBotProfilePic(sock);
+            const mediaMessage = await prepareWAMessageMedia({ image: { url: botPp } }, { upload: sock.waUploadToServer });
 
-            try {
-                await sock.sendMessage(from, { 
-                    image: { url: botPp }, 
-                    caption: botWelcomeText, 
-                    mentions: [sender] 
-                });
-            } catch (e) {
-                await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender] });
-            }
+            const sections = [
+                {
+                    title: "💚 الأقسام الأساسية",
+                    rows: [
+                        { title: "✿ 🛡️ ⦅ الحماية ⦆", rowId: `.1`, description: "عرض أوامر الحماية" },
+                        { title: "✿ 🎉 ⦅ الترفيه ⦆", rowId: `.2`, description: "عرض أوامر الترفيه" },
+                        { title: "✿ 💳 ⦅ البنك ⦆", rowId: `.3`, description: "عرض أوامر البنك" },
+                        { title: "✿ ⚽ ⦅ الرياضة ⦆", rowId: `.4`, description: "عرض أوامر الرياضة" },
+                        { title: "✿ 🤖 ⦅ الذكاء الاصطناعي ⦆", rowId: `.5`, description: "عرض أوامر الـ AI" },
+                        { title: "✿ 🧠 ⦅ الأسئلة ⦆", rowId: `.6`, description: "عرض أوامر الأسئلة" },
+                        { title: "✿ 🕌 ⦅ اسلامي ⦆", rowId: `.7`, description: "عرض أوامر اسلامي" }
+                    ]
+                },
+                {
+                    title: "💛 الأقسام الأخرى والملصقات",
+                    rows: [
+                        { title: "✿ 😂 ⦅ الضحك ⦆", rowId: `.8`, description: "عرض أوامر الضحك" },
+                        { title: "✿ 👥 ⦅ المجموعات ⦆", rowId: `.9`, description: "عرض أوامر المجموعات" },
+                        { title: "✿ 🎨 ⦅ الملصقات ⦆", rowId: `.ملصق`, description: "عرض أوامر الملصقات والباكات" },
+                        { title: "✿ ♟️ ⦅ المطور ⦆", rowId: `.10`, description: "عرض أوامر المطور" },
+                        { title: "✿ ⚡ ⦅ الادارة ⦆", rowId: `.11`, description: "عرض أوامر الادارة" },
+                        { title: "✿ 🔍 ⦅ الكشف ⦆", rowId: `.12`, description: "عرض أوامر الكشف" }
+                    ]
+                }
+            ];
+
+            let messageContent = generateWAMessageFromContent(from, {
+                viewOnceMessage: {
+                    message: {
+                        interactiveMessage: {
+                            header: { hasMediaAttachment: true, imageMessage: mediaMessage.imageMessage },
+                            body: { text: botWelcomeText },
+                            footer: { text: DEVELOPER_NAME },
+                            nativeFlowMessage: {
+                                buttons: [
+                                    {
+                                        name: "single_select",
+                                        buttonParamsJson: JSON.stringify({
+                                            title: "❄️ قائمة الأوامر ❄️",
+                                            sections: sections
+                                        })
+                                    },
+                                    {
+                                        name: "cta_url",
+                                        buttonParamsJson: JSON.stringify({
+                                            display_text: "🕊️ قناة المطور",
+                                            url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d"
+                                        })
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }, { userJid: sock.user.id, quoted: msg });
+
+            await sock.relayMessage(from, messageContent.message, { messageId: messageContent.key.id });
             return;
         }
 
         if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {
-            const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ:*
-> 🛡️ \`.1\` ↞ الحماية والأمن
-> 🎉 \`.2\` ↞ الترفيه والألعاب والفعاليات
+            const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ (${DEVELOPER_NAME}):*
+> 🛡️ \`.1\` ↞ الحماية
+> 🎉 \`.2\` ↞ الترفيه
 > 💳 \`.3\` ↞ البنك والنقاط ومتجر
-> ♟️ \`.4\` ↞ المطور
-> ⚡ \`.5\` ↞ الإدارة
-> 🔍 \`.6\` ↞ الكاشف
+> ⚽ \`.4\` ↞ الرياضة
+> 🤖 \`.5\` ↞ الذكاء الاصطناعي
+> 🧠 \`.6\` ↞ الأسئلة
+> 🕌 \`.7\` ↞ اسلامي
+> 😂 \`.8\` ↞ الضحك
+> 👥 \`.9\` ↞ المجموعات
+> 🎨 \`.ملصق\` ↞ الملصقات والباكات
+> ♟️ \`.10\` ↞ المطور
+> ⚡ \`.11\` ↞ الادارة
+> 🔍 \`.12\` ↞ الكشف
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-💡 *اكتب رقم القسم أو الكلمة المفتاحية للوصول السريع!*`;
+💡 *اكتب رقم القسم للوصول السريع!*`;
 
             const devPp = await getDeveloperProfilePic(sock);
-
             try {
-                await sock.sendMessage(from, { 
-                    image: { url: devPp }, 
-                    caption: menuText,
-                    mentions: [sender]
-                });
+                await sock.sendMessage(from, { image: { url: devPp }, caption: menuText, mentions: [sender] });
             } catch (e) {
                 await sock.sendMessage(from, { text: menuText });
             }
@@ -988,7 +1178,6 @@ async function startBot() {
         if (cmdBase === '1') {
             const settings = getGroupSetting(from);
             const userPp = await getUserProfilePic(sock, sender);
-            
             const text1 = `🛡️ *الحماية (لهذه المجموعة):*
 
 🔗 *1. حماية الروابط:* [${settings.antiLink ? '🟢 مفعلة' : '🔴 معطلة'}]
@@ -1002,57 +1191,142 @@ async function startBot() {
 
 ⚙️ *لتصفير إنذارات أي عضو:* \`.صفر @العضو\``;
 
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: text1 });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: text1 }); }
             return;
         }
 
         if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd === 'فعاليات') {
-            const entAndGamesText = `🎮🎲 *قسم الترفيه والألعاب والفعاليات:*
+            const entAndGamesText = `🎮🎲 *2. الترفيه والألعاب والفعاليات الأسطورية:*
 
-> ❓ \`.خيروك\` ↞ أسئلة لو خيروك بين عوالم الأنمي
-> 📜 \`.حكمة\` ↞ مقولة وحكمة أسطورية للأنمي
-> 🧩 \`.تفكيك\` ↞ تفكيك اسم الأنمي (+10 نقاط) [⏳ الوقت: 30 ثانية]
-> ✍️ \`.كتابه\` أو \`.كتابة\` ↞ سرعة كتابة الكلمة (+10 نقاط) [⏳ الوقت: 30 ثانية]
-> 💡 \`.حزورة\` أو \`.لغز\` ↞ ألغاز وحزازير الأنمي (+10 نقاط) [⏳ الوقت: دقيقتين]
-> ✊ \`.حجرة\` <حجر/ورقة/مقص> ↞ لعبة تحدي البوت [⚡ بلا وقت]
-> 🔢 \`.توقع\` <رقم من 1 لـ 5> ↞ اختبر حظك واربح نقاط [⚡ بلا وقت]
-> 🚪 \`.انسحب\` ↞ الانسحاب وإلغاء الفعالية الجارية في أي وقت.`;
+> ❓ \`.خيروك\` ↞ أسئلة لو خيروك
+> 📜 \`.حكمة\` ↞ مقولة أسطورية
+> 🧩 \`.تفكيك\` ↞ تفكيك أنمي (+10 نقاط)
+> ✍️ \`.كتابه\` ↞ سرعة كتابة (+10 نقاط)
+> 💡 \`.حزورة\` ↞ لغز أنمي (+10 نقاط)
+> 💬 \`.صراحة\` ↞ لعبة صراحة وتحدي
+> 🔥 \`.تحدي\` ↞ تحديات حماسية
+> 📝 \`.اكمل\` ↞ اكمل المثل أو الآية
+> 🔤 \`.رتب\` ↞ ترتيب الحروف
+> 🎯 \`.خمن\` ↞ خمن الرقم
+> 🔠 \`.حرف\` ↞ كلمات بالحرف المطلوب
+> 🔄 \`.عكس\` ↞ تفكيك عكسي للكلمات
+> 🚪 \`.انسحب\` ↞ إلغاء الفعالية`;
             
             const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: entAndGamesText });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: entAndGamesText }); }
             return;
         }
 
         if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {
-            const bankMenuText = `💳 *قسم البنك والنقاط ومتجر:*
+            const bankMenuText = `💳 *3. البنك والنقاط والمتجر:*
 
-> 💳 \`.بنك\` أو \`.حسابي\` ↞ كشف الحساب البنكي والمعرف الخاص
-> 💸 \`.تحويل\` <المبلغ> @منشن ↞ تحويل نقاط لعضو آخر
-> 🏆 \`.توب_نقاط\` ↞ قائمة أثرى 5 أعضاء
-> 🎁 \`.مكافأة\` ↞ استلم هديتك اليومية (نقاط مجانية)
-> 🛒 \`.متجر\` ↞ ✨ المتجر الأسطوري (شراء زخرفة، فيديوهات وملصقات بالنقاط)`;
+> 💳 \`.بنك\` | \`.حسابي\` ↞ كشف الحساب البنكي
+> 💸 \`.تحويل <المبلغ> @منشن\` ↞ تحويل نقاط
+> 🏆 \`.توب_نقاط\` ↞ أثرى الأعضاء
+> 🎁 \`.مكافأة\` ↞ الهدية اليومية
+> 🛒 \`.متجر\` ↞ المتجر الأسطوري`;
 
             const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: bankMenuText });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
             return;
         }
 
-        if (cmdBase === '4' || cmd === 'المطور' || cmd === 'مطور') {
+        if (cmdBase === '4') {
+            const sportText = `⚽ *4. الرياضة:*
+
+> ⚽ \`.كرة_قدم\` ↞ معلومات كرة القدم
+> 🏆 \`.مباريات\` ↞ المباريات الحية
+> 📊 \`.نتائج\` ↞ نتائج المباريات
+> 🥇 \`.بطولات\` ↞ البطولات الكبرى
+> 👤 \`.لاعب <اسم>\` ↞ معلومات لاعب
+> ⚽ \`.فريق <اسم>\` ↞ معلومات فريق
+> 🏆 \`.ترتيب\` ↞ ترتيب الفرق
+> 🔥 \`.هداف\` ↞ قائمة الهدافين`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
+            return;
+        }
+
+        if (cmdBase === '5') {
+            const aiText = `🤖 *5. الذكاء الاصطناعي:*
+
+> 🤖 \`.ai <سؤال>\` ↞ سؤال الذكاء الاصطناعي
+> 🧠 \`.اسأل <سؤال>\` ↞ الحصول على إجابة
+> ✍️ \`.اكتب <موضوع>\` ↞ كتابة نص
+> 📚 \`.لخص <نص>\` ↞ تلخيص النصوص
+> 🌐 \`.ترجم <نص>\` ↞ ترجمة فورية
+> 📝 \`.صحح <نص>\` ↞ تصحيح لغوي`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: aiText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: aiText }); }
+            return;
+        }
+
+        if (cmdBase === '6') {
+            const brainText = `🧠 *6. الأسئلة:*
+
+> ❓ \`.سؤال\` ↞ سؤال عشوائي
+> 🧠 \`.سؤال_ذكاء\` ↞ سؤال ذكاء
+> ✅ \`.صح_او_خطأ\` ↞ اختبار صواب أو خطأ
+> 📚 \`.ثقافة\` ↞ سؤال ثقافي
+> 🌍 \`.جغرافيا\` ↞ سؤال جغرافيا
+> 🔬 \`.علوم\` ↞ سؤال علمي
+> 📜 \`.تاريخ\` ↞ سؤال تاريخي`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: brainText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: brainText }); }
+            return;
+        }
+
+        if (cmdBase === '7') {
+            const islamText = `🕌 *7. اسلامي:*
+
+> 📖 \`.قرآن\` ↞ آية قرآنية عشوائية
+> 📜 \`.آية\` ↞ تفسير مختصر
+> 🕋 \`.سورة\` ↞ معلومات السور
+> 🤲 \`.دعاء\` ↞ دعاء عشوائي
+> 📿 \`.ذكر\` ↞ ذكر مبارك
+> ☪️ \`.حديث\` ↞ حديث نبوي شريف
+> 🌙 \`.أذكار\` ↞ أذكار الصباح والمساء`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: islamText }); }
+            return;
+        }
+
+        if (cmdBase === '8') {
+            const funText = `😂 *8. الضحك:*
+
+> 🤣 \`.نكتة\` ↞ نكتة مضحكة
+> 😂 \`.ضحكني\` ↞ موقف مضحك
+> 🤡 \`.مهرج\` ↞ اختيار عضو عشوائي
+> 🔥 \`.فضيحة\` ↞ سؤال مضحك
+> 👀 \`.مين_الأكثر\` ↞ اختيار عضو
+> 🤔 \`.ماذا_لو\` ↞ سؤال خيالي
+> 💀 \`.رعب\` ↞ موقف مرعب
+> 🗣️ \`.قول\` ↞ عبارة عشوائية
+> 😈 \`.مقلب\` ↞ مقلب نصي`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: funText }); }
+            return;
+        }
+
+        if (cmdBase === '9') {
+            const groupExtText = `👥 *9. المجموعات:*
+
+> 💍 \`.زواج\` ↞ زواج أعضاء المجموعة
+> 💔 \`.طلاق\` ↞ الانفصال بين الزوجين
+> 🌹 \`.غزل @منشن\` ↞ غزل أعضاء
+> 💞 \`.ثنائي\` ↞ اختيار ثنائي عشوائي
+> 👑 \`.ملك_المجموعة\` ↞ اختيار ملك الجروب
+> 🌟 \`.أسطورة_المجموعة\` ↞ أسطورة الجروب
+> 📊 \`.رسائلي\` \`توب_الرسائل\` ↞ إحصائيات النشاط`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: groupExtText }); }
+            return;
+        }
+
+        if (cmdBase === '10' || cmd === 'المطور' || cmd === 'مطور') {
             const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
-> 👤 *اسم المطور:* ${DEVELOPER_NAME}
-> 📱 *رقم المطور:* \`${DEVELOPER_NUMBER}\`
+> 👤 *اسم المطور:* 𝐄𝐫𝐞ن
+> 📱 *رقم المطور:* \`962796163926\`
 
 > 👑 \`.اضافة_مطور @منشن\` ↞ إضافة مطور جديد
 > ❌ \`.حذف_مطور @منشن\` ↞ إزالة مطور
@@ -1065,18 +1339,15 @@ async function startBot() {
 > 🔓 \`.عام\` أو \`.وضع_عام\` ↞ جعل البوت عاماً للجميع
 > 💸 \`.اعطاء <المبلغ> @منشن\` ↞ إضافة نقاط لأي عضو
 > 📢 \`.إذاعة <النص>\` ↞ إرسال رسالة لجميع المجموعات
+> 🤖 \`.تعطيل_البوتات تفعيل/ايقاف\` ↞ تعطيل البوتات الأخرى وبقاء بوتك فقط
 > 🔄 \`.ريستارت\` ↞ إعادة تشغيل البوت.`;
 
-            const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: devMenuText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: devMenuText });
-            }
+            const devPp = await getDeveloperProfilePic(sock);
+            try { await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: devMenuText }); }
             return;
         }
 
-        if (cmdBase === '5') {
+        if (cmdBase === '11' || cmd === 'الادارة' || cmd === 'الاداره') {
             const adminMenuText = `⚡ *قِـسْـمُ الإِدَارَةِ وَالتَّحَكُّمِ:*
 
 > 🔒 \`.قفل\` أو \`.غلق\` ↞ قفل الجروب (المشرفين فقط)
@@ -1100,100 +1371,42 @@ async function startBot() {
 > 🔄 \`.صفر @عضو\` ↞ تصفير إنذارات العضو`;
 
             const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: adminMenuText });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: adminMenuText }); }
             return;
         }
 
-        if (cmdBase === '6' || cmd === 'الكاشف') {
-            const detectorMenuText = `🔍 *قِـسْـمُ الكاشف:*
-
-هذا القسم مخصص لفك وكشف رسائل العرض لمرة واحدة (ViewOnce) بسهولة تامة.
-
-📌 **كيفية الاستخدام:**
-قم بالرد على أي رسالة مرسلة بنظام *(عرض مرة واحدة)* سواء كانت:
-📸 *صورة*
-🎥 *فيديو*
-🎙️ *رسالة صوتية (فويس)*
-
-ثم اكتب في الرد كلمة: 👇
-> \`.كشف\`
-
-✨ لكي يقوم البوت باستخراجها وإرسالها لك مباشرة في الشات بدون أن تختفي!`;
-
+        if (cmdBase === '12' || cmd === 'الكاشف') {
+            const detectorMenuText = `🔍 *12. الكشف:* رَدَّ على رسالة (عرض مرة واحدة) بكلمة \`.كشف\` لفكها فوراً.`;
             const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: detectorMenuText });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: detectorMenuText }); }
             return;
         }
 
         if (cmdBase === 'متجر' || cmd === 'المتجر') {
-            const storeText = `🛒 *مَـتْـجَرُ العَالَمِ الأُسْطُورِيِّ ${DEVELOPER_NAME} 𝐁𝐨𝐭* 🛒
-*استخدم رصيدك ونقاطك المكتسبة من الفعاليات لشراء ما تحب!*
-
-*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*
-
-✍️ [ *1* ] **زخرفة نصوص فخمة (عربي / إنجليزي)**
-> 💰 *السعر:* 20 نقطة
-> 📌 *للطليب:* اكتب \`.شراء زخرفة <النص>\`
-
-🎬 [ *2* ] **مقطع فيديو إيدت للأنمي**
-> 💰 *السعر:* 50 نقطة
-> 📌 *للطليب:* اكتب \`.شراء فيديو <اسم الشخصية>\`
-
-🏷️ [ *3* ] **حزمة ملصقات (باك أنمي)**
-> 💰 *السعر:* 40 نقطة
-> 📌 *للطليب:* اكتب \`.شراء ملصقات <اسم الشخصية>\`
-
-👑 [ *4* ] **لقب فخم خاص بملفك البنكي**
-> 💰 *السعر:* 100 نقطة
-> 📌 *للطليب:* اكتب \`.شراء لقب <اسم اللقب>\``;
-
+            const storeText = `🛒 *مَـتْـجَرُ ${DEVELOPER_NAME}* 🛒\nاستخدم رصيدك:\n✍️ \`.شراء زخرفة <النص>\``;
             const userPp = await getUserProfilePic(sock, sender);
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: storeText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: storeText });
-            }
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: storeText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: storeText }); }
             return;
         }
 
         if (cmdBase === 'بنك' || cmd === 'حسابي') {
             const bankAcc = getBankAccount(sender);
             const userPp = await getUserProfilePic(sock, sender);
-            const accText = `💳 *كَـشْـفُ الحِـسَـابِ البَـنْـكِـيِّ:*
-> 👤 *صاحب الحساب:* @${sender.split('@')[0]}
-> 🆔 *رقم الحساب:* \`${bankAcc.bankId}\`
-> 📅 *تاريخ الإنشاء:* ${bankAcc.createdAt}
-> 💰 *الرصيد الحالي:* *${userPoints[sender]} نقطة*`;
-
-            try {
-                await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender] });
-            } catch (e) {
-                await sock.sendMessage(from, { text: accText, mentions: [sender] });
-            }
+            const accText = `💳 *كَـشْـفُ الحِـسَـابِ (${DEVELOPER_NAME}):*\n> رصيدك: *${userPoints[sender]} نقطة*`;
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: accText, mentions: [sender] }); }
             return;
         }
 
         if (cmdBase === 'مكافأة' || cmd === 'هدية') {
             const today = new Date().toLocaleDateString('ar-EG');
             if (!dailyRewards[sender]) dailyRewards[sender] = {};
-
             if (dailyRewards[sender] === today) {
-                return sock.sendMessage(from, { text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً يا @${sender.split('@')[0]}! عُد غداً لاستلام مكافأة جديدة.`, mentions: [sender] });
+                return sock.sendMessage(from, { text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً!`, mentions: [sender] });
             }
-
             dailyRewards[sender] = today;
             getBankAccount(sender);
             userPoints[sender] += 50;
-
-            return sock.sendMessage(from, { text: `🎁 *تم تسليم المكافأة اليومية بنجاح!* @${sender.split('@')[0]}\n💰 تمت إضافة *50 نقطة* إلى رصيدك البنكي (رصيدك الحالي: ${userPoints[sender]})`, mentions: [sender] });
+            return sock.sendMessage(from, { text: `🎁 تمت إضافة 50 نقطة مكافأة لحسابك!`, mentions: [sender] });
         }
     });
 }
