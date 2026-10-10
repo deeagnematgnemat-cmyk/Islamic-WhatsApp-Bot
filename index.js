@@ -1,11 +1,12 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { Sticker, createSticker, StickerTypes } from 'wa-sticker-formatter';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
 
 const DEVELOPER_NUMBER = '962796163926'; 
-const DEVELOPER_NAME = 'TOJI BOT 🔱';
+const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 let extraDevelopers = []; 
 let botLogs = []; 
 
@@ -41,131 +42,65 @@ const gamesData = {
         { word: 'ايرين', answer: 'ا ي ر ن' },
         { word: 'لوفي', answer: 'ل و ف ي' },
         { word: 'زورو', answer: 'ز و ر و' },
-        { word: 'ساسكي', answer: 'س ا س ك ي' },
-        { word: 'كاكاشي', answer: 'ك ا ك ا ش ي' },
-        { word: 'غينتوكي', answer: 'غ ي ن ت و ك ي' },
-        { word: 'باكوغو', answer: 'ب ا ك و غ و' },
-        { word: 'تودوروكي', answer: 'ت و د و ر و ك ي' },
-        { word: 'ميكاسا', answer: 'م ي ك ا س ا' },
-        { word: 'ليفاي', answer: 'ل ي ف ا ي' },
-        { word: 'لايت', answer: 'ل ا ي ت' },
-        { word: 'كيلوا', answer: 'ك ي ل و ا' },
-        { word: 'غون', answer: 'غ و ن' },
-        { word: 'كورابيكا', answer: 'ك و ر ا ب ي ك ا' }
+        { word: 'ساسكي', answer: 'س ا س ك ي' }
     ],
     typing: [
         'ناروتو أوزوماكي بطل القرى المخفية وصاحب الإرادة الصلبة',
-        'ايرين ييغر عملاق الهجوم الذي سعى خلف حرية شعبه حتى النهاية',
-        'مونكي دي لوفي ملك القراصنة المستقبلي وصاحب قبعة القش',
-        'رورونوا زورو السياف الأعظم ونائب طاقم قبعة القش الأقوى',
-        'ساكاتا غينتوكي السامراء الأبدي صاحب الشعر الفضي المتمرد',
-        'ليلوش لامبروج استراتيجي العبقرية وملك عالم الچياس المظلم',
-        'كاجياما توبييو الموزع العبقري في فريق الكاراسونو للكرة الطائرة',
-        'إيتاتشي أوتشيها العبقري الحكيم الذي ضحي بكل شيء لأجل السلام'
+        'ايرين ييغر عملاق الهجوم الذي سعى خلف حرية شعبه حتى النهاية'
     ],
     riddles: [
-        { question: 'من هو الشخصية التي تمتلك قوة العمالقة المؤسس وتتعهد بتحرير شعبها؟', answer: 'ايرين' },
-        { question: 'ما هو اسم الفيلق الذي يخرج خارج الأسوار استكشافاً في انمي هجوم العمالقة؟', answer: 'فيلق الاستطلاع' },
-        { question: 'من هو الشخصية التي قامت بختم الكيوبي داخل ناروتو؟', answer: 'ميناتو' },
-        { question: 'ما هو اسم العشيرة التي ينتمي إليها ساسكي في ناروتو؟', answer: 'اوتشيها' },
-        { question: 'من هو مبتكر أوضاع الموت في أنمي مذكرة الموت؟', answer: 'ريوك' },
-        { question: 'ما اسم السيف الأسطوري الذي يمتلكه زورو ويقطع به كل شيء؟', answer: 'وافو' }
+        { question: 'من هو الشخصية التي تمتلك قوة العمالقة المؤسس وتتعهد بتحرير شعبها؟', answer: 'ايرين' }
     ],
     sports: [
-        { question: 'من هو اللاعب الحاصل على أكبر عدد من الكرات الذهبية؟', answer: 'ميسي' },
-        { question: 'ما هو النادي الأكثر تحقيقاً لدوري أبطال أوروبا؟', answer: 'ريال مدريد' },
-        { question: 'من هو الهداف التاريخي لبطولة دوري أبطال أوروبا؟', answer: 'رونالدو' },
-        { question: 'أي منتخب فاز بكأس العالم لكرة القدم 2022؟', answer: 'الارجنتين' },
-        { question: 'من هو النادي الملقب بالشياطين الحمر في إنجلترا؟', answer: 'مانشستر يونايتد' }
+        { question: 'من هو اللاعب الحاصل على أكبر عدد من الكرات الذهبية؟', answer: 'ميسي' }
     ],
     smartQ: [
-        { question: 'ما هو الحيوان الذي ينام وعينه مفتوحة؟', answer: 'السمكة' },
-        { question: 'ما هو الشيء الذي كلما أخذت منه كبر؟', answer: 'الحفرة' },
-        { question: 'ما هو البيت الذي ليس فيه أبواب ولا غرف؟', answer: 'بيت الشعر' },
-        { question: 'ما هو الشيء الذي يكتب ولا يقرأ؟', answer: 'القلم' }
+        { question: 'ما هو الحيوان الذي ينام وعينه مفتوحة؟', answer: 'السمكة' }
     ],
     trueFalse: [
-        { question: 'هل الشمس تشرق من الغرب؟ (صواب / خطأ)', answer: 'خطأ' },
-        { question: 'هل الماء يتكون من هيدروجين وأكسجين؟ (صواب / خطأ)', answer: 'صواب' },
-        { question: 'هل الحوت الأزرق يعتبر من الأسماك؟ (صواب / خطأ)', answer: 'خطأ' },
-        { question: 'هل الأرض تدور حول الشمس؟ (صواب / خطأ)', answer: 'صواب' }
+        { question: 'هل الشمس تشرق من الغرب؟ (صواب / خطأ)', answer: 'خطأ' }
     ],
     cultural: [
-        { question: 'ما عاصمة دولة فرنسا؟', answer: 'باريس' },
-        { question: 'في أي قارة تقع مصر؟', answer: 'افريقيا' },
-        { question: 'ما هي عاصمة اليابان؟', answer: 'طوكيو' },
-        { question: 'ما هي عاصمة المملكة العربية السعودية؟', answer: 'الرياض' },
-        { question: 'ما هي الدولة التي بها برج إيفل؟', answer: 'فرنسا' }
+        { question: 'ما عاصمة دولة فرنسا؟', answer: 'باريس' }
     ],
     geography: [
-        { question: 'ما هي أكبر دولة في العالم مساحة؟', answer: 'روسيا' },
-        { question: 'ما هي عاصمة اليابان؟', answer: 'طوكيو' },
-        { question: 'ما هو أكبر محيط في العالم؟', answer: 'المحيط الهادئ' },
-        { question: 'أين تقع أهرامات الجيزة؟', answer: 'مصر' }
+        { question: 'ما هي أكبر دولة في العالم مساحة؟', answer: 'روسيا' }
     ],
     science: [
-        { question: 'ما هو العنصر الكيميائي الذي يرمز له بالرمز H؟', answer: 'هيدروجين' },
-        { question: 'ما هي غاز الحياة الذي يمتصه النبات؟', answer: 'ثاني أكسيد الكربون' },
-        { question: 'ما هو الكوكب القريب من الشمس؟', answer: 'عطارد' },
-        { question: 'ما هي عاصمة الدم الحمراء التي تحمل الأكسجين؟', answer: 'كريات الدم الحمراء' }
+        { question: 'ما هو العنصر الكيميائي الذي يرمز له بالرمز H؟', answer: 'هيدروجين' }
     ],
     history: [
-        { question: 'في أي سنة وقعت غزوة بدر الكبرى؟', answer: 'السنة الثانية للهجرة' },
-        { question: 'من هو أول خلفاء المسلمين؟', answer: 'ابو بكر الصديق' },
-        { question: 'من هو فاتح القسطنطينية؟', answer: 'محمد الفاتح' },
-        { question: 'في أي عام هجري فتحت مكة المكرمة؟', answer: 'السنة الثامنة للهجرة' }
+        { question: 'في أي سنة وقعت غزوة بدر الكبرى؟', answer: 'السنة الثانية للهجرة' }
     ],
     islamicQ: [
-        { question: 'كم عدد سور القرآن الكريم؟', answer: '114 سورة' },
-        { question: 'ما هي السورة التي تسمى قلب القرآن؟', answer: 'سورة يس' },
-        { question: 'ما هي السورة التي تعدل ثلث القرآن؟', answer: 'سورة الإخلاص' },
-        { question: 'كم عدد حزب القرآن الكريم؟', answer: '60 حزبا' }
+        { question: 'كم عدد سور القرآن الكريم؟', answer: '114 سورة' }
     ],
     truth: [
-        { question: 'لعبة صراحة: ما هو أقوى موقف سويته وتندمت عليه؟', answer: 'صراحة' },
-        { question: 'لعبة صراحة: هل تحب شخصاً سراً حالياً؟', answer: 'نعم' },
-        { question: 'لعبة صراحة: ما هي أكبر كذبة كذبتها على أهلك؟', answer: 'صراحة' },
-        { question: 'لعبة صراحة: هل تتمنى العودة للماضي لتغيير قرار معين؟', answer: 'نعم' }
+        { question: 'لعبة صراحة: ما هو أقوى موقف سويته وتندمت عليه؟', answer: 'صراحة' }
     ],
     challenge: [
-        { question: 'تحدي: قم بإرسال ايموجي 🦅 في الشات حالاً!', answer: '🦅' },
-        { question: 'تحدي: اذكر اسم بطل ون بيس!', answer: 'لوفي' },
-        { question: 'تحدي: اكتب اسم أقوى شخصية في أنمي ناروتو!', answer: 'مادارا' },
-        { question: 'تحدي: ارسل ايموجي السيف 🗡️ في الشات!', answer: '🗡️' }
+        { question: 'تحدي: قم بإرسال ايموجي 🦅 في الشات حالاً!', answer: '🦅' }
     ],
     complete: [
-        { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' },
-        { question: 'أكمل الآية: إِنَّ مَعَ الْعُسْرِ ...', answer: 'يسرا' },
-        { question: 'أكمل المثل: الجار قبل ...', answer: 'الدار' },
-        { question: 'أكمل المثل: اطلب العلم من المهد إلى ...', answer: 'الحدق' }
+        { question: 'أكمل المثل: اتق شر من أحسنت ...', answer: 'اليه' }
     ],
     arrange: [
-        { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' },
-        { question: 'رتب الحروف لتكون اسم شخصية: ز و ر و', answer: 'زورو' },
-        { question: 'رتب الحروف لتكون اسم شخصية: ف ي ل و', answer: 'لوفي' }
+        { question: 'رتب الحروف لتكون اسم أنمي: ت و ر ا ن و', answer: 'ناروتو' }
     ],
     guess: [
         { question: 'خمن رقم شخصية بطل أنمي من 1 إلى 3:', answer: '2' }
     ],
     letterGame: [
-        { question: 'اكتب اسم شخصية تبدأ بحرف السين (س):', answer: 'ساسكي' },
-        { question: 'اكتب اسم شخصية تبدأ بحرف النون (ن):', answer: 'ناروتو' },
-        { question: 'اكتب اسم شخصية تبدأ بحرف اللام (ل):', answer: 'لوفي' }
+        { question: 'اكتب اسم شخصية تبدأ بحرف السين (س):', answer: 'ساسكي' }
     ],
     reverseGame: [
-        { question: 'تفكيك عكسي لكلمة (سماء):', answer: 'يامس' },
-        { question: 'تفكيك عكسي لكلمة (ناروتو):', answer: 'وتوران' }
+        { question: 'تفكيك عكسي لكلمة (سماء):', answer: 'يامس' }
     ],
     wouldYouRather: [
-        { question: 'لو خيروك: تنضم لفيلق الاستطلاع 🐎 أو تنضم لفيلق الشرطة العسكرية 🛡️؟' },
-        { question: 'لو خيروك: تمتلك عيون الشارينگان 👁️ أو تمتلك قدرة عمالقة الهجوم ⚡؟' },
-        { question: 'لو خيروك: تعيش في عالم ون بيس كقرصان 🏴‍☠️ أو في عالم ناروتو كنينجا 🥷؟' }
+        { question: 'لو خيروك: تنضم لفيلق الاستطلاع 🐎 أو تنضم لفيلق الشرطة العسكرية 🛡️؟' }
     ],
     quotes: [
-        '“إن لم تقاتل، فلن تفوز بشيء أبداً!” - إيرين ييغر',
-        '“الألم أفضل معلم للبشر.” - پين',
-        '“العدالة لن تتحقق إلا بالتضحيات الكبرى.” - إيروين سميث',
-        '“من لا يعمل بجد، لا يحق له أن يحلم.” - مونكي دي لوفي'
+        '“إن لم تقاتل، فلن تفوز بشيء أبداً!” - إيرين ييغر'
     ]
 };
 
@@ -251,7 +186,6 @@ function startTimedGame(from, sock, gameType, categoryObj, timeoutSec = 30) {
     if (activeGames[from] && activeGames[from].timer) {
         clearTimeout(activeGames[from].timer);
     }
-
     const timer = setTimeout(async () => {
         if (activeGames[from]) {
             delete activeGames[from];
@@ -951,16 +885,51 @@ async function startBot() {
             }
         }
 
-        if (cmdBase === 'ملصق') {
-            const query = trimmedBody.replace(/^\.ملصق/i, '').trim();
-            if (!query && !quotedMsg) return sock.sendMessage(from, { text: '📌 يرجى كتابة اسم الشخصية بجانب الأمر. مثال: `.ملصق ناروتو`' });
-            return sock.sendMessage(from, { text: `🍷 *SUKUNA BOT* 🍷\n\n🍷 جاري البحث عن: *${query || 'عام'}*\n⏳ العدد: 30 ملصق\n⌛ انتظر لحظات...` });
-        }
-
-        if (cmdBase === 'حزمة') {
-            const query = trimmedBody.replace(/^\.حزمة/i, '').trim();
-            if (!query) return sock.sendMessage(from, { text: '📌 يرجى كتابة اسم الشخصية أو الحزمة. مثال: `.حزمة مميز`' });
-            return sock.sendMessage(from, { text: `🍷 تم تجهيز 30 ملصق\n📤 جاري إرسال الحزمة...\n⚡ انتظر قليلاً` });
+        // --- قسم الملصقات الحقيقي لإنشاء وإرسال ستيكرات واتساب فعلية ---
+        if (cmdBase === 'ملصق' || cmdBase === 'حزمة') {
+            if (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage)) {
+                try {
+                    let quotInfo = msg.message.extendedTextMessage.contextInfo;
+                    let targetMsg = {
+                        key: { remoteJid: from, id: quotInfo.stanzaId, participant: quotInfo.participant || quotInfo.remoteJid },
+                        message: quotedMsg
+                    };
+                    let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+                    let sticker = new Sticker(stream, {
+                        pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+                        author: DEVELOPER_NAME,
+                        type: StickerTypes.FULL,
+                        categories: ['✨', '🍷'],
+                        id: '12345',
+                        quality: 75
+                    });
+                    let buffer = await sticker.toBuffer();
+                    await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
+                    return;
+                } catch (e) {
+                    return sock.sendMessage(from, { text: `❌ فشل تحويل الوسائط إلى ملصق حقيقي.` });
+                }
+            } else {
+                const sampleImages = [
+                    'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
+                    'https://i.postimg.cc/1879V9W3/toji-pfp.jpg'
+                ];
+                await sock.sendMessage(from, { text: `🍷 *SUKUNA & EREN BOT* 🍷\n\n🍷 جاري تجهيز وإرسال حزمة الملصقات الفعلية...\n⏳ انتظر لحظات...` });
+                for (let imgUrl of sampleImages) {
+                    try {
+                        let sticker = new Sticker(imgUrl, {
+                            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+                            author: DEVELOPER_NAME,
+                            type: StickerTypes.FULL,
+                            categories: ['✨', '🍷'],
+                            quality: 50
+                        });
+                        let buffer = await sticker.toBuffer();
+                        await sock.sendMessage(from, { sticker: buffer });
+                    } catch (err) {}
+                }
+                return;
+            }
         }
 
         if (cmdBase === 'كشف') {
@@ -1083,6 +1052,7 @@ async function startBot() {
 > ⤹ ❄️ إختر القسم من الزر بالأسفل
 `.trim();
 
+            // عند طلب أمر .بوت الرد بصورة بروفايل البوت
             const botPp = await getBotProfilePic(sock);
             const mediaMessage = await prepareWAMessageMedia({ image: { url: botPp } }, { upload: sock.waUploadToServer });
 
@@ -1165,6 +1135,7 @@ async function startBot() {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
+            // عند طلب .اوامر الرد بصورة بروفايل المطور
             const devPp = await getDeveloperProfilePic(sock);
             try {
                 await sock.sendMessage(from, { image: { url: devPp }, caption: menuText, mentions: [sender] });
@@ -1341,6 +1312,7 @@ async function startBot() {
 > 🤖 \`.تعطيل_البوتات تفعيل/ايقاف\` ↞ تعطيل البوتات الأخرى وبقاء بوتك فقط
 > 🔄 \`.ريستارت\` ↞ إعادة تشغيل البوت.`;
 
+            // عند طلب قسم المطور الرد بصورة بروفايل المطور
             const devPp = await getDeveloperProfilePic(sock);
             try { await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: devMenuText }); }
             return;
