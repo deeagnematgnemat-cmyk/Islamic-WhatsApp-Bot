@@ -209,7 +209,31 @@ const validCommands = [
 
 async function searchTelegramStickerPacks(query) {
 try {
-const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" } }); const html = await res.text(); const $ = cheerio.load(html); let packs = []; $('a[href]').each((_, el) => { const href = $(el).attr('href'); if (href && (href.includes('t.me/addstickers/') \vert{}\vert{} href.includes('telegram.me/addstickers/'))) { if (!packs.includes(href)) packs.push(href); } }); return packs; } catch (e) { return []; } }  function generateProgressBar(percent, title = "جاري المعالجة") { percent = Math.max(0, Math.min(100, percent)); const filled = Math.floor(percent / 10); const bar = "█".repeat(filled) + "░".repeat(10 - filled); return `🎮 ${title}\n[${bar}]${percent}%`;
+const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, {
+headers: {
+"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+});
+const html = await res.text();
+const $ = cheerio.load(html);
+let packs = [];
+$('a[href]').each((_, el) => {
+const href = $(el).attr('href');
+if (href && (href.includes('t.me/addstickers/') || href.includes('telegram.me/addstickers/'))) {
+if (!packs.includes(href)) packs.push(href);
+}
+});
+return packs;
+} catch (e) {
+return [];
+}
+}
+
+function generateProgressBar(percent, title = "جاري المعالجة") {
+percent = Math.max(0, Math.min(100, percent));
+const filled = Math.floor(percent / 10);
+const bar = "█".repeat(filled) + "░".repeat(10 - filled);
+return `🎮 ${title}\n[${bar}]${percent}%`;
 }
 
 function isValidCmd(fullCmd) {
@@ -286,7 +310,8 @@ clearTimeout(activeGames[from].timer);
 }
 
 const item = categoryObj[Math.floor(Math.random() * categoryObj.length)];
-let promptText = `🧩 *فعالية التفكيك (الوقت: 30 ثانية):*\n\nفكك الكلمة:\n\n👉 *${item.word}*`; if (gameType === 'typing') promptText = `✍️ *فعالية الكتابة (الوقت: 30 ثانية):*\n\nاكتب التالي بدقة:\n\n👉 *${item}*`;
+let promptText = `🧩 *فعالية التفكيك (الوقت: 30 ثانية):*\n\nفكك الكلمة:\n\n👉 *${item.word}*`;
+if (gameType === 'typing') promptText = `✍️ *فعالية الكتابة (الوقت: 30 ثانية):*\n\nاكتب التالي بدقة:\n\n👉 *${item}*`;
 
 const timer = setTimeout(async () => {
 if (activeGames[from]) {
@@ -305,7 +330,61 @@ function getBankAccount(senderJid) {
 if (!bankAccounts[senderJid]) {
 const randomId = Math.floor(100000 + Math.random() * 900000);
 bankAccounts[senderJid] = {
-bankId: `EREN-${randomId}`, createdAt: new Date().toLocaleDateString('ar-EG') }; } if (userPoints[senderJid] === undefined) userPoints[senderJid] = 0; return bankAccounts[senderJid]; }  function getGroupSetting(groupId) { if (!groupSettings[groupId]) { groupSettings[groupId] = { adminOnly: false, antiLink: true, antiBadWords: true, antiContact: true, welcome: true, goodbye: true, botMode: 'public', antiOtherBots: false }; } return groupSettings[groupId]; }  function getTargetUser(msg) { const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0]; const quoted = msg.message.extendedTextMessage?.contextInfo?.participant; return mentioned \vert{}\vert{} quoted \vert{}\vert{} null; }  async function startBot() { const { state, saveCreds } = await useMultiFileAuthState('arem_new_session'); const { version } = await fetchLatestBaileysVersion();  const sock = makeWASocket({ auth: state, version, printQRInTerminal: false, logger: pino({ level: 'silent' }), browser: ['Ubuntu', 'Chrome', '110.0.5481.100'], syncFullHistory: false, shouldSyncHistoryMessage: () => false, markOnlineOnConnect: true });  sock.ev.on('creds.update', saveCreds);  if (!sock.authState.creds.registered) { setTimeout(async () => { try { let phoneNumber = "962795106901"; let code = await sock.requestPairingCode(phoneNumber); code = code?.match(/.{1,4}/g)?.join("-") \vert{}\vert{} code; console.log(`\n========================================`); console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+bankId: `EREN-${randomId}`,
+createdAt: new Date().toLocaleDateString('ar-EG')
+};
+}
+if (userPoints[senderJid] === undefined) userPoints[senderJid] = 0;
+return bankAccounts[senderJid];
+}
+
+function getGroupSetting(groupId) {
+if (!groupSettings[groupId]) {
+groupSettings[groupId] = {
+adminOnly: false,
+antiLink: true,
+antiBadWords: true,
+antiContact: true,
+welcome: true,
+goodbye: true,
+botMode: 'public',
+antiOtherBots: false
+};
+}
+return groupSettings[groupId];
+}
+
+function getTargetUser(msg) {
+const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
+return mentioned || quoted || null;
+}
+
+async function startBot() {
+const { state, saveCreds } = await useMultiFileAuthState('arem_new_session');
+const { version } = await fetchLatestBaileysVersion();
+
+const sock = makeWASocket({
+auth: state,
+version,
+printQRInTerminal: false,
+logger: pino({ level: 'silent' }),
+browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
+syncFullHistory: false,
+shouldSyncHistoryMessage: () => false,
+markOnlineOnConnect: true
+});
+
+sock.ev.on('creds.update', saveCreds);
+
+if (!sock.authState.creds.registered) {
+setTimeout(async () => {
+try {
+let phoneNumber = "962795106901";
+let code = await sock.requestPairingCode(phoneNumber);
+code = code?.match(/.{1,4}/g)?.join("-") || code;
+console.log(`\n========================================`);
+console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
 console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e);
@@ -420,7 +499,6 @@ const body = msg.message.conversation || msg.message.extendedTextMessage?.text |
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
-// فحص خيار الإيقاف الكلي للبوت للمطور
 if (globalBotStopped && !isSenderDev) {
     return;
 }
@@ -1018,22 +1096,22 @@ if (cmdBase === '13') {
 
 *❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐*
 
-1. 🎨 `.صنع_حزمة` ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
-2. 🔎 `.بحث_متقدم` <اسم الموضوع> ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
-3. 📊 `.إحصائياتي` ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
-4. 💡 `.كيفية_الاستخدام` ↞ طريقة التعامل مع البوت وتنزيل الحزم.
-5. 🖼️ `.صوره` <اسم الشخصية> ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
-6. 🎬 `.ايدت` <اسم الشخصية> ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
-7. 🖤🤍 `.تطقيم` ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
-8. ▶️ `.يوتيوب` <الرابط> ↞ تحميل فيديو من يوتيوب.
-9. 🎵 `.تيك` <الرابط> ↞ تحميل مقطع تيك توك.
-10. 📸 `.انستا` <الرابط> ↞ تحميل منشورات أو ريلز انستقرام.
-11. 👥 `.فيس` <الرابط> ↞ تحميل فيديو فيسبوك.
-12. 🐦 `.اكس` <الرابط> ↞ تحميل فيديو من المنصة.
-13. 👻 `.سناب` <الرابط> ↞ تحميل فيديو سناب شات.
-14. 📌 `.بنترست` <الرابط> ↞ تحميل فيديو/صورة من بنترست.
-15. 📹 `.ريلز` <الرابط> ↞ تحميل مقاطع الريلز.
-16. ⚡ `.شورتس` <الرابط> ↞ تحميل شورتس يوتيوب.
+1. 🎨 \`.صنع_حزمة\` ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
+2. 🔎 \`.بحث_متقدم\` <اسم الموضوع> ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
+3. 📊 \`.إحصائياتي\` ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
+4. 💡 \`.كيفية_الاستخدام\` ↞ طريقة التعامل مع البوت وتنزيل الحزم.
+5. 🖼️ \`.صوره\` <اسم الشخصية> ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
+6. 🎬 \`.ايدت\` <اسم الشخصية> ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
+7. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
+8. ▶️ \`.يوتيوب\` <الرابط> ↞ تحميل فيديو من يوتيوب.
+9. 🎵 \`.تيك\` <الرابط> ↞ تحميل مقطع تيك توك.
+10. 📸 \`.انستا\` <الرابط> ↞ تحميل منشورات أو ريلز انستقرام.
+11. 👥 \`.فيس\` <الرابط> ↞ تحميل فيديو فيسبوك.
+12. 🐦 \`.اكس\` <الرابط> ↞ تحميل فيديو من المنصة.
+13. 👻 \`.سناب\` <الرابط> ↞ تحميل فيديو سناب شات.
+14. 📌 \`.بنترست\` <الرابط> ↞ تحميل فيديو/صورة من بنترست.
+15. 📹 \`.ريلز\` <الرابط> ↞ تحميل مقاطع الريلز.
+16. ⚡ \`.شورتس\` <الرابط> ↞ تحميل شورتس يوتيوب.
 
 *❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
 const userPp = await getUserProfilePic(sock, sender);
