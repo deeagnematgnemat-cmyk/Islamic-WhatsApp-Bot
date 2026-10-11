@@ -795,23 +795,35 @@ if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {
     }    
 }    
 
-if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط' || cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {    
+if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
-    const action = (cmdBase.includes('سماح')) ? false : true;    
-    getGroupSetting(from).antiLink = action;    
-    return sock.sendMessage(from, { text: action ? '🟢 تم تفعيل حماية الروابط.' : '🔴 تم سماح وإيقاف حماية الروابط.' });    
+    getGroupSetting(from).antiLink = true;    
+    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الروابط.' });    
 }    
-if (cmdBase === 'حظر_سب' || cmdBase === 'حظر سب' || cmdBase === 'سماح_سب' || cmdBase === 'سماح سب') {    
+if (cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
-    const action = (cmdBase.includes('سماح')) ? false : true;    
-    getGroupSetting(from).antiBadWords = action;    
-    return sock.sendMessage(from, { text: action ? '🟢 تم تفعيل حماية الشتائم.' : '🔴 تم سماح وإيقاف حماية الشتائم.' });    
+    getGroupSetting(from).antiLink = false;    
+    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الروابط (سماح).' });    
 }    
-if (cmdBase === 'حظر_جهات' || cmdBase === 'حظر جهات' || cmdBase === 'سماح_جهات' || cmdBase === 'سماح جهات') {    
+if (cmdBase === 'حظر_سب' || cmdBase === 'حظر سب') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
-    const action = (cmdBase.includes('سماح')) ? false : true;    
-    getGroupSetting(from).antiContact = action;    
-    return sock.sendMessage(from, { text: action ? '🟢 تم تفعيل حماية جهات الاتصال.' : '🔴 تم سماح وإيقاف حماية جهات الاتصال.' });    
+    getGroupSetting(from).antiBadWords = true;    
+    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتائم.' });    
+}    
+if (cmdBase === 'سماح_سب' || cmdBase === 'سماح سب') {    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
+    getGroupSetting(from).antiBadWords = false;    
+    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتائم (سماح).' });    
+}    
+if (cmdBase === 'حظر_جهات' || cmdBase === 'حظر جهات') {    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
+    getGroupSetting(from).antiContact = true;    
+    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية جهات الاتصال.' });    
+}    
+if (cmdBase === 'سماح_جهات' || cmdBase === 'سماح جهات') {    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
+    getGroupSetting(from).antiContact = false;    
+    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية جهات الاتصال (سماح).' });    
 }    
 
 if (cmd.startsWith('شراء')) {    
@@ -1381,7 +1393,7 @@ if (cmdBase === '1') {
 
 
 
-⚙️ لتصفير إنذارات أي عضو: .صفر @العضو`;
+⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: text1 }); }
 return;
@@ -1558,7 +1570,7 @@ if (cmdBase === '11' || cmd === 'الادارة' || cmd === 'الاداره') {
 🗑️ .حذف ↞ حذف رسالة محددة (بالرد عليها)
 📢 .الكل أو .منشن ↞ منشن جماعي لكل الأعضاء
 👑 .رفع @عضو ↞ ترقية عضو إلى مشرف
-📉 .تنزيل @عضو ↞ إزالة الإشراف عن عضو
+📉 .تنزيل @عضو -_ إزالة الإشراف عن عضو
 🚨 .طرد @عضو ↞ طرد العضو من المجموعة
 ⚠️ .اضف_انذار @عضو ↞ إضافة إنذار إداري للعضو
 📉 .ازل_انذار @عضو ↞ إزالة إنذار عن العضو
