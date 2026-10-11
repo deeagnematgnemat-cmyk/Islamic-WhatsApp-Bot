@@ -209,31 +209,7 @@ const validCommands = [
 
 async function searchTelegramStickerPacks(query) {
 try {
-const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, {
-headers: {
-"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-});
-const html = await res.text();
-const $ = cheerio.load(html);
-let packs = [];
-$('a[href]').each((_, el) => {
-const href = $(el).attr('href');
-if (href && (href.includes('t.me/addstickers/') || href.includes('telegram.me/addstickers/'))) {
-if (!packs.includes(href)) packs.push(href);
-}
-});
-return packs;
-} catch (e) {
-return [];
-}
-}
-
-function generateProgressBar(percent, title = "جاري المعالجة") {
-percent = Math.max(0, Math.min(100, percent));
-const filled = Math.floor(percent / 10);
-const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-return `🎮 ${title}\n[${bar}]${percent}%`;
+const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" } }); const html = await res.text(); const $ = cheerio.load(html); let packs = []; $('a[href]').each((_, el) => { const href = $(el).attr('href'); if (href && (href.includes('t.me/addstickers/') \vert{}\vert{} href.includes('telegram.me/addstickers/'))) { if (!packs.includes(href)) packs.push(href); } }); return packs; } catch (e) { return []; } }  function generateProgressBar(percent, title = "جاري المعالجة") { percent = Math.max(0, Math.min(100, percent)); const filled = Math.floor(percent / 10); const bar = "█".repeat(filled) + "░".repeat(10 - filled); return `🎮 ${title}\n[${bar}]${percent}%`;
 }
 
 function isValidCmd(fullCmd) {
@@ -310,8 +286,7 @@ clearTimeout(activeGames[from].timer);
 }
 
 const item = categoryObj[Math.floor(Math.random() * categoryObj.length)];
-let promptText = `🧩 *فعالية التفكيك (الوقت: 30 ثانية):*\n\nفكك الكلمة:\n\n👉 *${item.word}*`;
-if (gameType === 'typing') promptText = `✍️ *فعالية الكتابة (الوقت: 30 ثانية):*\n\nاكتب التالي بدقة:\n\n👉 *${item}*`;
+let promptText = `🧩 *فعالية التفكيك (الوقت: 30 ثانية):*\n\nفكك الكلمة:\n\n👉 *${item.word}*`; if (gameType === 'typing') promptText = `✍️ *فعالية الكتابة (الوقت: 30 ثانية):*\n\nاكتب التالي بدقة:\n\n👉 *${item}*`;
 
 const timer = setTimeout(async () => {
 if (activeGames[from]) {
@@ -330,61 +305,7 @@ function getBankAccount(senderJid) {
 if (!bankAccounts[senderJid]) {
 const randomId = Math.floor(100000 + Math.random() * 900000);
 bankAccounts[senderJid] = {
-bankId: `EREN-${randomId}`,
-createdAt: new Date().toLocaleDateString('ar-EG')
-};
-}
-if (userPoints[senderJid] === undefined) userPoints[senderJid] = 0;
-return bankAccounts[senderJid];
-}
-
-function getGroupSetting(groupId) {
-if (!groupSettings[groupId]) {
-groupSettings[groupId] = {
-adminOnly: false,
-antiLink: true,
-antiBadWords: true,
-antiContact: true,
-welcome: true,
-goodbye: true,
-botMode: 'public',
-antiOtherBots: false
-};
-}
-return groupSettings[groupId];
-}
-
-function getTargetUser(msg) {
-const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
-return mentioned || quoted || null;
-}
-
-async function startBot() {
-const { state, saveCreds } = await useMultiFileAuthState('arem_new_session');
-const { version } = await fetchLatestBaileysVersion();
-
-const sock = makeWASocket({
-auth: state,
-version,
-printQRInTerminal: false,
-logger: pino({ level: 'silent' }),
-browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
-syncFullHistory: false,
-shouldSyncHistoryMessage: () => false,
-markOnlineOnConnect: true
-});
-
-sock.ev.on('creds.update', saveCreds);
-
-if (!sock.authState.creds.registered) {
-setTimeout(async () => {
-try {
-let phoneNumber = "962795106901";
-let code = await sock.requestPairingCode(phoneNumber);
-code = code?.match(/.{1,4}/g)?.join("-") || code;
-console.log(`\n========================================`);
-console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+bankId: `EREN-${randomId}`, createdAt: new Date().toLocaleDateString('ar-EG') }; } if (userPoints[senderJid] === undefined) userPoints[senderJid] = 0; return bankAccounts[senderJid]; }  function getGroupSetting(groupId) { if (!groupSettings[groupId]) { groupSettings[groupId] = { adminOnly: false, antiLink: true, antiBadWords: true, antiContact: true, welcome: true, goodbye: true, botMode: 'public', antiOtherBots: false }; } return groupSettings[groupId]; }  function getTargetUser(msg) { const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0]; const quoted = msg.message.extendedTextMessage?.contextInfo?.participant; return mentioned \vert{}\vert{} quoted \vert{}\vert{} null; }  async function startBot() { const { state, saveCreds } = await useMultiFileAuthState('arem_new_session'); const { version } = await fetchLatestBaileysVersion();  const sock = makeWASocket({ auth: state, version, printQRInTerminal: false, logger: pino({ level: 'silent' }), browser: ['Ubuntu', 'Chrome', '110.0.5481.100'], syncFullHistory: false, shouldSyncHistoryMessage: () => false, markOnlineOnConnect: true });  sock.ev.on('creds.update', saveCreds);  if (!sock.authState.creds.registered) { setTimeout(async () => { try { let phoneNumber = "962795106901"; let code = await sock.requestPairingCode(phoneNumber); code = code?.match(/.{1,4}/g)?.join("-") \vert{}\vert{} code; console.log(`\n========================================`); console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
 console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e);
@@ -499,6 +420,7 @@ const body = msg.message.conversation || msg.message.extendedTextMessage?.text |
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
+// فحص خيار الإيقاف الكلي للبوت للمطور
 if (globalBotStopped && !isSenderDev) {
     return;
 }
@@ -1094,26 +1016,26 @@ if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {
 if (cmdBase === '13') {    
     const ordersMenuText = `📥📸 *قسم الطلبات وإنشاء الملصقات (${DEVELOPER_NAME}):*
 
-❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐
+*❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐*
 
-1. 🎨 .صنع_حزمة ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
-2. 🔎 .بحث_متقدم <اسم الموضوع> ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
-3. 📊 .إحصائياتي ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
-4. 💡 .كيفية_الاستخدام ↞ طريقة التعامل مع البوت وتنزيل الحزم.
-5. 🖼️ .صوره <اسم الشخصية> ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
-6. 🎬 .ايدت <اسم الشخصية> ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
-7. 🖤🤍 .تطقيم ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
-8. ▶️ .يوتيوب <الرابط> ↞ تحميل فيديو من يوتيوب.
-9. 🎵 .تيك <الرابط> ↞ تحميل مقطع تيك توك.
-10. 📸 .انستا <الرابط> ↞ تحميل منشورات أو ريلز انستقرام.
-11. 👥 .فيس <الرابط> ↞ تحميل فيديو فيسبوك.
-12. 🐦 .اكس <الرابط> ↞ تحميل فيديو من المنصة.
-13. 👻 .سناب <الرابط> ↞ تحميل فيديو سناب شات.
-14. 📌 .بنترست <الرابط> ↞ تحميل فيديو/صورة من بنترست.
-15. 📹 .ريلز <الرابط> ↞ تحميل مقاطع الريلز.
-16. ⚡ .شورتس <الرابط> ↞ تحميل شورتس يوتيوب.
+1. 🎨 `.صنع_حزمة` ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
+2. 🔎 `.بحث_متقدم` <اسم الموضوع> ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
+3. 📊 `.إحصائياتي` ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
+4. 💡 `.كيفية_الاستخدام` ↞ طريقة التعامل مع البوت وتنزيل الحزم.
+5. 🖼️ `.صوره` <اسم الشخصية> ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
+6. 🎬 `.ايدت` <اسم الشخصية> ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
+7. 🖤🤍 `.تطقيم` ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
+8. ▶️ `.يوتيوب` <الرابط> ↞ تحميل فيديو من يوتيوب.
+9. 🎵 `.تيك` <الرابط> ↞ تحميل مقطع تيك توك.
+10. 📸 `.انستا` <الرابط> ↞ تحميل منشورات أو ريلز انستقرام.
+11. 👥 `.فيس` <الرابط> ↞ تحميل فيديو فيسبوك.
+12. 🐦 `.اكس` <الرابط> ↞ تحميل فيديو من المنصة.
+13. 👻 `.سناب` <الرابط> ↞ تحميل فيديو سناب شات.
+14. 📌 `.بنترست` <الرابط> ↞ تحميل فيديو/صورة من بنترست.
+15. 📹 `.ريلز` <الرابط> ↞ تحميل مقاطع الريلز.
+16. ⚡ `.شورتس` <الرابط> ↞ تحميل شورتس يوتيوب.
 
-❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐`;
+*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
 return;
@@ -1303,31 +1225,28 @@ if (cmdBase === 'بوت') {
     const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });    
         
     const botWelcomeText = `
+🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
-🍷 أَهْـلاً بِـكَ فِي عَالَمِ 𝐄𝐫𝐞n 𝐁𝐨𝐭 🍷
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
-┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
-┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐄𝐫𝐞n (962796163926)
-┃
-┃ ♟️ "الهيبةُ ليستْ بصَخبِ الـحُضور،
-┃ بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."
-┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
-┃
-┃ ⌯🚀︙الـتـوقـيـت → ${time}
+> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
+> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-⚙️ لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:
+⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
 اكتب الأمر: 👇
 
-📌 .الاوامر  أو  .اقسام
+📌 *.الاوامر*  أو  *.اقسام*
 
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 `.trim();
 
 const botPp = await getBotProfilePic(sock);
@@ -1342,24 +1261,22 @@ return;
 if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ (${DEVELOPER_NAME}):*
 
-> 🛡️ .1 ↞ الحماية
-🎉 .2 ↞ الترفيه
-💳 .3 ↞ البنك والنقاط ومتجر
-⚽ .4 ↞ الرياضة
-🤖 .5 ↞ الذكاء الاصطناعي
-🧠 .6 ↞ الأسئلة
-🕌 .7 ↞ اسلامي
-😂 .8 ↞ الضحك
-👥 .9 ↞ المجموعات
-♟️ .10 ↞ المطور
-⚡ .11 ↞ الادارة
-🔍 .12 ↞ الكشف
-📥 .13 ↞ قسم الطلبات
+> 🛡️ \`.1\` ↞ الحماية
+> 🎉 \`.2\` ↞ الترفيه
+> 💳 \`.3\` ↞ البنك والنقاط ومتجر
+> ⚽ \`.4\` ↞ الرياضة
+> 🤖 \`.5\` ↞ الذكاء الاصطناعي
+> 🧠 \`.6\` ↞ الأسئلة
+> 🕌 \`.7\` ↞ اسلامي
+> 😂 \`.8\` ↞ الضحك
+> 👥 \`.9\` ↞ المجموعات
+> ♟️ \`.10\` ↞ المطور
+> ⚡ \`.11\` ↞ الادارة
+> 🔍 \`.12\` ↞ الكشف
+> 📥 \`.13\` ↞ قسم الطلبات
 
-
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-💡 اكتب رقم القسم للوصول السريع!`;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+💡 *اكتب رقم القسم للوصول السريع!*`;
 
 const devPp = await getDeveloperProfilePic(sock);
 try {
@@ -1403,20 +1320,20 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
     const entAndGamesText = `🎮🎲 *2. الترفيه والألعاب والفعاليات الأسطورية:*
 
 > ❓ .خيروك ↞ أسئلة لو خيروك
-📜 .حكمة ↞ مقولة أسطورية
-💍 .زواج @العضو ↞ زواج العريس من العروس
-💔 .طلاق @العضو ↞ طلاق العريس من العروس
-🧩 .تفكيك ↞ تفكيك أنمي (+10 نقاط)
-✍️ .كتابه ↞ سرعة كتابة (+10 نقاط)
-💡 .حزورة ↞ لغز أنمي (+10 نقاط)
-💬 .صراحة ↞ لعبة صراحة وتحدي
-🔥 .تحدي ↞ تحديات حماسية
-📝 .اكمل ↞ اكمل المثل أو الآية
-🔤 .رتب ↞ ترتيب الحروف
-🎯 .خمن ↞ خمن الرقم
-🔠 .حرف ↞ كلمات بالحرف المطلوب
-🔄 .عكس ↞ تفكيك عكسي للكلمات
-🚪 .انسحب ↞ إلغاء الفعالية`;
+> 📜 .حكمة ↞ مقولة أسطورية
+> 💍 .زواج @العضو ↞ زواج العريس من العروس
+> 💔 .طلاق @العضو ↞ طلاق العريس من العروس
+> 🧩 .تفكيك ↞ تفكيك أنمي (+10 نقاط)
+> ✍️ .كتابه ↞ سرعة كتابة (+10 نقاط)
+> 💡 .حزورة ↞ لغز أنمي (+10 نقاط)
+> 💬 .صراحة ↞ لعبة صراحة وتحدي
+> 🔥 .تحدي ↞ تحديات حماسية
+> 📝 .اكمل ↞ اكمل المثل أو الآية
+> 🔤 .رتب ↞ ترتيب الحروف
+> 🎯 .خمن ↞ خمن الرقم
+> 🔠 .حرف ↞ كلمات بالحرف المطلوب
+> 🔄 .عكس ↞ تفكيك عكسي للكلمات
+> 🚪 .انسحب ↞ إلغاء الفعالية`;
 
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: entAndGamesText }); }
@@ -1427,10 +1344,10 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
     const bankMenuText = `💳 *3. البنك والنقاط ومتجر:*
 
 > 💳 .بنك | .حسابي ↞ كشف الحساب البنكي
-💸 .تحويل <المبلغ> @منشن ↞ تحويل نقاط
-🏆 .توب_نقاط ↞ أثرى الأعضاء
-🎁 .مكافأة ↞ الهدية اليومية
-🛒 .متجر ↞ المتجر الأسطوري`;
+> 💸 .تحويل <المبلغ> @منشن ↞ تحويل نقاط
+> 🏆 .توب_نقاط ↞ أثرى الأعضاء
+> 🎁 .مكافأة ↞ الهدية اليومية
+> 🛒 .متجر ↞ المتجر الأسطوري`;
 
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
@@ -1441,124 +1358,118 @@ if (cmdBase === '4') {
     const sportText = `⚽ *4. الرياضة:*
 
 > ⚽ .كرة_قدم ↞ معلومات كرة القدم
-🏆 .مباريات ↞ المباريات الحية
-📊 .نتائج ↞ نتائج المباريات
-🥇 .بطولات ↞ البطولات الكبرى
-👤 .لاعب <اسم> ↞ معلومات لاعب
-⚽ .فريق <اسم> ↞ معلومات فريق
-🏆 .ترتيب ↞ ترتيب الفرق
-🔥 .هداف ↞ قائمة الهدافين`;
+> 🏆 .مباريات ↞ المباريات الحية
+> 📊 .نتائج ↞ نتائج المباريات
+> 🥇 .بطولات ↞ البطولات الكبرى
+> 👤 .لاعب <اسم> ↞ معلومات لاعب
+> ⚽ .فريق <اسم> ↞ معلومات فريق
+> 🏆 .ترتيب ↞ ترتيب الفرق
+> 🔥 .هداف ↞ قائمة الهدافين`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
 return;
 }
 
 if (cmdBase === '5') {
-const aiText = `🤖 5. الذكاء الاصطناعي:
+const aiText = `🤖 *5. الذكاء الاصطناعي:*
 
 > 🤖 .ai <سؤال> ↞ سؤال الذكاء الاصطناعي
-🧠 .اسأل <سؤال> ↞ الحصول على إجابة
-✍️ .اكتب <موضوع> ↞ كتابة نص
-📚 .لخص <نص> ↞ تلخيص النصوص
-🌐 .ترجم <نص> ↞ ترجمة فورية
-📝 .صحح <نص> ↞ تصحيح لغوي`;
+> 🧠 .اسأل <سؤال> ↞ الحصول على إجابة
+> ✍️ .اكتب <موضوع> ↞ كتابة نص
+> 📚 .لخص <نص> ↞ تلخيص النصوص
+> 🌐 .ترجم <نص> ↞ ترجمة فورية
+> 📝 .صحح <نص> ↞ تصحيح لغوي`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: aiText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: aiText }); }
 return;
 }
 
 if (cmdBase === '6') {
-const brainText = `🧠 6. الأسئلة:
+const brainText = `🧠 *6. الأسئلة:*
 
 > ❓ .سؤال ↞ سؤال عشوائي
-🧠 .سؤال_ذكاء ↞ سؤال ذكاء
-✅ .صح_او_خطأ ↞ اختبار صواب أو خطأ
-📚 .ثقافة ↞ سؤال ثقافي
-🌍 .جغرافيا ↞ سؤال جغرافيا
-🔬 .علوم ↞ سؤال علمي
-📜 .تاريخ ↞ سؤال تاريخي`;
+> 🧠 .سؤال_ذكاء ↞ سؤال ذكاء
+> ✅ .صح_او_خطأ ↞ اختبار صواب أو خطأ
+> 📚 .ثقافة ↞ سؤال ثقافي
+> 🌍 .جغرافيا ↞ سؤال جغرافيا
+> 🔬 .علوم ↞ سؤال علمي
+> 📜 .تاريخ ↞ سؤال تاريخي`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: brainText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: brainText }); }
 return;
 }
 
 if (cmdBase === '7') {
-const islamText = `🕌 7. اسلامي:
+const islamText = `🕌 *7. اسلامي:*
 
 > 📖 .قرآن ↞ آية قرآنية عشوائية
-📜 .آية ↞ تفسير مختصر
-🕋 .سورة ↞ معلومات السور
-🤲 .دعاء دعاء عشوائي
-📿 .ذكر ↞ ذكر مبارك
-☪️ .حديث ↞ حديث نبوي شريف
-🌙 .أذكار ↞ أذكار الصباح والمساء`;
+> 📜 .آية ↞ تفسير مختصر
+> 🕋 .سورة ↞ معلومات السور
+> 🤲 .دعاء ↞ دعاء عشوائي
+> 📿 .ذكر ↞ ذكر مبارك
+> ☪️ .حديث ↞ حديث نبوي شريف
+> 🌙 .أذكار ↞ أذكار الصباح والمساء`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: islamText }); }
 return;
 }
 
 if (cmdBase === '8') {
-const funText = `😂 8. الضحك:
+const funText = `😂 *8. الضحك:*
 
 > 🤣 .نكتة ↞ نكتة مضحكة
-😂 .ضحكني ↞ موقف مضحك
-🤡 .مهرج ↞ اختيار عضو عشوائي
-🔥 .فضيحة ↞ سؤال مضحك
-👀 .مين_الأكثر ↞ اختيار عضو
-🤔 .ماذا_لو ↞ سؤال خيالي
-💀 .رعب ↞ موقف مرعب
-🗣️ .قول ↞ عبارة عشوائية
-😈 .مقلب ↞ مقلب نصي`;
+> 😂 .ضحكني ↞ موقف مضحك
+> 🤡 .مهرج ↞ اختيار عضو عشوائي
+> 🔥 .فضيحة ↞ سؤال مضحك
+> 👀 .مين_الأكثر ↞ اختيار عضو
+> 🤔 .ماذا_لو ↞ سؤال خيالي
+> 💀 .رعب ↞ موقف مرعب
+> 🗣️ .قول ↞ عبارة عشوائية
+> 😈 .مقلب ↞ مقلب نصي`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: funText }); }
 return;
 }
 
 if (cmdBase === '9') {
-const groupExtText = `👥 9. المجموعات:
+const groupExtText = `👥 *9. المجموعات:*
 
 > 💍 .زواج @العضو ↞ زواج العريس بالعروس
-💔 .طلاق @العضو ↞ طلاق العريس بالعروس
-🌹 .غزل @منشن ↞ غزل أعضاء
-💞 .ثنائي ↞ اختيار ثنائي عشوائي
-👑 .ملك_المجموعة ↞ اختيار ملك الجروب
-🌟 .أسطورة_المجموعة ↞ أسطورة الجروب
-📊 .رسائلي توب_الرسائل ↞ إحصائيات النشاط`;
+> 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
+> 🌹 .غزل @منشن ↞ غزل أعضاء
+> 💞 .ثنائي ↞ اختيار ثنائي عشوائي
+> 👑 .ملك_المجموعة ↞ اختيار ملك الجروب
+> 🌟 .أسطورة_المجموعة ↞ أسطورة الجروب
+> 📊 .رسائلي | .توب_الرسائل ↞ إحصائيات النشاط`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: groupExtText }); }
 return;
 }
 
 if (cmdBase === '10' || cmd === 'المطور' || cmd === 'مطور') {
-const devMenuText = `♟️ قِـسْـمُ الـمُـطَـوِّرِ:
+const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
 
-> 👤 اسم المطور: 𝐄𝐫𝐞ن
-📱 رقم المطور: 962796163926
-
-
+> 👤 اسم المطور: 𝐸𝓇𝑒𝓃
+> 📱 رقم المطور: 962796163926
 
 > 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً وعدم الاستجابة لأحد نهائياً
-🟢 .تفعيل_البوت ↞ تفعيل البوت وعودته للاستجابة للكل
-👑 .اضافة_مطور @منشن ↞ إضافة مطور جديد
-❌ .حذف_مطور @منشن ↞ إزالة مطور
-📋 .قائمة_المطورين ↞ عرض قائمة المطورين
-📡 .سجل_البوت ↞ عرض آخر عمليات البوت
-🧪 .اختبار ↞ اختبار وظائف البوت وفحص الاستجابة
-❤️ .تفاعل ↞ التحكم بالتفاعل التلقائي لأوامر الأعضاء
-❤️ .تفاعل_مطور ↞ التحكم بالتفاعل التلقائي لرسائل المطور
-🔒 .خاص أو .وضع_خاص ↞ جعل البوت خاصاً للمطور والمشرفين
-🔓 .عام أو .وضع_عام ↞ جعل البوت عاماً للجميع
-💸 .اعطاء <المبلغ> @منشن ↞ إضافة نقاط لأي عضو
-📢 .إذاعة <النص> ↞ إرسال رسالة لجميع المجموعات
-🤖 .تعطيل_البوتات تفعيل/ايقاف ↞ تعطيل البوتات الأخرى وبقاء بوتك فقط
-🔄 .ريستارت ↞ إعادة تشغيل البوت.`;
+> 🟢 .تفعيل_البوت ↞ تفعيل البوت وعودته للاستجابة للكل
+> 👑 .اضافة_مطور @منشن ↞ إضافة مطور جديد
+> ❌ .حذف_مطور @منشن ↞ إزالة مطور
+> 📋 .قائمة_المطورين ↞ عرض قائمة المطورين
+> 📡 .سجل_البوت ↞ عرض آخر عمليات البوت
+> 🧪 .اختبار ↞ اختبار وظائف البوت وفحص الاستجابة
+> ❤️ .تفاعل ↞ التحكم بالتفاعل التلقائي لأوامر الأعضاء
+> ❤️ .تفاعل_مطور ↞ التحكم بالتفاعل التلقائي لرسائل المطور
+> 🔒 .خاص أو .وضع_خاص ↞ جعل البوت خاصاً للمطور والمشرفين
+> 🔓 .عام أو .وضع_عام ↞ جعل البوت عاماً للجميع
+> 💸 .اعطاء <المبلغ> @منشن ↞ إضافة نقاط لأي عضو
+> 📢 .إذاعة <النص> ↞ إرسال رسالة لجميع المجموعات
+> 🤖 .تعطيل_البوتات تفعيل/ايقاف ↞ تعطيل البوتات الأخرى وبقاء بوتك فقط
+> 🔄 .ريستارت ↞ إعادة تشغيل البوت.`;
 
 const devPp = await getDeveloperProfilePic(sock);
-try {
-await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] });
-} catch (e) {
-await sock.sendMessage(from, { text: devMenuText });
-}
+try { await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: devMenuText }); }
 return;
 }
 
@@ -1566,24 +1477,24 @@ if (cmdBase === '11' || cmd === 'الادارة' || cmd === 'الاداره') {
     const adminMenuText = `⚡ *قِـسْـمُ الإِدَارَةِ وَالتَّحَكُّمِ:*
 
 > 🔒 .قفل أو .غلق ↞ قفل الجروب (المشرفين فقط)
-🔓 .فتح ↞ فتح الجروب للأعضاء
-🗑️ .حذف ↞ حذف رسالة محددة (بالرد عليها)
-📢 .الكل أو .منشن ↞ منشن جماعي لكل الأعضاء
-👑 .رفع @عضو ↞ ترقية عضو إلى مشرف
-📉 .تنزيل @عضو -_ إزالة الإشراف عن عضو
-🚨 .طرد @عضو ↞ طرد العضو من المجموعة
-⚠️ .اضف_انذار @عضو ↞ إضافة إنذار إداري للعضو
-📉 .ازل_انذار @عضو ↞ إزالة إنذار عن العضو
-📊 .عدد_الانذارات @عضو ↞ عرض عدد الإنذارات الحالية
-🔇 .كتم <دقائق> @عضو ↞ كتم العضو مؤقتاً
-🔊 .الغاء_كتم @عضو ↞ فك الكتم عن العضو
-📌 .تفعيل ادمن / .توقيف ادمن ↞ وضع الآدمن
-👋 .تفعيل ترحيب / .توقيف ترحيب ↞ الترحيب بالجدد
-📤 .تفعيل توديع / .توقيف توديع ↞ رسائل الخروج
-🏷️ .تغيير_الاسم <الاسم> ↞ تغيير عنوان الجروب
-📝 .تغيير_الوصف <الوصف> ↞ تغيير وصف الجروب
-🔗 .الرابط ↞ إحضار رابط دعوة المجموعة
-🔄 .صفر @عضو ↞ تصفير إنذارات العضو`;
+> 🔓 .فتح ↞ فتح الجروب للأعضاء
+> 🗑️ .حذف ↞ حذف رسالة محددة (بالرد عليها)
+> 📢 .الكل أو .منشن ↞ منشن جماعي لكل الأعضاء
+> 👑 .رفع @عضو ↞ ترقية عضو إلى مشرف
+> 📉 .تنزيل @عضو ↞ إزالة الإشراف عن عضو
+> 🚨 .طرد @عضو ↞ طرد العضو من المجموعة
+> ⚠️ .اضف_انذار @عضو ↞ إضافة إنذار إداري للعضو
+> 📉 .ازل_انذار @عضو ↞ إزالة إنذار عن العضو
+> 📊 .عدد_الانذارات @عضو ↞ عرض عدد الإنذارات الحالية
+> 🔇 .كتم <دقائق> @عضو ↞ كتم العضو مؤقتاً
+> 🔊 .الغاء_كتم @عضو ↞ فك الكتم عن العضو
+> 📌 .تفعيل ادمن / .توقيف ادمن ↞ وضع الآدمن
+> 👋 .تفعيل ترحيب / .توقيف ترحيب ↞ الترحيب بالجدد
+> 📤 .تفعيل توديع / .توقيف توديع ↞ رسائل الخروج
+> 🏷️ .تغيير_الاسم <الاسم> ↞ تغيير عنوان الجروب
+> 📝 .تغيير_الوصف <الوصف> ↞ تغيير وصف الجروب
+> 🔗 .الرابط ↞ إحضار رابط دعوة المجموعة
+> 🔄 .صفر @عضو ↞ تصفير إنذارات العضو`;
 
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: adminMenuText }); }
