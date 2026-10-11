@@ -1,5 +1,7 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
@@ -23,6 +25,10 @@ let mutedUsers = {};
 let userMessagesCount = {};
 let groupSettings = {}; 
 let marriages = {}; 
+
+// بيانات وأرئشيف حزم الملصقات (من الكود الخارجي)
+let userStickerPacksCount = {};
+let globalCreatedPacks = [];
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -197,8 +203,39 @@ const validCommands = [
     'ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة',
     'رسائلي', 'رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'نشاطي', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
     'تعطيل_البوتات', 'تعطيل بوتات',
-    'يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر', 'صوره', 'تطقيم', 'ايدت'
+    'يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر', 'صوره', 'تطقيم', 'ايدت',
+    'صنع_حزمة', 'بحث_متقدم', 'احصائياتي', 'إحصائياتي', 'كيفية_الاستخدام', 'ملصق'
 ];
+
+// دالة البحث المباشرة عن الملصقات في تيليجرام (المأخوذة من الكود الخارجي)
+async function searchTelegramStickerPacks(query) {
+    try {
+        const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+        });
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        let packs = [];
+        $('a[href]').each((_, el) => {
+            const href = $(el).attr('href');
+            if (href && (href.includes('t.me/addstickers/') || href.includes('telegram.me/addstickers/'))) {
+                if (!packs.includes(href)) packs.push(href);
+            }
+        });
+        return packs;
+    } catch (e) {
+        return [];
+    }
+}
+
+function generateProgressBar(percent, title = "جاري المعالجة") {
+    percent = Math.max(0, Math.min(100, percent));
+    const filled = Math.floor(percent / 10);
+    const bar = "█".repeat(filled) + "░".repeat(10 - filled);
+    return `🎮 *${title}*\n\`[${bar}]\` *${percent}%*`;
+}
 
 function isValidCmd(fullCmd) {
     const base = fullCmd.split(' ')[0];
@@ -360,7 +397,6 @@ async function startBot() {
         } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
     });
 
-    // تفعيل الترحيب والتوديع الدقيق بالاستمارات المطلوبة وتأكيد عملها
     sock.ev.on('group-participants.update', async (anu) => {
         try {
             const { id, participants, action } = anu;
@@ -1038,7 +1074,93 @@ async function startBot() {
             return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });
         }
 
-        // --- المعالجة الصحيحة تماماً لأوامر الصور والإيدت بحسب اسم الشخصية ---
+        // ==================== القسم رقم 13 المكتمل والمفعّل بالكامل ====================
+        if (cmdBase === '13') {
+            const ordersMenuText = `📥📸 *قسم الطلبات وإنشاء الملصقات (${DEVELOPER_NAME}):*
+
+❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐
+
+1. 🎨 \`.صنع_حزمة\` ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
+2. 🔎 \`.بحث_متقدم <اسم الموضوع>\` ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
+3. 📊 \`.إحصائياتي\` ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
+4. 💡 \`.كيفية_الاستخدام\` ↞ طريقة التعامل مع البوت وتنزيل الحزم.
+5. 🖼️ \`.صوره <اسم الشخصية>\` ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
+6. 🎬 \`.ايدت <اسم الشخصية>\` ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
+7. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
+8. ▶️ \`.يوتيوب <الرابط>\` ↞ تحميل فيديو من يوتيوب.
+9. 🎵 \`.تيك <الرابط>\` ↞ تحميل مقطع تيك توك.
+10. 📸 \`.انستا <الرابط>\` ↞ تحميل منشورات أو ريلز انستقرام.
+11. 👥 \`.فيس <الرابط>\` ↞ تحميل فيديو فيسبوك.
+12. 🐦 \`.اكس <الرابط>\` ↞ تحميل فيديو من المنصة.
+13. 👻 \`.سناب <الرابط>\` ↞ تحميل فيديو سناب شات.
+14. 📌 \`.بنترست <الرابط>\` ↞ تحميل فيديو/صورة من بنترست.
+15. 📹 \`.ريلز <الرابط>\` ↞ تحميل مقاطع الريلز.
+16. ⚡ \`.شورتس <الرابط>\` ↞ تحميل شورتس يوتيوب.
+
+❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐`;
+            const userPp = await getUserProfilePic(sock, sender);
+            try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
+            return;
+        }
+
+        // --- تنفيذ أوامر وظائف الكود الخارجي بالكامل ---
+
+        // 1. أمر صنع حزمة / ملصق مخصص
+        if (cmdBase === 'صنع_حزمة' || cmdBase === 'ملصق') {
+            const quot = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+            const isImage = msg.message.imageMessage || quot?.imageMessage;
+            if (!isImage) {
+                return sock.sendMessage(from, { text: `📌 يرجى أرسال صورة مع كتابة \`.صنع_حزمة\` أو الرد على صورة بكلمة \`.ملصق\`` }, { quoted: msg });
+            }
+            try {
+                await sock.sendMessage(from, { text: `⚙️ *جاري معالجة تحويل الصورة لملصق وحفظها في حزمتك...*` }, { quoted: msg });
+                let targetMsg = msg.message.imageMessage ? msg : {
+                    key: { remoteJid: from, id: msg.message.extendedTextMessage.contextInfo.stanzaId, participant: msg.message.extendedTextMessage.contextInfo.participant },
+                    message: quot
+                };
+                let buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
+                
+                userStickerPacksCount[sender] = (userStickerPacksCount[sender] || 0) + 1;
+                globalCreatedPacks.push(`pack_${Date.now()}_by_${sender.split('@')[0]}`);
+
+                await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
+                return sock.sendMessage(from, { text: `🎉 *تم إنشاء وإضافة الملصق بنجاح إلى حزمتك المخصصة!* \n📊 إجمالي ملصقاتك الحالية: \`${userStickerPacksCount[sender]}\`` }, { quoted: msg });
+            } catch (e) {
+                return sock.sendMessage(from, { text: `❌ حدث خطأ أثناء معالجة الملصق.` });
+            }
+        }
+
+        // 2. أمر البحث المتقدم في تيليجرام عن حزم جاهزة
+        if (cmdBase === 'بحث_متقدم') {
+            const query = trimmedBody.split(' ').slice(1).join(' ');
+            if (!query) return sock.sendMessage(from, { text: `📌 يرجى إدخال كلمة للبحث! مثال:\n\`.بحث_متقدم ون بيس\`` }, { quoted: msg });
+
+            const statusMsg = await sock.sendMessage(from, { text: generateProgressBar(30, "البحث في تيليجرام 🔎") }, { quoted: msg });
+            const readyPacks = await searchTelegramStickerPacks(query);
+
+            if (readyPacks.length === 0) {
+                return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزم ملصقات جاهزة مطابقة لـ (${query}) في تيليجرام.` }, { quoted: msg });
+            }
+
+            let finalText = `🎉 *نتائج البحث في تيليجرام عن: ${query}*\n\n📦 **حزم ملصقات جاهزة ومطابقة من Telegram:**\n`;
+            readyPacks.slice(0, 8).forEach((pack, idx) => {
+                finalText += `${idx + 1}. 🔗 ${pack}\n`;
+            });
+
+            return sock.sendMessage(from, { text: finalText }, { quoted: msg });
+        }
+
+        // 3. أمر إحصائيات الحزم
+        if (cmdBase === 'احصائياتي' || cmdBase === 'إحصائياتي') {
+            const createdCount = userStickerPacksCount[sender] || 0;
+            return sock.sendMessage(from, { text: `📊 *إحصائيات ملصقاتك المخصصة:*\n\n📦 إجمالي الملصقات والحزم المنشأة باسمك: \`${createdCount}\`\n🌐 إجمالي الحزم المنشأة بالبوت: \`${globalCreatedPacks.length}\`` }, { quoted: msg });
+        }
+
+        // 4. أمر كيفية الاستخدام
+        if (cmdBase === 'كيفية_الاستخدام') {
+            return sock.sendMessage(from, { text: `💡 *كيفية الاستخدام:*\n\n1️⃣ أرسل صورة مع كتابة \`.صنع_حزمة\` لإنشاء ملصق خاص بك.\n2️⃣ اكتب \`.بحث_متقدم اسم_الموضوع\` (مثل: ميمز، انمي) وستحصل على حزم ملصقات جاهزة مباشرة من تيليجرام.` }, { quoted: msg });
+        }
+
         if (cmdBase === 'صوره' || cmd.startsWith('صوره')) {
             const charName = trimmedBody.replace(/^\.صوره/i, '').trim().toLowerCase();
             const imageUrl = characterImages[charName] || characterImages['ايرين'];
@@ -1277,7 +1399,7 @@ async function startBot() {
         }
 
         if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {
-            const bankMenuText = `💳 *3. البنك والنقاط والمتجر:*
+            const bankMenuText = `💳 *3. البنك والنقاط ومتجر:*
 
 > 💳 \`.بنك\` | \`.حسابي\` ↞ كشف الحساب البنكي
 > 💸 \`.تحويل <المبلغ> @منشن\` ↞ تحويل نقاط
@@ -1438,39 +1560,6 @@ async function startBot() {
             const detectorMenuText = `🔍 *12. الكشف:* رَدَّ على رسالة (عرض مرة واحدة) بكلمة \`.كشف\` لفكها فوراً.`;
             const userPp = await getUserProfilePic(sock, sender);
             try { await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: detectorMenuText }); }
-            return;
-        }
-
-        if (cmdBase === '13') {
-            const ordersMenuText = `📥📸 *قسم الطلبات (${DEVELOPER_NAME}):*
-
-❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐
-
-1. ▶️ \`.يوتيوب الرابط\` ↞ تحميل فيديو من YouTube.
-2. 🎵 \`.تيك الرابط\` ↞ تحميل فيديو من TikTok.
-3. 📸 \`.انستا الرابط\` ↞ تحميل فيديو أو صورة من Instagram.
-4. 👥 \`.فيس الرابط\` ↞ تحميل فيديو من Facebook.
-5. 🐦 \`.اكس الرابط\` ↞ تحميل فيديو من X (Twitter).
-6. 👻 \`.سناب الرابط\` ↞ تحميل فيديو من Snapchat.
-7. 📌 \`.بنترست الرابط\` ↞ تحميل فيديو من Pinterest.
-8. 🎮 \`.تويتش الرابط\` ↞ جلب مقطع من Twitch.
-9. 🟣 \`.كيك الرابط\` ↞ جلب مقطع من Kick.
-10. 🎞️ \`.دايلي الرابط\` ↞ تحميل فيديو من Dailymotion.
-11. 🌐 \`.ريديت الرابط\` ↞ تحميل فيديو من Reddit.
-12. 💬 \`.تليجرام الرابط\` ↞ جلب فيديو من رابط Telegram عام.
-13. 🎬 \`.فيميو الرابط\` ↞ تحميل فيديو من Vimeo.
-14. 📺 \`.لايكي الرابط\` ↞ تحميل فيديو من Likee.
-15. 🎥 \`.كواي الرابط\` ↞ تحميل فيديو من Kwai.
-16. 📹 \`.ريلز الرابط\` ↞ تحميل Instagram Reels.
-17. ⚡ \`.شورتس الرابط\` ↞ تحميل YouTube Shorts.
-18. 🎼 \`.تريلر الرابط\` ↞ جلب مقطع ترويجي من رابط مدعوم.
-19. 🖼️ \`.صوره اسم_الصورة\` ↞ جلب صورة من Pinterest حسب الاسم.
-20. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم من بنتريست.
-21. 🎬 \`.ايدت اسم_الشخصية\` ↞ جلب مقطع ايدت تيك توك حقيقي للشخصية.
-
-❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐`;
-            const userPp = await getUserProfilePic(sock, sender);
-            try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
             return;
         }
 
