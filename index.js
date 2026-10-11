@@ -26,10 +26,8 @@ let userMessagesCount = {};
 let groupSettings = {};
 let marriages = {};
 
-// متغير عام للتحكم بإيقاف/تفعيل البوت كلياً للمطور
 let globalBotStopped = false;
 
-// بيانات وأرئشيف حزم الملصقات (من الكود الخارجي)
 let userStickerPacksCount = {};
 let globalCreatedPacks = [];
 
@@ -45,7 +43,6 @@ const badWords = [
 'منيكة', 'عرصات', 'ابن القحبة', 'ابن الكلب'
 ];
 
-// قاعدة بيانات دقيقة للصور الأصلية الحقيقية من بنترست حسب الشخصية
 const characterImages = {
 'ايرين': 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
 'eren': 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg',
@@ -63,7 +60,6 @@ const characterImages = {
 'levi': 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800'
 };
 
-// قاعدة بيانات مقاطع الإيدت الحقيقية حسب الشخصية (روابط مباشرة شغالة)
 const characterEdits = {
 'ايرين': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
 'eren': 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-with-a-green-screen-42999-large.mp4',
@@ -503,7 +499,6 @@ const body = msg.message.conversation || msg.message.extendedTextMessage?.text |
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
-// التحقق من إيقاف البوت كلياً للمطور
 if (globalBotStopped && !isSenderDev) {
     return;
 }
@@ -1084,7 +1079,6 @@ if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {
     return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });    
 }    
 
-// ==================== القسم رقم 13 المكتمل والمفعّل بالكامل ====================    
 if (cmdBase === '13') {    
     const ordersMenuText = `📥📸 *قسم الطلبات وإنشاء الملصقات (${DEVELOPER_NAME}):*
 
@@ -1112,8 +1106,6 @@ const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
 return;
 }
-
-// --- تنفيذ أوامر وظائف الكود الخارجي بالكامل ---
 
 if (cmdBase === 'صنع_حزمة' || cmdBase === 'ملصق') {    
     const quot = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
@@ -1305,7 +1297,7 @@ if (cmdBase === 'بوت') {
 ❐═━━━═╊⊰🍷⊱╉═━━━═❐
 
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
-┃ ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
+┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
 ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐄𝐫𝐞n (962796163926)
 ┃
 ┃ ♟️ "الهيبةُ ليستْ بصَخبِ الـحُضور،
@@ -1389,7 +1381,7 @@ if (cmdBase === '1') {
 
 
 
-⚙️ لتصفير إنذارات أي عضو: `.صفر @العضو``;
+⚙️ لتصفير إنذارات أي عضو: .صفر @العضو`;
 
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: text1 }); }
 return;
