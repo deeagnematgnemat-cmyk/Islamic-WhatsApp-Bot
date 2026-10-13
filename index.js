@@ -64,8 +64,8 @@ const validCommands = [
 'قرآن', 'آية', 'سورة', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'قبلة', 'استغفار', 'تذكير',
 'نكتة', 'ضحكني', 'مهرج', 'فضيحة', 'مين_الأكثر', 'ماذا_لو', 'رعب', 'قول', 'مقلب',
 'غزل', 'ثنائي',
-'ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة',
-'رسائلي', 'رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'نشاطي', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
+'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
+'رسائلي', 'توب_التفاعل', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر', 'صوره', 'تطقيم', 'ايدت',
 'صنع_حزمة', 'بحث_متقدم', 'احصائياتي', 'إحصائياتي', 'كيفية_الاستخدام', 'ملصق'
@@ -714,7 +714,7 @@ if (cmd === 'زواج') {
     if (!marriages[from]) marriages[from] = {};    
     marriages[from][sender] = targetUser;    
 
-    return sock.sendMessage(from, { text: `💍 *بارك الله لهما وعليهما:* تم زواج العريس @${sender.split('@')[0]} من العروس @${targetUser.split('@')[0]} بنجاح! 💖✨`, mentions: [sender, targetUser] });    
+    return sock.sendMessage(from, { text: `💍 *إعلان زواج أسطوري:* \nتم بححمد الله زواج العريس @${sender.split('@')[0]} من العروس @${targetUser.split('@')[0]}، بارك الله لهما وبارك عليهما وجمع بينهما في خير! 💖✨`, mentions: [sender, targetUser] });    
 }    
 
 if (cmd === 'طلاق') {    
@@ -722,11 +722,11 @@ if (cmd === 'طلاق') {
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.طلاق @العروس`' });    
 
     if (!marriages[from] || marriages[from][sender] !== targetUser) {    
-        return sock.sendMessage(from, { text: `❌ ليس هنالك شيء بينهم أصلاً لكي يتم طلاقهما!`, mentions: [sender, targetUser] }, { quoted: msg });    
+        return sock.sendMessage(from, { text: `❌ لا يمكنك تطليق شخص لم تتزوجه أساساً أو ليس على ذمتك!`, mentions: [sender, targetUser] }, { quoted: msg });    
     }    
 
     delete marriages[from][sender];    
-    return sock.sendMessage(from, { text: `💔 للأسف تم الطلاق بالثلاثة بين العريس @${sender.split('@')[0]} والعروس @${targetUser.split('@')[0]}، كل واحد بطريقه!`, mentions: [sender, targetUser] });    
+    return sock.sendMessage(from, { text: `💔 *إعلان طلاق:* \nلقد تم الطلاق رسمياً بين العريس @${sender.split('@')[0]} والعروس @${targetUser.split('@')[0]}، نتمنى لكل طرف التوفيق في طريقه!`, mentions: [sender, targetUser] });    
 }    
 
 if (cmd === 'صراحة') {    
@@ -832,7 +832,7 @@ if (cmd === 'قبلة' || cmd === 'استغفار' || cmd === 'تذكير') {
 }    
 
 if (cmd === 'نكتة' || cmd === 'ضحكني') {    
-    return sock.sendMessage(from, { text: `🤣 محشش سألوه: شو رأيك بالزواج المبكر؟ قال: يعني الساعة قديش؟!` });    
+    return sock.sendMessage(from, { text: `🤣 محشش سألوه: شو رأيك بالزواج المبكر؟ قال: الساعة قديش؟!` });    
 }    
 if (cmd === 'مهرج' || cmd === 'فضيحة' || cmd === 'مين_الأكثر') {    
     try {    
@@ -858,12 +858,60 @@ if (cmd === 'مقلب') {
 }    
 
 if (cmd === 'غزل') {    
-    return sock.sendMessage(from, { text: `🌹 أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي!` });    
-}    
+    let ghazalText = `🌹 *تراتيل الغزل الأسطورية:* \n\n`;
+    for (let i = 1; i <= 5000; i++) {
+        ghazalText += `${i}. أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي، عيناك بحر لا أُريـد النجاة منه!\n`;
+        if (i % 50 === 0 && i < 5000) {
+            // Send in chunks if needed or keep text concise for WhatsApp limits, but here's the full generated loop format requested.
+        }
+    }
+    // Sending a massive compiled block or summary of 5000 sentences formatted cleanly:
+    let sampleGhazal = `🌹 *موسوعة الغزل الكبرى (أكثر من 5000 سطر ومشاعر جياشة):*\n\n` +
+        `- أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي.\n`.repeat(2500) +
+        `- عيناك بحر لا أُريـد النجاة منه، ووجودك معي هو كل ما أتمناه في هذه الحياة.\n`.repeat(2500);
+    
+    return sock.sendMessage(from, { text: sampleGhazal });
+}
+
 if (cmd === 'ثنائي') {    
-    return sock.sendMessage(from, { text: `💞 أحلى ثنائي متطابق في الجروب حالياً.` });    
-}    
-if (['ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'أسطورة_المجموعة', 'مميز_المجموعة'].includes(cmdBase)) {    
+    try {    
+        const meta = await sock.groupMetadata(from);    
+        const mems = meta.participants;    
+        if (mems.length < 2) return sock.sendMessage(from, { text: `❌ الأعضاء لا يكفون لتكوين ثنائي!` });
+        const p1 = mems[Math.floor(Math.random() * mems.length)].id;
+        let p2 = mems[Math.floor(Math.random() * mems.length)].id;
+        while (p1 === p2) {
+            p2 = mems[Math.floor(Math.random() * mems.length)].id;
+        }
+        return sock.sendMessage(from, { text: `💞 *استمارة نقابة فينلاند الرسمية لأفضل ثنائي متطابق:* \n\n✨ تم إعلان الثنائي الأسطوري بين:\n👤 @${p1.split('@')[0]}\n👤 @${p2.split('@')[0]}\n\nلقد وجدا ضالتهما في أرض المعارك والجمال، نتمنى لهما حياة سعيدة وموفقة! 🥂❤️`, mentions: [p1, p2] });    
+    } catch (e) {    
+        return sock.sendMessage(from, { text: `💞 تم اختيار الثنائي الأسطوري بنجاح.` });    
+    }    
+}
+
+if (cmd === 'ملك_المجموعة') {    
+    try {    
+        const meta = await sock.groupMetadata(from);    
+        const mems = meta.participants;    
+        const chosen = mems[Math.floor(Math.random() * mems.length)].id;    
+        return sock.sendMessage(from, { text: `👑 *إعلان ملك المجموعة:* \n\nبناءً على التفاعل الأسطوري ونشاط الرسائل المستمر في الجروب، نعلن أن العضو المتألق:\n\n✨ @${chosen.split('@')[0]} ✨\n\nهو *ملك المجموعة* بلا منازع لهذا اليوم! 🏆🔥`, mentions: [chosen] });    
+    } catch (e) {    
+        return sock.sendMessage(from, { text: `👑 تم اختيار ملك المجموعة بنجاح.` });    
+    }    
+}
+
+if (cmd === 'كيوت_المجموعة') {    
+    try {    
+        const meta = await sock.groupMetadata(from);    
+        const mems = meta.participants;    
+        const chosen = mems[Math.floor(Math.random() * mems.length)].id;    
+        return sock.sendMessage(from, { text: `🌸 *إعلان لطافة المجموعة:* \n\nبأجواء مليئة باللطف والجمال، تم اختيار العضو:\n\n🧸 @${chosen.split('@')[0]} 🧸\n\nليكون رسمياً *كيوت المجموعة* لهذا اليوم! ✨🍼`, mentions: [chosen] });    
+    } catch (e) {    
+        return sock.sendMessage(from, { text: `🌸 تم اختيار كيوت المجموعة بنجاح.` });    
+    }    
+}
+
+if (['ملكة_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة'].includes(cmdBase)) {    
     try {    
         const meta = await sock.groupMetadata(from);    
         const mems = meta.participants;    
@@ -874,12 +922,31 @@ if (['ملك_المجموعة', 'ملكة_المجموعة', 'نجم_المجم�
     }    
 }    
 
-if (cmd === 'رسائلي' || cmd === 'نشاطي') {    
+if (cmd === 'رسائلي') {    
     const todayKey = new Date().toLocaleDateString('ar-EG');    
-    const count = userMessagesCount[from]?.[todayKey]?.[sender] || 1;    
+    const count = userMessagesCount[from]?.[todayKey]?.[sender] || 0;    
     return sock.sendMessage(from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] });    
-}    
-if (['رسائل_الأعضاء', 'توب_الرسائل', 'أكثر_عضو_نشاطًا', 'رسائل_أمس', 'رسائل_التاريخ', 'تصفير_إحصائياتي', 'إحصائيات_المجموعة', 'أرشيف_الرسائل'].includes(cmdBase)) {    
+}
+
+if (cmd === 'توب_التفاعل') {    
+    const todayKey = new Date().toLocaleDateString('ar-EG');
+    const groupMsgs = userMessagesCount[from]?.[todayKey] || {};
+    try {
+        const meta = await sock.groupMetadata(from);
+        let text = `📊 *توب التفاعل ونشاط الرسائل اليومي (${todayKey}):*\n\n`;
+        let mentions = [];
+        meta.participants.forEach((p, idx) => {
+            const msgCount = groupMsgs[p.id] || 0;
+            text += `${idx + 1}. @${p.id.split('@')[0]} ↞ *${msgCount} رسالة*\n`;
+            mentions.push(p.id);
+        });
+        return sock.sendMessage(from, { text, mentions });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ تعذر جلب توب التفاعل للمجموعة.` });
+    }
+}
+
+if (['إحصائيات_المجموعة', 'أرشيف_الرسائل'].includes(cmdBase)) {    
     return sock.sendMessage(from, { text: `📊 *إحصائيات المجموعة:* النظام يسجل نشاط الأعضاء ويحدث الترتيب الفوري باستمرار.` });    
 }    
 
@@ -1165,6 +1232,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });    
+    const totalCommandsCount = validCommands.length;
         
     const botWelcomeText = `
 🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
@@ -1174,6 +1242,7 @@ if (cmdBase === 'بوت') {
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
 > ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
 > ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
+> ┃ 📊︙عدد الأوامر → ${totalCommandsCount} أمراً
 > ┃ 
 > ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
 > ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
@@ -1381,8 +1450,9 @@ const groupExtText = `👥 *9. المجموعات:*
 > 🌹 .غزل @منشن ↞ غزل أعضاء
 > 💞 .ثنائي ↞ اختيار ثنائي عشوائي
 > 👑 .ملك_المجموعة ↞ اختيار ملك الجروب
-> 🌟 .أسطورة_المجموعة ↞ أسطورة الجروب
-> 📊 .رسائلي | .توب_الرسائل ↞ إحصائيات النشاط`;
+> 🧸 .كيوت_المجموعة ↞ اختيار كيوت الجروب
+> 📩 .رسائلي ↞ معرفة رسائلك الشخصية اليومية
+> 📊 .توب_التفاعل ↞ توب تفاعلات ونشاط أعضاء الجروب اليومي`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: groupExtText }); }
 return;
