@@ -1351,6 +1351,7 @@ return;
 }
 
 if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {    
+if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {
     const bankMenuText = `💳 *3. البنك والنقاط ومتجر:*
 
 > 💳 .بنك | .حسابي ↞ كشف الحساب البنكي
@@ -1359,19 +1360,39 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 🎁 .مكافأة ↞ الهدية اليومية
 > 🛒 .متجر ↞ المتجر الأسطوري`;
 
-const userPp = await getUserProfilePic(sock, sender);
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
-return;
+    const userPp = await getUserProfilePic(sock, sender);
+    try {
+        await sock.sendMessage(from, {
+            image: { url: userPp },
+            caption: bankMenuText,
+            mentions: [sender]
+        });
+    } catch (e) {
+        await sock.sendMessage(from, { text: bankMenuText });
+    }
+    return;
 }
 
+if (cmdBase === '4') {
+    const sportText = `⚽ *4. قسم الرياضة:*
+
+> ⚽ .كرة_قدم ↞ معلومات كرة القدم
 > 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
 > 🌹 .غزل ↞ ترتيب الفرق
 > 🔥 .هداف ↞ قائمة الهدافين`;
-const userPp = await getUserProfilePic(sock, sender);
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
-return;
-}
 
+    const userPp = await getUserProfilePic(sock, sender);
+    try {
+        await sock.sendMessage(from, {
+            image: { url: userPp },
+            caption: sportText,
+            mentions: [sender]
+        });
+    } catch (e) {
+        await sock.sendMessage(from, { text: sportText });
+    }
+    return;
+}
 if (cmdBase === '5') {
 const aiText = `🤖 *5. الذكاء الاصطناعي:*
 
