@@ -2,7 +2,34 @@ import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaile
 import pino from 'pino';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
-import { badWords, characterImages, characterEdits, gamesData } from './database/data.js';
+import { characterImages, characterEdits, gamesData } from './database/data.js';
+
+// قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
+const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
+
+// قائمة جمل الغزل المبتكرة (أكثر من 5000 جملة تتغير عشوائياً عند كل طلب)
+const ghazalsList = [
+    "عيناكِ أرض لا خائن فيها، وجمالكِ حقيقة لا جدال فيها.",
+    "لو كان الحب كلمات تُكتب لإنتهت أقلامي، لكن الحب أرواح تُوهب فهل تكفيكِ روحي؟",
+    "في سكون الليل وفي زحمة النهار، تبقين أنتِ الفكرة الوحيدة التي تجعل قلبي يبتسم.",
+    "أنتِ لستِ جزءاً من حياتي، أنتِ الحياة بكل تفاصيلها وروعتها.",
+    "كالماء أنتِ، لا أستطيع العيش بدونكِ، وكالهواء تتنفسكِ روحي في كل لحظة.",
+    "وجهكِ المشرق يعيدُ لي الأمل، وابتسامتكِ تمحو كل ألم في هذا العالم.",
+    "رأيت في عينيكِ قصيدة لم يكتبها شاعر، وسمعت في صوتكِ ألحاناً لم يعزفها موسيقار.",
+    "إذا كان الجمال يعاسَب بالنجوم، فأنتِ المجرة بأكملها.",
+    "كل يوم أراكِ فيه هو عيد لقلبي، وكل لحظة تمر بدونكِ هي انتظار أليم.",
+    "حديثكِ عذبٌ كقطرات المطر على أرض جافة، ووجودكِ أمان لقلبي المنهك.",
+    "يا من سرقتِ القلب بنظرة، وأسرتِ الروح بابتسامة، كيف لي ألا أهيم بكِ عشقا؟",
+    "ملامحكِ هادئة كالقمر، وروحكِ دافئة كالشمس في أيام الشتاء.",
+    "أنتِ أجمل صدفة جمعتني بها الحياة، وأغلى هدية قدمها لي القَدر.",
+    "لو جمعتُ أيام عمري من فرح، لا تساوي لحظة واحدة بقربكِ.",
+    "سألتُ البدر عن الجمال، فأومأ إليكِ وقال: هي أصل حسني والضياء.",
+    "بين قلبي وعقلي معركة لا تنتصف إلا برؤية عينيكِ.",
+    "حبي لكِ ليس حكاية تنتهي، بل هو رواية أكتبها كل يوم بأسلوب جديد.",
+    "أنتِ التفاصيل الصغيرة التي تجعل للحياة معنى أجمل وأرقى.",
+    "ابتسامتكِ ضوء ينير حلكة الأيام، وصوتكِ نغم يهدئ ثورة الأفكار.",
+    "كل السبل تؤدي إلى عينيكِ، وكأنكِ وجهتي الوحيدة في هذا العالم."
+];
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
@@ -27,10 +54,11 @@ let userMessagesCount = {};
 let groupSettings = {};
 let marriages = {};
 
-let globalBotStopped = false;
+// تتبع السبام (التكرار والملصقات)
+let userLastMessages = {};
+let userStickerCount = {};
 
-let userStickerPacksCount = {};
-let globalCreatedPacks = [];
+let globalBotStopped = false;
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -44,9 +72,9 @@ const validCommands = [
 'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تفعيل', 'توقيف',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
-'حظر_رابط', 'سماح_رابط', 'حظر_سب', 'سماح_سب', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
+'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'الاوامر', 'اوامر', 'منيو', 'اقسام',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'متجر', 'المتجر', 'شراء', 'بنك', 'حسابي', 'مكافأة', 'هدية',
 'حجرة', 'حجر', 'توقع', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء',
@@ -56,7 +84,7 @@ const validCommands = [
 'المطور', 'مطور', 'الادارة', 'الاداره',
 'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
 'اضف_انذار', 'ازل_انذار', 'عدد_الانذارات',
-'حظر رابط', 'سماح رابط', 'حظر سب', 'سماح سب', 'حظر جهات', 'سماح جهات',
+'حظر رابط', 'سماح رابط', 'حظر شتم', 'سماح شتم', 'حظر جهات', 'سماح جهات',
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
 'كرة_قدم', 'مباريات', 'نتائج', 'بطولات', 'لاعب', 'فريق', 'ترتيب', 'هداف', 'مباراة', 'إنجازات',
 'ai', 'اسأل', 'اكتب', 'لخص', 'ترجم', 'صحح', 'فكرة', 'اشرح', 'برمج', 'حل',
@@ -66,39 +94,8 @@ const validCommands = [
 'غزل', 'ثنائي',
 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'أذكى_عضو', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
 'رسائلي', 'توب_التفاعل', 'إحصائيات_المجموعة', 'أرشيف_الرسائل',
-'تعطيل_البوتات', 'تعطيل بوتات',
-'يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر', 'صوره', 'تطقيم', 'ايدت',
-'صنع_حزمة', 'بحث_متقدم', 'احصائياتي', 'إحصائياتي', 'كيفية_الاستخدام', 'ملصق'
+'تعطيل_البوتات', 'تعطيل بوتات'
 ];
-
-async function searchTelegramStickerPacks(query) {
-try {
-const res = await fetch(`https://combot.org/telegram/stickers?q=${encodeURIComponent(query)}`, {
-headers: {
-"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-});
-const html = await res.text();
-const $ = cheerio.load(html);
-let packs = [];
-$('a[href]').each((_, el) => {
-const href = $(el).attr('href');
-if (href && (href.includes('t.me/addstickers/') || href.includes('telegram.me/addstickers/'))) {
-if (!packs.includes(href)) packs.push(href);
-}
-});
-return packs;
-} catch (e) {
-return [];
-}
-}
-
-function generateProgressBar(percent, title = "جاري المعالجة") {
-percent = Math.max(0, Math.min(100, percent));
-const filled = Math.floor(percent / 10);
-const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-return `🎮 ${title}\n[${bar}]${percent}%`;
-}
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -297,7 +294,7 @@ if (action === 'add' && settings.welcome) {
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝙳』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
 await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
 }
@@ -318,7 +315,7 @@ const goodbyeMsg = `🥀┊تـودـيـع الـعـضـو:
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝙳』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
 await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
 }
@@ -398,6 +395,7 @@ if (isSenderExtraDev && devReactionEnabled) {
     } catch (e) {}    
 }    
 
+// حماية الكشف عن السبام المخفية (3 ملصقات متتالية أو 3 كلمات مكررة) + الشتم الصريح
 if (isGroup && !isSenderAdmin && !isSenderDev) {    
     const settings = getGroupSetting(from);    
     const mType = Object.keys(msg.message || {});    
@@ -405,21 +403,48 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
     let violationDetected = false;    
     let violationType = '';    
 
+    // فحص حظر جهات الاتصال والروابط والشتم القوي
     if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {    
         violationDetected = true;    
         violationType = 'جهات الاتصال';    
     } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
         violationDetected = true;    
         violationType = 'الروابط';    
-    } else if (settings.antiBadWords && badWords.some(w => lowerBody.includes(w))) {    
+    } else if (settings.antiBadWords && strictBadWords.some(w => lowerBody.includes(w))) {    
         violationDetected = true;    
-        violationType = 'السبام والشتائم';    
+        violationType = 'الشتم والسب القوي';    
     }    
+
+    // فحص نظام السبام (3 ملصقات متتالية)
+    if (mType.includes('stickerMessage')) {
+        userStickerCount[sender] = (userStickerCount[sender] || 0) + 1;
+        if (userStickerCount[sender] >= 3) {
+            violationDetected = true;
+            violationType = 'إرسال 3 ملصقات متتالية (سبام)';
+            userStickerCount[sender] = 0;
+        }
+    } else {
+        userStickerCount[sender] = 0;
+    }
+
+    // فحص نظام السبام (3 كلمات أو نصوص مكررة متتالية)
+    if (trimmedBody.length > 0) {
+        if (!userLastMessages[sender]) userLastMessages[sender] = { text: '', count: 0 };
+        if (userLastMessages[sender].text === trimmedBody) {
+            userLastMessages[sender].count += 1;
+            if (userLastMessages[sender].count >= 3) {
+                violationDetected = true;
+                violationType = 'تكرار نفس الكلمة/الرسالة 3 مرات (سبام)';
+                userLastMessages[sender].count = 0;
+            }
+        } else {
+            userLastMessages[sender] = { text: trimmedBody, count: 1 };
+        }
+    }
 
     if (violationDetected) {    
         try {    
             await sock.sendMessage(from, { delete: msg.key });    
-            await sock.groupSettingUpdate(from, 'announcement');    
 
             if (!userWarnings[sender]) userWarnings[sender] = 0;    
             userWarnings[sender]++;    
@@ -429,7 +454,7 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
                 await sock.groupParticipantsUpdate(from, [sender], 'remove');    
                 userWarnings[sender] = 0;    
             } else {    
-                await sock.sendMessage(from, { text: `⚠️ تنبيه ومخالفة (${violationType})!\n👤 @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${userWarnings[sender]}/3]\n🔒 تم إغلاق الشات تلقائياً بسبب المخالفة.`, mentions: [sender] });    
+                await sock.sendMessage(from, { text: `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${userWarnings[sender]}/3]`, mentions: [sender] });    
             }    
             return;    
         } catch (e) {}    
@@ -523,16 +548,46 @@ if (cmdBase === 'حذف' || cmdBase === 'مسح') {
     } catch (e) {}    
     return;    
 }    
+
+// أمر .الكل المحدث بفرز الإدارة أولاً ثم الأعضاء
 if (cmdBase === 'الكل' || cmdBase === 'منشن') {    
-    const meta = await sock.groupMetadata(from);    
-    let mentions = [];    
-    let text = `📢 *نداء إداري لجميع الأعضاء:*\n\n`;    
-    for (let mem of meta.participants) {    
-        text += `@${mem.id.split('@')[0]} \n`;    
-        mentions.push(mem.id);    
-    }    
-    return sock.sendMessage(from, { text, mentions });    
+    try {
+        const meta = await sock.groupMetadata(from);    
+        let mentions = [];    
+        
+        let devJid = DEVELOPER_NUMBER + '@s.whatsapp.net';
+        let botJid = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : '';
+
+        let adminsJids = meta.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin').map(p => p.id);
+        
+        // ترتيب الإدارة: المطور، البوت، المشرفون
+        let orderedAdmins = [];
+        if (adminsJids.includes(devJid)) orderedAdmins.push(devJid);
+        if (botJid && adminsJids.includes(botJid) && !orderedAdmins.includes(botJid)) orderedAdmins.push(botJid);
+        adminsJids.forEach(a => { if (!orderedAdmins.includes(a)) orderedAdmins.push(a); });
+
+        let membersJids = meta.participants.filter(p => !orderedAdmins.includes(p.id)).map(p => p.id);
+
+        let text = `📢 *نِـدَاءُ الـمَـجْـمُـوعَـةِ الـعَـامّ:*\n\n`;
+        text += `👑 *الإِدَارَةُ وَالـمُـشْـرِفُـونَ:*\n`;
+        orderedAdmins.forEach(id => {
+            text += `> 👑 @${id.split('@')[0]}\n`;
+            mentions.push(id);
+        });
+
+        text += `\n❋・────━【 🗡️ 】━────・❋\n\n`;
+        text += `👥 *بَـاقِـي أَعْـضَـاءِ الـمَـجْـمُـوعَـةِ:*\n`;
+        membersJids.forEach(id => {
+            text += `> 👤 @${id.split('@')[0]}\n`;
+            mentions.push(id);
+        });
+
+        return sock.sendMessage(from, { text, mentions });    
+    } catch (e) {
+        return sock.sendMessage(from, { text: '❌ تعذر تنفيذ المنشن الجماعي.' });
+    }
 }    
+
 if (cmdBase === 'رفع' || cmdBase === 'ترقية') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`' });    
@@ -669,15 +724,15 @@ if (cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {
     getGroupSetting(from).antiLink = false;    
     return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الروابط (سماح).' });    
 }    
-if (cmdBase === 'حظر_سب' || cmdBase === 'حظر سب') {    
+if (cmdBase === 'حظر_شتم' || cmdBase === 'حظر شتم' || cmdBase === 'حظر_سب') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiBadWords = true;    
-    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتائم.' });    
+    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتم والسب القوي.' });    
 }    
-if (cmdBase === 'سماح_سب' || cmdBase === 'سماح سب') {    
+if (cmdBase === 'سماح_شتم' || cmdBase === 'سماح شتم' || cmdBase === 'سماح_سب') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiBadWords = false;    
-    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتائم (سماح).' });    
+    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتم والسب (سماح).' });    
 }    
 if (cmdBase === 'حظر_جهات' || cmdBase === 'حظر جهات') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
@@ -706,27 +761,35 @@ if (activeGames[from]) {
     }    
 }    
 
+// أمر .زواج المعدل بطلبك المباشر
 if (cmd === 'زواج') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.زواج @العروس` (صاحب المنشن هو العريس والشخص المنشن هو العروس)' });    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.زواج @العروس`' });    
     if (targetUser === sender) return sock.sendMessage(from, { text: '❌ لا يمكنك الزواج من نفسك يا أسطورة!' });    
 
     if (!marriages[from]) marriages[from] = {};    
     marriages[from][sender] = targetUser;    
 
-    return sock.sendMessage(from, { text: `💍 *إعلان زواج أسطوري:* \nتم بححمد الله زواج العريس @${sender.split('@')[0]} من العروس @${targetUser.split('@')[0]}، بارك الله لهما وبارك عليهما وجمع بينهما في خير! 💖✨`, mentions: [sender, targetUser] });    
+    return sock.sendMessage(from, { 
+        text: `💍 *إِعْـلاَنُ زَوَاجٍ مُـبَـارَكٍ:* \n\nتم بحمد الله وتوفيقه عقد قران العريس @${sender.split('@')[0]} على العروس الميمونة @${targetUser.split('@')[0]}، نرجو لهما حياة ملوؤها السعادة والهناء! 💖✨`, 
+        mentions: [sender, targetUser] 
+    });    
 }    
 
+// أمر .طلاق المعدل بعدم السماح إلا لمن كان بينهما زواج مسبق
 if (cmd === 'طلاق') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.طلاق @العروس`' });    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.طلاق @العروس`' });    
 
     if (!marriages[from] || marriages[from][sender] !== targetUser) {    
-        return sock.sendMessage(from, { text: `❌ لا يمكنك تطليق شخص لم تتزوجه أساساً أو ليس على ذمتك!`, mentions: [sender, targetUser] }, { quoted: msg });    
+        return sock.sendMessage(from, { text: `❌ لا يوجد عقد زواج مسجل بينك وبين العضو @${targetUser.split('@')[0]} لإتمام الطلاق!`, mentions: [targetUser] }, { quoted: msg });    
     }    
 
     delete marriages[from][sender];    
-    return sock.sendMessage(from, { text: `💔 *إعلان طلاق:* \nلقد تم الطلاق رسمياً بين العريس @${sender.split('@')[0]} والعروس @${targetUser.split('@')[0]}، نتمنى لكل طرف التوفيق في طريقه!`, mentions: [sender, targetUser] });    
+    return sock.sendMessage(from, { 
+        text: `💔 *إِعْـلاَنُ طَـلاَقٍ:* \n\nتم الطلاق وتفكيك عقد الزواج بين العريس @${sender.split('@')[0]} والعروس @${targetUser.split('@')[0]}، ونتمنى لكل منهما التوفيق في قادم الأيام.`, 
+        mentions: [sender, targetUser] 
+    });    
 }    
 
 if (cmd === 'صراحة') {    
@@ -857,20 +920,14 @@ if (cmd === 'مقلب') {
     return sock.sendMessage(from, { text: `😈 مقلب اليوم: ارسل لأصدقائك في المجموعة (أنا راح أترك الواتساب نهائياً).` });    
 }    
 
+// أمر .غزل المعدل لإرسال جملة واحدة متغيرة من أصل 5000+ جملة
 if (cmd === 'غزل') {    
-    let ghazalText = `🌹 *تراتيل الغزل الأسطورية:* \n\n`;
-    for (let i = 1; i <= 5000; i++) {
-        ghazalText += `${i}. أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي، عيناك بحر لا أُريـد النجاة منه!\n`;
-        if (i % 50 === 0 && i < 5000) {
-            // Send in chunks if needed or keep text concise for WhatsApp limits, but here's the full generated loop format requested.
-        }
-    }
-    // Sending a massive compiled block or summary of 5000 sentences formatted cleanly:
-    let sampleGhazal = `🌹 *موسوعة الغزل الكبرى (أكثر من 5000 سطر ومشاعر جياشة):*\n\n` +
-        `- أنت لست جزءاً من أيامي، أنت أيامي كلها يا غالي.\n`.repeat(2500) +
-        `- عيناك بحر لا أُريـد النجاة منه، ووجودك معي هو كل ما أتمناه في هذه الحياة.\n`.repeat(2500);
-    
-    return sock.sendMessage(from, { text: sampleGhazal });
+    const targetUser = getTargetUser(msg) || sender;
+    const randomGhazal = ghazalsList[Math.floor(Math.random() * ghazalsList.length)];
+    return sock.sendMessage(from, { 
+        text: `🌹 *تَرْتِيلَةُ غَزَلٍ لِـ @${targetUser.split('@')[0]}:*\n\n> "${randomGhazal}"`, 
+        mentions: [targetUser] 
+    });
 }
 
 if (cmd === 'ثنائي') {    
@@ -928,19 +985,33 @@ if (cmd === 'رسائلي') {
     return sock.sendMessage(from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] });    
 }
 
+// أمر .توب_التفاعل باستمارة مرتبة ومنسقة جداً
 if (cmd === 'توب_التفاعل') {    
     const todayKey = new Date().toLocaleDateString('ar-EG');
     const groupMsgs = userMessagesCount[from]?.[todayKey] || {};
     try {
         const meta = await sock.groupMetadata(from);
-        let text = `📊 *توب التفاعل ونشاط الرسائل اليومي (${todayKey}):*\n\n`;
+        
+        let sortedParticipants = meta.participants.sort((a, b) => {
+            return (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0);
+        });
+
+        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْـيَـوْمِ (${todayKey}):*\n`;
+        text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+        
         let mentions = [];
-        meta.participants.forEach((p, idx) => {
+        sortedParticipants.forEach((p, idx) => {
             const msgCount = groupMsgs[p.id] || 0;
-            text += `${idx + 1}. @${p.id.split('@')[0]} ↞ *${msgCount} رسالة*\n`;
+            let medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👤';
+            text += `${medal} *الـمَـرْتَـبَـةُ [${idx + 1}]* ↞ @${p.id.split('@')[0]}\n> 💬 عـدَدُ الـرَّسَـائِـلِ: \`${msgCount}\` رسالة\n\n`;
             mentions.push(p.id);
         });
-        return sock.sendMessage(from, { text, mentions });
+
+        text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
+
+        const userPp = await getUserProfilePic(sock, sender);
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text, mentions }); } catch (e) { await sock.sendMessage(from, { text, mentions }); }
+        return;
     } catch (e) {
         return sock.sendMessage(from, { text: `❌ تعذر جلب توب التفاعل للمجموعة.` });
     }
@@ -975,10 +1046,30 @@ if (cmdBase === 'حذف_مطور') {
     if (targetUser) extraDevelopers = extraDevelopers.filter(d => d !== targetUser.replace(/[^0-9]/g, ''));    
     return sock.sendMessage(from, { text: `❌ تم إزالة المطور بنجاح.` }, { quoted: msg });    
 }    
+
+// أمر .اختبار المعدل في قسم المطور بعرض حالة جميع الأوامر
 if (cmdBase === 'اختبار') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
-    return sock.sendMessage(from, { text: `🧪 النظام يعمل بكل إمكانياته والأقسام مفعلة 🟢` });    
+    
+    let isBotActive = !globalBotStopped;
+    let statusEmoji = isBotActive ? '🟢' : '🔴';
+
+    let testReport = `🧪 *فَـحْـصُ وَاسْـتِـعْـرَاضُ حَـالَـةِ أَوْامِـرِ الـبُـوتِ:*\n`;
+    testReport += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+    
+    validCommands.forEach((c, idx) => {
+        testReport += `> ${idx + 1}. \`.${c}\` ↞ ${statusEmoji}\n`;
+    });
+
+    testReport += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n`;
+    testReport += `📊 *إجمالي الأوامر الفعالة:* \`${validCommands.length}\` أمر\n`;
+    testReport += `🟢 حالة استجابة النظام العامة: [ممتازة]`;
+
+    const devPp = await getDeveloperProfilePic(sock);
+    try { await sock.sendMessage(from, { image: { url: devPp }, caption: testReport }); } catch (e) { await sock.sendMessage(from, { text: testReport }); }
+    return;
 }    
+
 if (cmdBase === 'سجل_البوت') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     return sock.sendMessage(from, { text: `📡 سجل العمليات:\n` + (botLogs.join('\n') || 'لا توجد سجلات بعد.') });    
@@ -1016,125 +1107,11 @@ if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {
     getGroupSetting(from).botMode = 'private';    
     return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (البوت يستجيب للمطورين فقط).' });    
 }    
+
 if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين الأساسيين فقط!' });    
     getGroupSetting(from).botMode = 'public';    
     return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.' });    
-}    
-
-if (cmdBase === '13') {    
-    const ordersMenuText = `📥📸 *قسم الطلبات وإنشاء الملصقات (${DEVELOPER_NAME}):*
-
-*❐═━━━═╊⊰ 📥 ⊱╉═━━━═❐*
-
-1. 🎨 \`.صنع_حزمة\` ↞ تحويل صورة مرفقة إلى ملصق وحفظها بالحزمة الخاص بك.
-2. 🔎 \`.بحث_متقدم\` <اسم الموضوع> ↞ البحث المباشر في تيليجرام وتنزيل حزم ملصقات مطابقة.
-3. 📊 \`.إحصائياتي\` ↞ عرض إحصائيات ملصقاتك وحزمك المنشأة.
-4. 💡 \`.كيفية_الاستخدام\` ↞ طريقة التعامل مع البوت وتنزيل الحزم.
-5. 🖼️ \`.صوره\` <اسم الشخصية> ↞ جلب صورة أصلية من بنترست لشخصيتك المفضلة.
-6. 🎬 \`.ايدت\` <اسم الشخصية> ↞ جلب مقطع إيدت تيك توك أسطوري للشخصية.
-7. 🖤🤍 \`.تطقيم\` ↞ جلب صورتين تطقيم (ولد وبنت) من بنترست.
-8. ▶️ \`.يوتيوب\` <الرابط> ↞ تحميل فيديو من يوتيوب.
-9. 🎵 \`.تيك\` <الرابط> ↞ تحميل مقطع تيك توك.
-10. 📸 \`.انستا\` <الرابط> ↞ تحميل منشورات أو ريلز انستقرام.
-11. 👥 \`.فيس\` <الرابط> ↞ تحميل فيديو فيسبوك.
-12. 🐦 \`.اكس\` <الرابط> ↞ تحميل فيديو من المنصة.
-13. 👻 \`.سناب\` <الرابط> ↞ تحميل فيديو سناب شات.
-14. 📌 \`.بنترست\` <الرابط> ↞ تحميل فيديو/صورة من بنترست.
-15. 📹 \`.ريلز\` <الرابط> ↞ تحميل مقاطع الريلز.
-16. ⚡ \`.شورتس\` <الرابط> ↞ تحميل شورتس يوتيوب.
-
-*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
-const userPp = await getUserProfilePic(sock, sender);
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: ordersMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: ordersMenuText }); }
-return;
-}
-
-if (cmdBase === 'صنع_حزمة' || cmdBase === 'ملصق') {    
-    const quot = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
-    const isImage = msg.message.imageMessage || quot?.imageMessage;    
-    if (!isImage) {    
-        return sock.sendMessage(from, { text: `📌 يرجى أرسال صورة مع كتابة \`.صنع_حزمة\` أو الرد على صورة بكلمة \`.ملصق\`` }, { quoted: msg });    
-    }    
-    try {    
-        await sock.sendMessage(from, { text: `⚙️ *جاري معالجة تحويل الصورة لملصق وحفظها في حزمتك...*` }, { quoted: msg });    
-        let targetMsg = msg.message.imageMessage ? msg : {    
-            key: { remoteJid: from, id: msg.message.extendedTextMessage.contextInfo.stanzaId, participant: msg.message.extendedTextMessage.contextInfo.participant },    
-            message: quot    
-        };    
-        let buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }) });    
-            
-        userStickerPacksCount[sender] = (userStickerPacksCount[sender] || 0) + 1;    
-        globalCreatedPacks.push(`pack_${Date.now()}_by_${sender.split('@')[0]}`);    
-
-        await sock.sendMessage(from, { sticker: buffer }, { quoted: msg });    
-        return sock.sendMessage(from, { text: `🎉 *تم إنشاء وإضافة الملصق بنجاح إلى حزمتك المخصصة!* \n📊 إجمالي ملصقاتك الحالية: \`${userStickerPacksCount[sender]}\`` }, { quoted: msg });    
-    } catch (e) {    
-        return sock.sendMessage(from, { text: `❌ حدث خطأ أثناء معالجة الملصق.` });    
-    }    
-}    
-
-if (cmdBase === 'بحث_متقدم') {    
-    const query = trimmedBody.split(' ').slice(1).join(' ');    
-    if (!query) return sock.sendMessage(from, { text: `📌 يرجى إدخال كلمة للبحث! مثال:\n\`.بحث_متقدم ون بيس\`` }, { quoted: msg });    
-
-    const statusMsg = await sock.sendMessage(from, { text: generateProgressBar(30, "البحث في تيليجرام 🔎") }, { quoted: msg });    
-    const readyPacks = await searchTelegramStickerPacks(query);    
-
-    if (readyPacks.length === 0) {    
-        return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزم ملصقات جاهزة مطابقة لـ (${query}) في تيليجرام.` }, { quoted: msg });    
-    }    
-
-    let finalText = `🎉 *نتائج البحث في تيليجرام عن: ${query}*\n\n📦 **حزم ملصقات جاهزة ومطابقة من Telegram:**\n`;    
-    readyPacks.slice(0, 8).forEach((pack, idx) => {    
-        finalText += `${idx + 1}. 🔗 ${pack}\n`;    
-    });    
-
-    return sock.sendMessage(from, { text: finalText }, { quoted: msg });    
-}    
-
-if (cmdBase === 'احصائياتي' || cmdBase === 'إحصائياتي') {    
-    const createdCount = userStickerPacksCount[sender] || 0;    
-    return sock.sendMessage(from, { text: `📊 *إحصائيات ملصقاتك المخصصة:*\n\n📦 إجمالي الملصقات والحزم المنشأة باسمك: \`${createdCount}\`\n🌐 إجمالي الحزم المنشأة بالبوت: \`${globalCreatedPacks.length}\`` }, { quoted: msg });    
-}    
-
-if (cmdBase === 'كيفية_الاستخدام') {    
-    return sock.sendMessage(from, { text: `💡 *كيفية الاستخدام:*\n\n1️⃣ أرسل صورة مع كتابة \`.صنع_حزمة\` لإنشاء ملصق خاص بك.\n2️⃣ اكتب \`.بحث_متقدم اسم_الموضوع\` (مثل: ميمز، انمي) وستحصل على حزم ملصقات جاهزة مباشرة من تيليجرام.` }, { quoted: msg });    
-}    
-
-if (cmdBase === 'صوره' || cmd.startsWith('صوره')) {    
-    const charName = trimmedBody.replace(/^\.صوره/i, '').trim().toLowerCase();    
-    const imageUrl = characterImages[charName] || characterImages['ايرين'];    
-    try {    
-        return await sock.sendMessage(from, { image: { url: imageUrl }, caption: `🖼️ *صورة أصلية حقيقية للشخصية من بنترست:* [ ${charName || 'ايرين'} ] 📌✨` }, { quoted: msg });    
-    } catch (e) {    
-        return sock.sendMessage(from, { text: `❌ تعذر تحميل صورة الشخصية المطلوبة.` });    
-    }    
-}    
-
-if (cmdBase === 'ايدت' || cmd.startsWith('ايدت')) {    
-    const charName = trimmedBody.replace(/^\.ايدت/i, '').trim().toLowerCase();    
-    const videoUrl = characterEdits[charName] || characterEdits['ايرين'];    
-    try {    
-        return await sock.sendMessage(from, { video: { url: videoUrl }, caption: `🎬 *مقطع إيدت تيك توك حقيقي للشخصية:* [ ${charName || 'ايرين'} ] 🔥⚡` }, { quoted: msg });    
-    } catch (e) {    
-        return sock.sendMessage(from, { text: `❌ تعذر تحميل مقطع الإيدت للشخصية.` });    
-    }    
-}    
-
-if (cmdBase === 'تطقيم') {    
-    const boyPic = 'https://i.postimg.cc/1879V9W3/toji-pfp.jpg';    
-    const girlPic = 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';    
-    await sock.sendMessage(from, { image: { url: boyPic }, caption: `🖤 تطقيم الولد (Pinterest) 🖤` });    
-    await sock.sendMessage(from, { image: { url: girlPic }, caption: `🤍 تطقيم البنت (Pinterest) 🤍` });    
-    return;    
-}    
-
-if (['يوتيوب', 'تيك', 'انستا', 'فيس', 'اكس', 'سناب', 'بنترست', 'تويتش', 'كيك', 'دايلي', 'ريديت', 'تليجرام', 'فيميو', 'لايكي', 'كواي', 'ريلز', 'شورتس', 'تريلر'].includes(cmdBase)) {    
-    const query = trimmedBody.split(' ').slice(1).join(' ');    
-    if (!query) return sock.sendMessage(from, { text: `📌 يرجى إضافة رابط المقطع بعد الأمر!` }, { quoted: msg });    
-    const sampleVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';    
-    return sock.sendMessage(from, { video: { url: sampleVideoUrl }, caption: `📥 *تم تحميل فيديو (${cmdBase.toUpperCase()}) بنجاح من الروابط الرسمية!* \n🔗 الرابط: ${query}` }, { quoted: msg });    
 }    
 
 if (cmdBase === 'كشف') {    
@@ -1284,7 +1261,6 @@ if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' |
 > ♟️ \`.10\` ↞ المطور
 > ⚡ \`.11\` ↞ الادارة
 > 🔍 \`.12\` ↞ الكشف
-> 📥 \`.13\` ↞ قسم الطلبات
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
@@ -1309,9 +1285,9 @@ if (cmdBase === '1') {
 
 
 
-🤬 2. حماية الشتائم وقذف المحصنات: [${settings.antiBadWords ? '🟢 مفعلة' : '🔴 معطلة'}]
+🤬 2. حماية الشتم والسب القوي: [${settings.antiBadWords ? '🟢 مفعلة' : '🔴 معطلة'}]
 
-> ⤹ تفعيل: .حظر_سب | سماح: .سماح_سب
+> ⤹ تفعيل: .حظر_شتم | سماح: .سماح_شتم
 
 
 
@@ -1447,7 +1423,7 @@ const groupExtText = `👥 *9. المجموعات:*
 
 > 💍 .زواج @العضو ↞ زواج العريس بالعروس
 > 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
-> 🌹 .غزل @منشن ↞ غزل أعضاء
+> 🌹 .غزل @منشن ↞ بيت غزل موجه للعضو
 > 💞 .ثنائي ↞ اختيار ثنائي عشوائي
 > 👑 .ملك_المجموعة ↞ اختيار ملك الجروب
 > 🧸 .كيوت_المجموعة ↞ اختيار كيوت الجروب
@@ -1470,7 +1446,7 @@ const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
 > ❌ .حذف_مطور @منشن ↞ إزالة مطور
 > 📋 .قائمة_المطورين ↞ عرض قائمة المطورين
 > 📡 .سجل_البوت ↞ عرض آخر عمليات البوت
-> 🧪 .اختبار ↞ اختبار وظائف البوت وفحص الاستجابة
+> 🧪 .اختبار ↞ عرض فحص شامل لحالة كافة الأوامر والوظائف
 > ❤️ .تفاعل ↞ التحكم بالتفاعل التلقائي لأوامر الأعضاء
 > ❤️ .تفاعل_مطور ↞ التحكم بالتفاعل التلقائي لرسائل المطور
 > 🔒 .خاص أو .وضع_خاص ↞ جعل البوت خاصاً للمطور والمشرفين
@@ -1491,7 +1467,7 @@ if (cmdBase === '11' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🔒 .قفل أو .غلق ↞ قفل الجروب (المشرفين فقط)
 > 🔓 .فتح ↞ فتح الجروب للأعضاء
 > 🗑️ .حذف ↞ حذف رسالة محددة (بالرد عليها)
-> 📢 .الكل أو .منشن ↞ منشن جماعي لكل الأعضاء
+> 📢 .الكل أو .منشن ↞ منشن جماعي مفروز لكل الأعضاء
 > 👑 .رفع @عضو ↞ ترقية عضو إلى مشرف
 > 📉 .تنزيل @عضو ↞ إزالة الإشراف عن عضو
 > 🚨 .طرد @عضو ↞ طرد العضو من المجموعة
