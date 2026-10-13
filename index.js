@@ -1199,31 +1199,28 @@ if (cmdBase === 'بوت') {
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
 > ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
 > ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
-> ┃
-> ┃ ♟️ *الهيبة ليست بصخب الحضور،*
-> ┃ *بل بالتأثير الصامت الذي يترك أثراً لا يُنسى.*
-> ┃ ✦ لا نسعى خلف الأضواء، بل ندع النتائج تتكلم.
-> ┃
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
 > ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-اختر أحد الخيارات من الأزرار بالأسفل.
+⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
+اكتب الأمر: 👇
+
+📌 *.الاوامر*  أو  *.اقسام*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 `.trim();
 
     const botPp = await getBotProfilePic(sock);
-
     try {
-        await sock.sendMessage(from, {
-            image: { url: botPp },
-            caption: botWelcomeText,
-            mentions: [sender]
-        });
+        await sock.sendMessage(from, { image: { url: botPp }, caption: botWelcomeText, mentions: [sender] });
     } catch (e) {
-        await sock.sendMessage(from, {
-            text: botWelcomeText,
-            mentions: [sender]
-        });
+        await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender] });
     }
 
     const buttonsMessage = generateWAMessageFromContent(
@@ -1261,14 +1258,14 @@ if (cmdBase === 'بوت') {
         { userJid: sock.user.id }
     );
 
-        await sock.relayMessage(from, buttonsMessage.message, {
+    await sock.relayMessage(from, buttonsMessage.message, {
         messageId: buttonsMessage.key.id
     });
 
     return;
 }
 
-if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {
+if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ (${DEVELOPER_NAME}):*
 
 > 🛡️ \`.1\` ↞ الحماية
@@ -1351,7 +1348,6 @@ return;
 }
 
 if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {    
-if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'النقاط') {
     const bankMenuText = `💳 *3. البنك والنقاط ومتجر:*
 
 > 💳 .بنك | .حسابي ↞ كشف الحساب البنكي
@@ -1360,39 +1356,27 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 🎁 .مكافأة ↞ الهدية اليومية
 > 🛒 .متجر ↞ المتجر الأسطوري`;
 
-    const userPp = await getUserProfilePic(sock, sender);
-    try {
-        await sock.sendMessage(from, {
-            image: { url: userPp },
-            caption: bankMenuText,
-            mentions: [sender]
-        });
-    } catch (e) {
-        await sock.sendMessage(from, { text: bankMenuText });
-    }
-    return;
+const userPp = await getUserProfilePic(sock, sender);
+try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
+return;
 }
 
-if (cmdBase === '4') {
-    const sportText = `⚽ *4. قسم الرياضة:*
+if (cmdBase === '4') {    
+    const sportText = `⚽ *4. الرياضة:*
 
 > ⚽ .كرة_قدم ↞ معلومات كرة القدم
-> 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
-> 🌹 .غزل ↞ ترتيب الفرق
+> 🏆 .مباريات ↞ المباريات الحية
+> 📊 .نتائج ↞ نتائج المباريات
+> 🥇 .بطولات ↞ البطولات الكبرى
+> 👤 .لاعب <اسم> ↞ معلومات لاعب
+> ⚽ .فريق <اسم> ↞ معلومات فريق
+> 🏆 .ترتيب ↞ ترتيب الفرق
 > 🔥 .هداف ↞ قائمة الهدافين`;
-
-    const userPp = await getUserProfilePic(sock, sender);
-    try {
-        await sock.sendMessage(from, {
-            image: { url: userPp },
-            caption: sportText,
-            mentions: [sender]
-        });
-    } catch (e) {
-        await sock.sendMessage(from, { text: sportText });
-    }
-    return;
+const userPp = await getUserProfilePic(sock, sender);
+try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
+return;
 }
+
 if (cmdBase === '5') {
 const aiText = `🤖 *5. الذكاء الاصطناعي:*
 
