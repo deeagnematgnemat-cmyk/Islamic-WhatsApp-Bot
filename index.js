@@ -359,7 +359,29 @@ if (isGroup && !isFromMe && !isSenderDev) {
     } catch (e) {}    
 }    
 
-const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';    
+const interactiveResponse =
+    msg.message?.interactiveResponseMessage
+        ?.nativeFlowResponseMessage?.paramsJson;
+
+let buttonId = '';
+
+if (interactiveResponse) {
+    try {
+        buttonId = JSON.parse(interactiveResponse).id || '';
+    } catch (e) {}
+}
+
+const body =
+    buttonId === 'bot_sections'
+        ? '.الاوامر'
+        : (
+            msg.message.conversation ||
+            msg.message.extendedTextMessage?.text ||
+            msg.message.imageMessage?.caption ||
+            msg.message.videoMessage?.caption ||
+            ''
+        );
+
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
@@ -1163,7 +1185,6 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
     process.exit(0);    
 }    
 
-if (cmdBase === 'بوت') {    
 if (cmdBase === 'بوت') {
     const time = new Date().toLocaleTimeString('ar-EG', {
         hour: '2-digit',
@@ -1240,14 +1261,14 @@ if (cmdBase === 'بوت') {
         { userJid: sock.user.id }
     );
 
-    await sock.relayMessage(from, buttonsMessage.message, {
+        await sock.relayMessage(from, buttonsMessage.message, {
         messageId: buttonsMessage.key.id
     });
 
     return;
-            }
+}
 
-if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
+if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ (${DEVELOPER_NAME}):*
 
 > 🛡️ \`.1\` ↞ الحماية
