@@ -253,7 +253,7 @@ console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e);
 }
-}, 4000);
+}, 8000);
 }
 
 sock.ev.on('connection.update', (u) => {
