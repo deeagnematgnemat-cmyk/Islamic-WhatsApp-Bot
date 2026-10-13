@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, proto, generateWAMessageFromContent } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
@@ -359,29 +359,7 @@ if (isGroup && !isFromMe && !isSenderDev) {
     } catch (e) {}    
 }    
 
-const interactiveResponse =
-    msg.message?.interactiveResponseMessage
-        ?.nativeFlowResponseMessage?.paramsJson;
-
-let buttonId = '';
-
-if (interactiveResponse) {
-    try {
-        buttonId = JSON.parse(interactiveResponse).id || '';
-    } catch (e) {}
-}
-
-const body =
-    buttonId === 'bot_sections'
-        ? '.الاوامر'
-        : (
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text ||
-            msg.message.imageMessage?.caption ||
-            msg.message.videoMessage?.caption ||
-            ''
-        );
-
+const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';    
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
@@ -1185,12 +1163,9 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
     process.exit(0);    
 }    
 
-if (cmdBase === 'بوت') {
-    const time = new Date().toLocaleTimeString('ar-EG', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-
+if (cmdBase === 'بوت') {    
+    const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });    
+        
     const botWelcomeText = `
 🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
@@ -1199,76 +1174,33 @@ if (cmdBase === 'بوت') {
 > ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
 > ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
 > ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
-> ┃
-> ┃ ♟️ *الهيبة ليست بصخب الحضور،*
-> ┃ *بل بالتأثير الصامت الذي يترك أثراً لا يُنسى.*
-> ┃ ✦ لا نسعى خلف الأضواء، بل ندع النتائج تتكلم.
-> ┃
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
 > ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-اختر أحد الخيارات من الأزرار بالأسفل.
+⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
+اكتب الأمر: 👇
+
+📌 *.الاوامر*  أو  *.اقسام*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 `.trim();
 
-    const botPp = await getBotProfilePic(sock);
-
-    try {
-        await sock.sendMessage(from, {
-            image: { url: botPp },
-            caption: botWelcomeText,
-            mentions: [sender]
-        });
-    } catch (e) {
-        await sock.sendMessage(from, {
-            text: botWelcomeText,
-            mentions: [sender]
-        });
-    }
-
-    const buttonsMessage = generateWAMessageFromContent(
-        from,
-        {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage: proto.Message.InteractiveMessage.create({
-                        body: {
-                            text: '🍷 『 Eren Bot 』\nاختر ما تريد:'
-                        },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: 'quick_reply',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: '📋 الأقسام',
-                                        id: 'bot_sections'
-                                    })
-                                },
-                                {
-                                    name: 'cta_url',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: '🍷 قناة المطور',
-                                        url: 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d',
-                                        merchant_url: 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d'
-                                    })
-                                }
-                            ]
-                        }
-                    })
-                }
-            }
-        },
-        { userJid: sock.user.id }
-    );
-
-        await sock.relayMessage(from, buttonsMessage.message, {
-        messageId: buttonsMessage.key.id
-    });
-
-    return;
+const botPp = await getBotProfilePic(sock);
+try {
+await sock.sendMessage(from, { image: { url: botPp }, caption: botWelcomeText, mentions: [sender] });
+} catch (e) {
+await sock.sendMessage(from, { text: botWelcomeText });
+}
+return;
 }
 
-if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {
+if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ (${DEVELOPER_NAME}):*
 
 > 🛡️ \`.1\` ↞ الحماية
@@ -1359,38 +1291,25 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 🎁 .مكافأة ↞ الهدية اليومية
 > 🛒 .متجر ↞ المتجر الأسطوري`;
 
-    const userPp = await getUserProfilePic(sock, sender);
-    try {
-        await sock.sendMessage(from, {
-            image: { url: userPp },
-            caption: bankMenuText,
-            mentions: [sender]
-        });
-    } catch (e) {
-        await sock.sendMessage(from, { text: bankMenuText });
-    }
-    return;
+const userPp = await getUserProfilePic(sock, sender);
+try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
+return;
 }
 
-if (cmdBase === '4') {
-    const sportText = `⚽ *4. قسم الرياضة:*
+if (cmdBase === '4') {    
+    const sportText = `⚽ *4. الرياضة:*
 
 > ⚽ .كرة_قدم ↞ معلومات كرة القدم
-> 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
-> 🌹 .غزل ↞ ترتيب الفرق
+> 🏆 .مباريات ↞ المباريات الحية
+> 📊 .نتائج ↞ نتائج المباريات
+> 🥇 .بطولات ↞ البطولات الكبرى
+> 👤 .لاعب <اسم> ↞ معلومات لاعب
+> ⚽ .فريق <اسم> ↞ معلومات فريق
+> 🏆 .ترتيب ↞ ترتيب الفرق
 > 🔥 .هداف ↞ قائمة الهدافين`;
-
-    const userPp = await getUserProfilePic(sock, sender);
-    try {
-        await sock.sendMessage(from, {
-            image: { url: userPp },
-            caption: sportText,
-            mentions: [sender]
-        });
-    } catch (e) {
-        await sock.sendMessage(from, { text: sportText });
-    }
-    return;
+const userPp = await getUserProfilePic(sock, sender);
+try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
+return;
 }
 
 if (cmdBase === '5') {
