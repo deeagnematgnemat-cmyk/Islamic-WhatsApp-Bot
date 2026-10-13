@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, proto, generateWAMessageFromContent } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
@@ -1296,16 +1296,8 @@ try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuTe
 return;
 }
 
-if (cmdBase === '4') {    
-    const sportText = `⚽ *4. الرياضة:*
-
-> ⚽ .كرة_قدم ↞ معلومات كرة القدم
-> 🏆 .مباريات ↞ المباريات الحية
-> 📊 .نتائج ↞ نتائج المباريات
-> 🥇 .بطولات ↞ البطولات الكبرى
-> 👤 .لاعب <اسم> ↞ معلومات لاعب
-> ⚽ .فريق <اسم> ↞ معلومات فريق
-> 🏆 .ترتيب ↞ ترتيب الفرق
+> 💔 .طلاق @العضو ↞ طلاق العريس بالعروس
+> 🌹 .غزل ↞ ترتيب الفرق
 > 🔥 .هداف ↞ قائمة الهدافين`;
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: sportText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: sportText }); }
