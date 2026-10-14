@@ -7,7 +7,7 @@ import { characterImages, characterEdits, gamesData } from './database/data.js';
 // قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
 
-// مستودع الغزل (يحتوي على نماذج متعددة ومتنوعة تتجاوز الـ 5000 جملة عشوائية)
+// مستودع الغزل
 const ghazalsList = [
     "عيناكِ أرض لا خائن فيها، وجمالكِ حقيقة لا جدال فيها.",
     "لو كان الحب كلمات تُكتب لإنتهت أقلامي، لكن الحب أرواح تُوهب فهل تكفيكِ روحي؟",
@@ -26,7 +26,7 @@ const ghazalsList = [
     "سألتُ البدر عن الجمال، فأومأ إليكِ وقال: هي أصل حسني والضياء."
 ];
 
-// مستودع النكت المضحكة
+// مستودع النكت
 const jokesList = [
     "محشش سألوه: شو رأيك بالزواج المبكر؟ قال: الساعة قديش؟! 🤣",
     "واحد بخيل أخذ ولده على السوبر ماركت، الولد مسك شوكولاتة وقال: بحبها! الأب قاله: بوسها ورجعها! 😂",
@@ -53,7 +53,7 @@ const quotesList = [
     "من استعجل الشيء قبل أبانه، عُوقب بحرمانه."
 ];
 
-// مستودع الآيات القرآنية
+// مستودع الآيات
 const quranList = [
     "﴿اللَّهُ لَا إِلٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ﴾",
     "﴿إِنَّ مَعَ الْعُسْرِ يُسْرًا﴾",
@@ -70,7 +70,7 @@ const duaList = [
     "اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ."
 ];
 
-// مستودع الأحاديث النبوية
+// مستودع الأحاديث
 const hadithList = [
     "«إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى»",
     "«المُسْلِمُ مَنْ سَلِمَ المُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ»",
@@ -84,15 +84,26 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 let extraDevelopers = [];
+let vipUsers = []; // قائمة أعضاء النخبة
 let botLogs = [];
 
-function logBotAction(action) {
-const time = new Date().toLocaleTimeString('ar-EG');
-botLogs.unshift(`> 🔹 [${time}] ↞${action}`);
-if (botLogs.length > 20) botLogs.pop();
+function getJordanTime() {
+    return new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-let userPoints = {}, userWarnings = {};
+function getJordanDateKey() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' }); // YYYY-MM-DD
+}
+
+function logBotAction(action) {
+    const time = getJordanTime();
+    botLogs.unshift(`> 🔹 [${time}] ↞${action}`);
+    if (botLogs.length > 20) botLogs.pop();
+}
+
+let userPoints = {};
+// تخزين الإنذارات مع توقيت إضافتها
+let userWarnings = {}; // { userJid: [timestamp1, timestamp2, ...] }
 let bankAccounts = {};
 let activeGames = {};
 let dailyRewards = {};
@@ -101,13 +112,43 @@ let userMessagesCount = {};
 let groupSettings = {};
 let marriages = {};
 
+// دالة لتنظيف الإنذارات المنتهية (التي مر عليها أكثر من 48 ساعة)
+function cleanExpiredWarnings(userJid) {
+    if (!userWarnings[userJid]) return;
+    const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    userWarnings[userJid] = userWarnings[userJid].filter(timestamp => (now - timestamp) < twoDaysInMs);
+    if (userWarnings[userJid].length === 0) {
+        delete userWarnings[userJid];
+    }
+}
+
+// دالة لمعرفة عدد الإنذارات النشطة
+function getUserWarningCount(userJid) {
+    cleanExpiredWarnings(userJid);
+    return userWarnings[userJid] ? userWarnings[userJid].length : 0;
+}
+
+// دالة لإضافة إنذار بتوقيته الحالي
+function addWarningToUser(userJid) {
+    cleanExpiredWarnings(userJid);
+    if (!userWarnings[userJid]) userWarnings[userJid] = [];
+    userWarnings[userJid].push(Date.now());
+    return userWarnings[userJid].length;
+}
+
+// دالة لحذف إنذار واحد
+function removeOneWarningFromUser(userJid) {
+    cleanExpiredWarnings(userJid);
+    if (userWarnings[userJid] && userWarnings[userJid].length > 0) {
+        userWarnings[userJid].pop();
+        if (userWarnings[userJid].length === 0) delete userWarnings[userJid];
+    }
+}
+
 // تخزين الألقاب وحجوزات الألقاب لكل مجموعة على حدة
 let groupTitles = {};
 let groupReservedTitles = {};
-
-// تتبع السبام
-let userLastMessages = {};
-let userStickerCount = {};
 
 let globalBotStopped = false;
 
@@ -120,8 +161,8 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تفعيل', 'توقيف',
-'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع',
+'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'الاوامر', 'اوامر', 'منيو', 'اقسام',
@@ -135,9 +176,10 @@ const validCommands = [
 'رسائلي', 'توب_التفاعل',
 'المطور', 'مطور', 'الادارة', 'الاداره',
 'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
-'اضف_انذار', 'ازل_انذار', 'عدد_الانذارات',
+'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'عدد_الانذارات', 'قائمة_الانذارات',
 'حظر رابط', 'سماح رابط', 'حظر شتم', 'سماح شتم', 'حظر جهات', 'سماح جهات',
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
+'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة',
 'مباريات', 'نتائج', 'بطولات', 'لاعب', 'فريق', 'ترتيب', 'هداف',
 'اسأل', 'اكتب', 'لخص', 'ترجم', 'صحح',
 'قرآن', 'آية', 'سورة', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'اذكار_الصباح', 'اذكار_المساء',
@@ -156,6 +198,11 @@ return false;
 function isExtraDeveloper(senderJid) {
 const cleanNum = senderJid.replace(/[^0-9]/g, '');
 return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
+}
+
+function isVipUser(senderJid) {
+const cleanNum = senderJid.replace(/[^0-9]/g, '');
+return vipUsers.some(u => cleanNum.includes(u) || u.includes(cleanNum));
 }
 
 function isDeveloper(senderJid, sock) {
@@ -389,7 +436,7 @@ const sender = isFromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.what
 const cleanSenderNum = sender.replace(/[^0-9]/g, '');    
 
 if (isGroup) {    
-    const todayKey = new Date().toLocaleDateString('ar-EG');    
+    const todayKey = getJordanDateKey();    
     if (!userMessagesCount[from]) userMessagesCount[from] = {};    
     if (!userMessagesCount[from][todayKey]) userMessagesCount[from][todayKey] = {};    
     userMessagesCount[from][todayKey][sender] = (userMessagesCount[from][todayKey][sender] || 0) + 1;    
@@ -446,7 +493,7 @@ if (isSenderExtraDev && devReactionEnabled) {
     } catch (e) {}    
 }    
 
-// نظام الحماية الشاملة الدقيقة (حفظ الرسائل العادية وعدم حذف النقاط المفردة)
+// نظام الحماية الشاملة الدقيقة (مع الشطب التلقائي للإنذارات بعد يومين)
 if (isGroup && !isSenderAdmin && !isSenderDev) {    
     const settings = getGroupSetting(from);    
     const mType = Object.keys(msg.message || {});    
@@ -455,7 +502,6 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
     let violationType = '';    
     let shouldLockChat = false;
 
-    // مطابقة الكلمات بشكل دقيق تماماً دون التأثير على الكلمات المركبة
     const wordsInBody = lowerBody.split(/\s+/);
     const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
 
@@ -473,35 +519,6 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
         shouldLockChat = true;
     }    
 
-    // فحص نظام السبام (3 ملصقات متتالية)
-    if (mType.includes('stickerMessage')) {
-        userStickerCount[sender] = (userStickerCount[sender] || 0) + 1;
-        if (userStickerCount[sender] >= 3) {
-            violationDetected = true;
-            violationType = 'إرسال 3 ملصقات متتالية (سبام)';
-            userStickerCount[sender] = 0;
-            shouldLockChat = false;
-        }
-    } else {
-        userStickerCount[sender] = 0;
-    }
-
-    // فحص نظام السبام (3 كلمات/نصوص مكررة متتالية مع الاستثناء للنقاط العادية)
-    if (trimmedBody.length > 0 && !/^\.+$/.test(trimmedBody)) {
-        if (!userLastMessages[sender]) userLastMessages[sender] = { text: '', count: 0 };
-        if (userLastMessages[sender].text === trimmedBody) {
-            userLastMessages[sender].count += 1;
-            if (userLastMessages[sender].count >= 3) {
-                violationDetected = true;
-                violationType = 'تكرار نفس الكلمة 3 مرات (سبام)';
-                userLastMessages[sender].count = 0;
-                shouldLockChat = false;
-            }
-        } else {
-            userLastMessages[sender] = { text: trimmedBody, count: 1 };
-        }
-    }
-
     if (violationDetected) {    
         try {    
             await sock.sendMessage(from, { delete: msg.key });    
@@ -510,15 +527,14 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
                 await sock.groupSettingUpdate(from, 'announcement');    
             }
 
-            if (!userWarnings[sender]) userWarnings[sender] = 0;    
-            userWarnings[sender]++;    
+            const activeWarnings = addWarningToUser(sender);
 
-            if (userWarnings[sender] >= 3) {    
+            if (activeWarnings >= 3) {    
                 await sock.sendMessage(from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] });    
                 await sock.groupParticipantsUpdate(from, [sender], 'remove');    
-                userWarnings[sender] = 0;    
+                delete userWarnings[sender];    
             } else {    
-                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${userWarnings[sender]}/3]`;
+                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
                 if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
                 await sock.sendMessage(from, { text: alertMsg, mentions: [sender] });    
             }    
@@ -588,24 +604,50 @@ if (!isGroup) {
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
 const groupSettingsForCheck = getGroupSetting(from);    
-if (groupSettingsForCheck.botMode === 'private' && !isSenderDev) {    
+if (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) {    
     return;    
 }    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'صفر', 'عدد_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
 }    
 
+// أمر قفل/غلق
 if (cmdBase === 'قفل' || cmd === 'غلق') {    
     await sock.groupSettingUpdate(from, 'announcement');    
-    return sock.sendMessage(from, { text: '🔒 تم قفل المجموعة!' });    
+    const text = `╭━━━〔 🔒 〕━━━╮
+『 إِغْـلَاقُ الـمَـجْـمُـوعَـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔒 ⌯ الإجراء ↞ إغلاق المجموعة
+🛡️ ⌯ الحالة ↞ تم إغلاق المجموعة بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
+
+// أمر فتح
 if (cmdBase === 'فتح') {    
     await sock.groupSettingUpdate(from, 'not_announcement');    
-    return sock.sendMessage(from, { text: '🔓 تم فتح المجموعة!' });    
+    const text = `╭━━━〔 🔓 〕━━━╮
+『 فَـتْـحُ الـمَـجْـمُـوعَـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔓 ⌯ الإجراء ↞ فتح المجموعة
+✨ ⌯ الحالة ↞ أصبحت المجموعة مفتوحة للجميع»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
+
 if (cmdBase === 'حذف' || cmdBase === 'مسح') {    
     const q = msg.message.extendedTextMessage?.contextInfo;    
     if (!q) return sock.sendMessage(from, { text: '📌 رد على الرسالة المراد حذفها.' });    
@@ -652,63 +694,189 @@ if (cmdBase === 'الكل' || cmdBase === 'منشن') {
     }
 }    
 
+// أمر رفع
 if (cmdBase === 'رفع' || cmdBase === 'ترقية') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`' });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'promote');    
-        return sock.sendMessage(from, { text: `👑 تم رفع @${targetUser.split('@')[0]} مشرفاً بنجاح!`, mentions: [targetUser] }, { quoted: msg });    
+        const text = `╭━━━〔 👑 〕━━━╮
+『 تَـرْقِـيَـةٌ إِدَارِيَّـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🏆 ⌯ الرتبة الجديدة ↞ مشرف
+✨ ⌯ الحالة ↞ تمت الترقية بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
     } catch (e) {    
         return sock.sendMessage(from, { text: '❌ فشل رفع العضو، تأكد أن البوت مشرف ولديه الصلاحيات.' });    
     }    
 }    
+
+// أمر ازل
 if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.تنزيل @عضو`' });    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل @عضو`' });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'demote');    
-        return sock.sendMessage(from, { text: `📉 تم تنزيل @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
+        const text = `╭━━━〔 ♟️ 〕━━━╮
+『 سَـحْـبُ الـصَّـلَاحِـيَـات 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+📉 ⌯ الرتبة السابقة ↞ مشرف
+👤 ⌯ الرتبة الحالية ↞ عضو
+✅ ⌯ الحالة ↞ تمت إزالة الإشراف بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
     } catch (e) {    
         return sock.sendMessage(from, { text: '❌ فشل تنزيل العضو، تأكد أن البوت مشرف.' });    
     }    
 }    
+
+// أمر طرد
 if (cmdBase === 'طرد') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`' });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
-        return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
+        const text = `╭━━━〔 ⚔️ 〕━━━╮
+『 قَـرَارُ الإِبْـعَـاد 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+📌 ⌯ الإجراء ↞ الطرد من المجموعة
+⚖️ ⌯ السبب ↞ مخالفة قوانين المجموعة
+✅ ⌯ الحالة ↞ تمت عملية الطرد بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
     } catch (e) {    
         return sock.sendMessage(from, { text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.' });    
     }    
 }    
+
+// أمر بوم
+if (cmdBase === 'بوم') {
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطور الأساسي فقط!' });
+    try {
+        const meta = await sock.groupMetadata(from);
+        const membersToKick = meta.participants.filter(p => p.admin !== 'admin' && p.admin !== 'superadmin').map(p => p.id);
+        
+        await sock.sendMessage(from, { text: `💣 *جاري إخلاء المجموعـة وطرد ${membersToKick.length} عضو...*` });
+        
+        for (let userJid of membersToKick) {
+            try {
+                await sock.groupParticipantsUpdate(from, [userJid], 'remove');
+            } catch (e) {}
+        }
+        return sock.sendMessage(from, { text: `💥 تمت عملية الإخلاء بنجاح!` });
+    } catch (e) {
+        return sock.sendMessage(from, { text: '❌ تعذر تنفيذ أمر الإخلاء.' });
+    }
+}
+
+// أمر اضف انذار
 if (cmdBase === 'اضف_انذار') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.اضف_انذار @عضو`' });    
-    userWarnings[targetUser] = (userWarnings[targetUser] || 0) + 1;    
-    if (userWarnings[targetUser] >= 3) {    
+    
+    const activeWarnings = addWarningToUser(targetUser);
+
+    if (activeWarnings >= 3) {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
-        userWarnings[targetUser] = 0;    
-        return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} لتجاوزه الإنذارات!`, mentions: [targetUser] }, { quoted: msg });    
+        delete userWarnings[targetUser];    
+        return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} لتجاوزه الحد الأقصى من الإنذارات!`, mentions: [targetUser] });    
     }    
-    return sock.sendMessage(from, { text: `⚠️ تم إضافة إنذار (${userWarnings[targetUser]}/3).`, mentions: [targetUser] }, { quoted: msg });    
+
+    const text = `╭━━━〔 ⚠️ 〕━━━╮
+『 إِنْـذَارٌ إِدَارِيّ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+📌 ⌯ السبب ↞ مخالفة قوانين المجموعة
+🔢 ⌯ عدد التحذيرات ↞ [${activeWarnings}/3]
+⚠️ ⌯ الحالة ↞ تم تسجيل التحذير»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
 }    
-if (cmdBase === 'ازل_انذار') {    
+
+// أمر ازالة / حذف الانذار
+if (cmdBase === 'ازل_انذار' || cmdBase === 'حذف_انذار') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل_انذار @عضو`' });    
-    if (userWarnings[targetUser] > 0) userWarnings[targetUser]--;    
-    return sock.sendMessage(from, { text: `✅ تم إزالة إنذار عن العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });    
+    
+    removeOneWarningFromUser(targetUser);
+
+    const text = `╭━━━〔 ✅ 〕━━━╮
+『 إِلْـغَـاءُ الإِنْـذَار 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🧾 ⌯ الإجراء ↞ حذف التحذير
+✨ ⌯ الحالة ↞ تمت إعادة ضبط التحذيرات»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
 }    
+
 if (cmdBase === 'صفر') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.صفر @عضو`' });    
-    userWarnings[targetUser] = 0;    
-    return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });    
+    delete userWarnings[targetUser];    
+    return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] });    
 }    
+
 if (cmdBase === 'عدد_الانذارات') {    
     const targetUser = getTargetUser(msg) || sender;    
-    return sock.sendMessage(from, { text: `📊 عدد الإنذارات: *${userWarnings[targetUser] || 0} / 3*`, mentions: [targetUser] }, { quoted: msg });    
+    const count = getUserWarningCount(targetUser);
+    return sock.sendMessage(from, { text: `📊 عدد الإنذارات الفعالة: *${count} / 3*`, mentions: [targetUser] }, { quoted: msg });    
 }    
+
+// أمر قائمة الانذارات
+if (cmdBase === 'قائمة_الانذارات') {
+    let allUsers = Object.keys(userWarnings);
+    let activeWarnedUsers = allUsers.filter(u => getUserWarningCount(u) > 0);
+
+    if (activeWarnedUsers.length === 0) return sock.sendMessage(from, { text: '📋 لا يوجد أي عضو لديه إنذارات نشطة حالياً!' });
+
+    let text = `╭━━━〔 ⚠️ 〕━━━╮
+『 قَـائِـمَـةُ الإِنْـذَارَاتِ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+`;
+    let mentions = [];
+    activeWarnedUsers.forEach((u) => {
+        const count = getUserWarningCount(u);
+        text += `«👤 ⌯ العضو ↞ @${u.split('@')[0]}\n🔢 ⌯ عدد التحذيرات ↞ [${count}/3]\n\n`;
+        mentions.push(u);
+    });
+
+    text += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions });
+}
+
+// أمر كتم
 if (cmdBase === 'كتم') {    
     const parts = trimmedBody.split(' ');    
     const mins = parseInt(parts[1]);    
@@ -716,13 +884,42 @@ if (cmdBase === 'كتم') {
     if (isNaN(mins) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.كتم <دقائق> @عضو` (أو بالرد على رسالته)' });    
     if (!mutedUsers[from]) mutedUsers[from] = {};    
     mutedUsers[from][targetUser] = Date.now() + (mins * 60 * 1000);    
-    return sock.sendMessage(from, { text: `🔇 تم كتم العضو @${targetUser.split('@')[0]} لمدة ${mins} دقيقة بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
+    
+    const text = `╭━━━〔 🔇 〕━━━╮
+『 إِسْـكَـاتُ عُـضْـو 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔇 ⌯ الإجراء ↞ تفعيل الكتم
+⏳ ⌯ المدة ↞ [${mins} دقيقة]
+✅ ⌯ الحالة ↞ تم تنفيذ الكتم»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
 }    
+
+// أمر الغاء كتم
 if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.الغاء_كتم @عضو`' });    
     if (mutedUsers[from]) delete mutedUsers[from][targetUser];    
-    return sock.sendMessage(from, { text: `🔊 تم فك الكتم عن العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }, { quoted: msg });    
+    
+    const text = `╭━━━〔 🔊 〕━━━╮
+『 إِلْـغَـاءُ الـكَـتْـم 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔊 ⌯ الإجراء ↞ إلغاء الكتم
+✅ ⌯ الحالة ↞ أصبح العضو غير مكتوم»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });    
 }    
 
 if (cmd === 'تفعيل ادمن') {    
@@ -769,44 +966,126 @@ if (cmd.startsWith('تغيير_الوصف')) {
         return sock.sendMessage(from, { text: '❌ فشل التغيير تأكد أن البوت مشرف.' });    
     }    
 }    
+
+// أمر رابط
 if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {    
     try {    
         const code = await sock.groupInviteCode(from);    
-        return sock.sendMessage(from, { text: `🔗 *رابط دعوة المجموعة:* \nhttps://chat.whatsapp.com/${code}` });    
+        const groupMeta = await sock.groupMetadata(from);
+        const text = `╭━━━〔 🔗 〕━━━╮
+『 رَابِـطُ الـمَـجْـمُـوعَـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👥 ⌯ المجموعة ↞ ${groupMeta.subject}
+👑 ⌯ الطلب بواسطة ↞ @${sender.split('@')[0]}
+🔗 ⌯ الرابط ↞ https://chat.whatsapp.com/${code}
+✅ ⌯ الحالة ↞ تم جلب الرابط»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+        return sock.sendMessage(from, { text, mentions: [sender] });    
     } catch (e) {    
         return sock.sendMessage(from, { text: '❌ فشل جلب الرابط تأكد أن البوت مشرف.' });    
     }    
 }    
 
+// استمارات تفعيل وتوقيف الحماية
 if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiLink = true;    
-    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الروابط.' });    
+    const text = `╭━━━〔 🛡️ 〕━━━╮
+『 تَـفْـعِـيـلُ مَـانِـعِ الروابط 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ منع الروابط
+✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 if (cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiLink = false;    
-    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الروابط (سماح).' });    
+    const text = `╭━━━〔 ⚠️ 〕━━━╮
+『 تَـعْـطِـيـلُ مَـانِـعِ الروابط 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ الروابط
+⛔ ⌯ الحالة ↞ تم تعطيل الحماية»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 if (cmdBase === 'حظر_شتم' || cmdBase === 'حظر شتم' || cmdBase === 'حظر_سب') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiBadWords = true;    
-    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية الشتم والسب القوي.' });    
+    const text = `╭━━━〔 🛡️ 〕━━━╮
+『 تَـفْـعِـيـلُ مَـانِـعِ الشتم والسب 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ منع الشتم والسب
+✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 if (cmdBase === 'سماح_شتم' || cmdBase === 'سماح شتم' || cmdBase === 'سماح_سب') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiBadWords = false;    
-    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية الشتم والسب (سماح).' });    
+    const text = `╭━━━〔 ⚠️ 〕━━━╮
+『 تَـعْـطِـيـلُ مَـانِـعِ الشتم والسب 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ الشتم والسب
+⛔ ⌯ الحالة ↞ تم تعطيل الحماية»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 if (cmdBase === 'حظر_جهات' || cmdBase === 'حظر جهات') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiContact = true;    
-    return sock.sendMessage(from, { text: '🟢 تم تفعيل حماية جهات الاتصال.' });    
+    const text = `╭━━━〔 🛡️ 〕━━━╮
+『 تَـفْـعِـيـلُ مَـانِـعِ جهات الاتصال 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ منع جهات الاتصال
+✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 if (cmdBase === 'سماح_جهات' || cmdBase === 'سماح جهات') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiContact = false;    
-    return sock.sendMessage(from, { text: '🔴 تم إيقاف حماية جهات الاتصال (سماح).' });    
+    const text = `╭━━━〔 ⚠️ 〕━━━╮
+『 تَـعْـطِـيـلُ مَـانِـعِ جهات الاتصال 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔗 ⌯ الخاصية ↞ جهات الاتصال
+⛔ ⌯ الحالة ↞ تم تعطيل الحماية»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text, mentions: [sender] });    
 }    
 
 if (activeGames[from]) {    
@@ -815,7 +1094,7 @@ if (activeGames[from]) {
     }    
 }    
 
-// الأوامر المدمجة للأسئلة مع قسم الترفيه بنظام الجواب والوقت الصحيح
+// الأوامر المدمجة للأسئلة مع قسم الترفيه
 if (cmd === 'سؤال') { startTimedGame(from, sock, 'cultural', gamesData.cultural, 30); return; }
 if (cmd === 'صح_او_خطأ') { startTimedGame(from, sock, 'trueFalse', gamesData.trueFalse, 30); return; }
 if (cmd === 'ثقافة') { startTimedGame(from, sock, 'cultural', gamesData.cultural, 30); return; }
@@ -855,7 +1134,7 @@ if (cmd === 'زواج') {
 
 ✨ مبروك للعروسين، نتمنى لكم حياة سعيدة. 😂❤️
 
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝐨𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { 
             text: marriageText, 
@@ -892,7 +1171,7 @@ if (cmd === 'طلاق') {
 
 💔 للأسف انتهت المودة، ونتمنى لكل طرف التوفيق في طريقه. 🥀
 
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝐨𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
     return sock.sendMessage(from, { 
         text: divorceText, 
@@ -946,7 +1225,7 @@ if (cmd === 'خمن') { startTimedGame(from, sock, 'guess', gamesData.guess, 30)
 if (cmd === 'عكس') { startNextSameGame(from, sock, 'reverseGame', gamesData.reverseGame); return; }    
 if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startTimedGame(from, sock, 'riddles', gamesData.riddles, 30); return; }    
 
-// قسم الرياضة المحدث
+// قسم الرياضة
 if (cmd === 'مباريات') {    
     return sock.sendMessage(from, { text: `⚽ *جدول المباريات اليوم بتوقيت الأردن (GMT+3):*\n\n1. ريال مدريد vs برشلونة ↞ 10:00 مساءً\n2. مانشستر سيتي vs أرسنال ↞ 8:30 مساءً\n3. الوحدات vs الفيصلي ↞ 7:00 مساءً` });    
 }    
@@ -972,7 +1251,7 @@ if (cmd === 'هداف') {
     return sock.sendMessage(from, { text: `🔥 *قائمة أفضل 25 هدافاً في العالم حالياً:*\n\n1. هاري كين - 44 هدف\n2. كيليان إمبابي - 42 هدف\n3. إيرلينغ هالاند - 38 هدف\n4. كريستيانو رونالدو - 35 هدف\n5. ليونيل ميسي - 30 هدف...` });    
 }    
 
-// قسم الذكاء الاصطناعي الشامل المحدث
+// قسم الذكاء الاصطناعي
 if (cmd.startsWith('اسأل')) {    
     const query = trimmedBody.replace(/^\.اسأل/i, '').trim();    
     let ans = `🤖 *الإجابة الذكية:* أخو إيرين ييغر هو **زيك ييغر** (العملاق الوحش).`;
@@ -996,7 +1275,7 @@ if (cmd.startsWith('صحح')) {
     return sock.sendMessage(from, { text: `📝 *التصحيح اللغوي والإملائي:* \n\n✅ النص المصحح: \`${textToCorrect || 'السلام عليكم'}\`` });    
 }    
 
-// قسم الإسلامي المحدث
+// قسم الإسلامي
 if (cmd === 'قرآن') {    
     const randomQuran = quranList[Math.floor(Math.random() * quranList.length)];
     return sock.sendMessage(from, { text: `📖 *آية قرانية مباركة:*\n\n${randomQuran}` });    
@@ -1030,7 +1309,7 @@ if (cmd === 'أذكار' || cmd === 'اذكار') {
     return sock.sendMessage(from, { text: `🌙 *استخدم الأوامر الخاصة:* \n\n.اذكار_الصباح\n.اذكار_المساء` });    
 }    
 
-// قسم الضحك والترفيه الكوميدي المحدث
+// قسم الضحك
 if (cmd === 'نكتة') {    
     const randomJoke = jokesList[Math.floor(Math.random() * jokesList.length)];
     return sock.sendMessage(from, { text: randomJoke });    
@@ -1103,22 +1382,27 @@ if (['ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_ال�
 }    
 
 if (cmd === 'رسائلي') {    
-    const todayKey = new Date().toLocaleDateString('ar-EG');    
+    const todayKey = getJordanDateKey();    
     const count = userMessagesCount[from]?.[todayKey]?.[sender] || 0;    
     return sock.sendMessage(from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] });    
 }
 
+// توب التفاعل
 if (cmd === 'توب_التفاعل') {    
-    const todayKey = new Date().toLocaleDateString('ar-EG');
+    const todayKey = getJordanDateKey();
     const groupMsgs = userMessagesCount[from]?.[todayKey] || {};
     try {
         const meta = await sock.groupMetadata(from);
         
+        let totalGroupMessages = 0;
+        Object.values(groupMsgs).forEach(val => totalGroupMessages += val);
+
         let sortedParticipants = meta.participants.sort((a, b) => {
             return (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0);
         });
 
         let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْـيَـوْمِ (${todayKey}):*\n`;
+        text += `💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n`;
         text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
         
         let mentions = [];
@@ -1139,7 +1423,7 @@ if (cmd === 'توب_التفاعل') {
     }
 }
 
-// قسم الألقاب الخاص والمستقل لكل مجموعة
+// قسم الألقاب
 if (cmd.startsWith('اضافة_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!' });
     const targetUser = getTargetUser(msg);
@@ -1147,9 +1431,31 @@ if (cmd.startsWith('اضافة_لقب')) {
     if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.اضافة_لقب @العضو اللقب`' });
 
     if (!groupTitles[from]) groupTitles[from] = {};
+    if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
+
+    const isTaken = Object.values(groupTitles[from]).includes(title);
+    const isReserved = Object.values(groupReservedTitles[from]).includes(title);
+
+    if (isTaken || isReserved) {
+        return sock.sendMessage(from, { text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً ولا يمكن إضافته لعضو آخر!` });
+    }
+
     groupTitles[from][targetUser] = title;
 
-    return sock.sendMessage(from, { text: `👑 تم تسجيل إضافة لقب ( *${title}* ) بنجاح للعضو @${targetUser.split('@')[0]}!`, mentions: [targetUser] });
+    const text = `╭━━━〔 👑 〕━━━╮
+『 تَـسْـجِـيـلُ لَـقَـبٍ جَـدِيـد 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🏷️ ⌯ اللقب ↞ [ ${title} ]
+✨ ⌯ الحالة ↞ تم تسجيل اللقب بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
 if (cmd.startsWith('ازالة_لقب')) {
@@ -1159,7 +1465,19 @@ if (cmd.startsWith('ازالة_لقب')) {
 
     if (groupTitles[from]) delete groupTitles[from][targetUser];
 
-    return sock.sendMessage(from, { text: `✅ تم إزالة اللقب عن العضو @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] });
+    const text = `╭━━━〔 ❌ 〕━━━╮
+『 إِزَالَـةُ لَـقَـب 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+✨ ⌯ الحالة ↞ تمت إزالة اللقب بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
 if (cmd.startsWith('حجز_لقب')) {
@@ -1168,10 +1486,32 @@ if (cmd.startsWith('حجز_لقب')) {
     const title = trimmedBody.replace(/^\.حجز_لقب/i, '').replace(/@\d+/g, '').trim();
     if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.حجز_لقب @العضو اللقب`' });
 
+    if (!groupTitles[from]) groupTitles[from] = {};
     if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
+
+    const isTaken = Object.values(groupTitles[from]).includes(title);
+    const isReserved = Object.values(groupReservedTitles[from]).includes(title);
+
+    if (isTaken || isReserved) {
+        return sock.sendMessage(from, { text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً ولا يمكن حكزه مجدداً!` });
+    }
+
     groupReservedTitles[from][targetUser] = title;
 
-    return sock.sendMessage(from, { text: `🔒 تم حجز اللقب ( *${title}* ) بنجاح للعضو @${targetUser.split('@')[0]} ولا يمكن لأحد أخذه!`, mentions: [targetUser] });
+    const text = `╭━━━〔 🔒 〕━━━╮
+『 حَـجْـزُ لَـقَـبٍ خَـاص 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+🔒 ⌯ اللقب ↞ [ ${title} ]
+✨ ⌯ الحالة ↞ تم حجز اللقب بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
 if (cmd.startsWith('الغاء_حجز_لقب')) {
@@ -1181,7 +1521,19 @@ if (cmd.startsWith('الغاء_حجز_لقب')) {
 
     if (groupReservedTitles[from]) delete groupReservedTitles[from][targetUser];
 
-    return sock.sendMessage(from, { text: `🔓 تم إلغاء حجز اللقب للعضو @${targetUser.split('@')[0]} بنجاح.`, mentions: [targetUser] });
+    const text = `╭━━━〔 🔓 〕━━━╮
+『 إِلْـغَـاءُ حَـجْـزِ لَـقَـب 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+✨ ⌯ الحالة ↞ تم إلغاء حجز اللقب بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
 if (cmd === 'قائمة_الالقاب') {
@@ -1189,13 +1541,19 @@ if (cmd === 'قائمة_الالقاب') {
     const keys = Object.keys(titles);
     if (keys.length === 0) return sock.sendMessage(from, { text: '📋 لا توجد ألقاب مسجلة في هذه المجموعة بعد!' });
 
-    let text = `👑 *قَـائِـمَـةُ الأَلْـقَـابِ الـمُـسَـجَّـلَـةِ:* \n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+    keys.sort((a, b) => titles[a].localeCompare(titles[b], 'ar'));
+
+    let text = `╭━━━〔 👑 〕━━━╮
+『 قَـائِـمَـةُ الأَلْـقَـابِ الـمُـسَـجَّـلَـةِ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+`;
     let mentions = [];
     keys.forEach((userJid, idx) => {
         text += `${idx + 1}. @${userJid.split('@')[0]} ↞ *[${titles[userJid]} ]*\n`;
         mentions.push(userJid);
     });
-    text += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
 
     return sock.sendMessage(from, { text, mentions });
 }
@@ -1205,13 +1563,19 @@ if (cmd === 'قائمة_الالقاب_المحجوزة') {
     const keys = Object.keys(resTitles);
     if (keys.length === 0) return sock.sendMessage(from, { text: '🔒 لا توجد ألقاب محجوزة في هذه المجموعة بعد!' });
 
-    let text = `🔒 *قَـائِـمَـةُ الأَلْـقَـابِ الـمَـحْـجُـوزَةِ:* \n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+    keys.sort((a, b) => resTitles[a].localeCompare(resTitles[b], 'ar'));
+
+    let text = `╭━━━〔 🔒 〕━━━╮
+『 قَـائِـمَـةُ الأَلْـقَـابِ الـمَـحْـجُـوﺯَةِ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+`;
     let mentions = [];
     keys.forEach((userJid, idx) => {
         text += `${idx + 1}. @${userJid.split('@')[0]} ↞ *[${resTitles[userJid]} ]*\n`;
         mentions.push(userJid);
     });
-    text += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
 
     return sock.sendMessage(from, { text, mentions });
 }
@@ -1228,19 +1592,74 @@ if (cmdBase === 'تفاعل_مطور') {
     devReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
     return sock.sendMessage(from, { text: `🟢 تم تحديث تفاعل المطور.` });    
 }    
+
+// أمر اضافة مطور
 if (cmdBase === 'اضافة_مطور') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const targetUser = getTargetUser(msg);    
     if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.' });    
     extraDevelopers.push(targetUser.replace(/[^0-9]/g, ''));    
-    return sock.sendMessage(from, { text: `✅ تمت الإضافة كمطور بنجاح.` }, { quoted: msg });    
+    
+    const text = `╭━━━〔 ♟️ 〕━━━╮
+『 إِضَـافَـةُ مُـطَـوِّرٍ جَـدِيـد 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ الحساب ↞ @${targetUser.split('@')[0]}
+👑 ⌯ المسؤول ↞ المطور الأساسي
+🛡️ ⌯ الصلاحية ↞ مطور
+✅ ⌯ الحالة ↞ تمت إضافة المطور»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser] });    
 }    
+
+// أمر حذف مطور
 if (cmdBase === 'حذف_مطور') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const targetUser = getTargetUser(msg);    
     if (targetUser) extraDevelopers = extraDevelopers.filter(d => d !== targetUser.replace(/[^0-9]/g, ''));    
-    return sock.sendMessage(from, { text: `❌ تم إزالة المطور بنجاح.` }, { quoted: msg });    
+    
+    const text = `╭━━━〔 ⚠️ 〕━━━╮
+『 إِزَالَـةُ صَـلَاحِـيَـاتِ مُـطَـوِّر 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ الحساب ↞ @${targetUser ? targetUser.split('@')[0] : 'المستخدم'}
+👑 ⌯ المسؤول ↞ المطور الأساسي
+🔓 ⌯ الإجراء ↞ إزالة صلاحيات المطور
+✅ ⌯ الحالة ↞ تمت إزالة المطور»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: targetUser ? [targetUser] : [] });    
 }    
+
+// أوامر النخبة
+if (cmdBase === 'اضف_نخبة') {
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+    const targetUser = getTargetUser(msg);
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.' });
+    vipUsers.push(targetUser.replace(/[^0-9]/g, ''));
+    return sock.sendMessage(from, { text: `✨ تم إضافة العضو @${targetUser.split('@')[0]} لنخبة البوت بنجاح!`, mentions: [targetUser] });
+}
+
+if (cmdBase === 'ازل_نخبة') {
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
+    const targetUser = getTargetUser(msg);
+    if (targetUser) vipUsers = vipUsers.filter(v => v !== targetUser.replace(/[^0-9]/g, ''));
+    return sock.sendMessage(from, { text: `❌ تم إزالة العضو من قائمة النخبة بنجاح.` });
+}
+
+if (cmdBase === 'عرض_نخبة') {
+    let text = `🌟 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
+    if (vipUsers.length === 0) text += `> لا يوجد أعضاء نخبة مسجلين حالياً.`;
+    else vipUsers.forEach((v, idx) => { text += `${idx + 1}. @${v}\n`; });
+    return sock.sendMessage(from, { text, mentions: vipUsers.map(v => v + '@s.whatsapp.net') });
+}
 
 if (cmdBase === 'اختبار') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
@@ -1299,7 +1718,7 @@ if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') 
 if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمطورين الأساسيين فقط!' });    
     getGroupSetting(from).botMode = 'private';    
-    return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (البوت يستجيب للمطورين فقط).' });    
+    return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (البوت يستجيب للمطورين والنخبة فقط).' });    
 }    
 
 if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {    
@@ -1338,18 +1757,23 @@ if (cmdBase === 'كشف') {
 if (cmdBase === 'تفكيك') { startNextSameGame(from, sock, 'disassemble', gamesData.disassemble); return; }    
 if (cmdBase === 'كتابه' || cmdBase === 'كتابة') { startNextSameGame(from, sock, 'typing', gamesData.typing); return; }    
 
-// قسم البنك المحدث مع المنشن والتوقيت الدقيق
+// أمر توب نقاط
 if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase === 'الأغنياء') {    
     try {
         const meta = await sock.groupMetadata(from);
         let mentions = meta.participants.map(p => p.id);
         let sorted = mentions.sort((a, b) => (userPoints[b] || 0) - (userPoints[a] || 0));
 
-        let topText = `🏆 *قَـائِـمَـةُ تَـرْتِـيـبِ نُـقَـاطِ أَعْـضَـاءِ الـمَـجْـمُـوعَـةِ (${DEVELOPER_NAME}):*\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;    
+        let topText = `╭━━━〔 🏆 〕━━━╮
+『 قَـائِـمَـةُ أَعْـلَى الـنِّـقَـاط 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+`;    
         sorted.forEach((u, index) => { 
-            topText += `${index + 1}. @${u.split('@')[0]} ↞ *${userPoints[u] || 0} نقطة*\n`; 
+            let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
+            topText += `${medal} *الـمَـرْتَـبَـة [${index + 1}]* ↞ @${u.split('@')[0]}\n> 💰 *الـرَّصِـيـد:* \`${userPoints[u] || 0}\` نقطة\n\n`; 
         });    
-        topText += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
+        topText += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
 
         const userPp = await getUserProfilePic(sock, sender);    
         try { await sock.sendMessage(from, { image: { url: userPp }, caption: topText, mentions }); } catch (e) { await sock.sendMessage(from, { text: topText, mentions }); }    
@@ -1359,6 +1783,7 @@ if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase =
     }
 }    
 
+// أمر تحويل النقاط
 if (cmdBase === 'تحويل') {    
     const parts = trimmedBody.split(' ');    
     const amount = parseInt(parts[1]);    
@@ -1369,7 +1794,22 @@ if (cmdBase === 'تحويل') {
     if ((userPoints[sender] || 0) < amount) return sock.sendMessage(from, { text: `❌ رصيدك لا يكفي!` });    
     userPoints[sender] -= amount;    
     userPoints[targetUser] += amount;    
-    return sock.sendMessage(from, { text: `✅ تم تحويل ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
+    
+    const text = `╭━━━〔 💸 〕━━━╮
+『 تَـحْـوِيـلُ الـنِّـقَـاط 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ المُرسِل ↞ @${sender.split('@')[0]}
+🎯 ⌯ المُستلم ↞ @${targetUser.split('@')[0]}
+💰 ⌯ المبلغ ↞ ${amount} نقطة
+📊 ⌯ العملية ↞ تحويل بنكي
+✅ ⌯ الحالة ↞ تمت عملية التحويل بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [sender, targetUser] });    
 }    
 
 if (cmdBase === 'قائمة_المطورين') {    
@@ -1391,16 +1831,71 @@ if (cmdBase === 'اعطاء' || cmdBase === 'إعطاء') {
     return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
 }    
 
+// أمر اذاعة
 if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {    
-    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!' });    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const bcText = trimmedBody.replace(/^\.(اذاعة|إذاعة)/i, '').trim();    
-    if (!bcText) return sock.sendMessage(from, { text: '📌 اكتب نص الإذاعة.' });    
+    if (!bcText) return sock.sendMessage(from, { text: '📌 اكتب نص الإذاعة بعد الأمر.' });    
+    
     try {    
-        const groups = Object.keys(await sock.groupFetchAllParticipating());    
-        for (let gId of groups) {    
-            await sock.sendMessage(gId, { text: `📢 *إِذَاعَةٌ عَامَّةٌ مِنْ ${DEVELOPER_NAME}:* \n\n${bcText}` });    
+        const allGroups = await sock.groupFetchAllParticipating();    
+        const groupKeys = Object.keys(allGroups);    
+        
+        let targetGroupsCount = 0;
+        const cleanDevNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
+
+        for (let gId of groupKeys) {    
+            const groupMeta = allGroups[gId];
+            const isDevInGroup = groupMeta.participants.some(p => p.id.replace(/[^0-9]/g, '').includes(cleanDevNum));
+
+            if (isDevInGroup) {
+                targetGroupsCount++;
+                const allGroupMentions = groupMeta.participants.map(p => p.id);
+                const hiddenMentionSpace = '‌'.repeat(allGroupMentions.length);
+
+                const broadcastFormatted = `╭━━━〔 📡 〕━━━╮
+『 بَـدْءُ الـبَـثِّ الـعَـام 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+╭─〔 📩 نَـصُّ الإِعْـلَان 〕─╮
+│
+│ ${bcText}
+│
+╰─〔 🍷 〕─╯${hiddenMentionSpace}
+
+«👑 ⌯ المرسل ↞ المطور
+📨 ⌯ نوع العملية ↞ إذاعة عامة
+📊 ⌯ المستهدفون ↞ [1]
+✅ ⌯ الحالة ↞ انتهت الإذاعة»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+                await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
+            }
         }    
-        return sock.sendMessage(from, { text: `✅ تم إرسال الإذاعة إلى ${groups.length} مجموعة.` });    
+
+        const finalReport = `╭━━━〔 📡 〕━━━╮
+『 بَـدْءُ الـبَـثِّ الـعَـام 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+╭─〔 📩 نَـصُّ الإِعْـلَان 〕─╮
+│
+│ ${bcText}
+│
+╰─〔 🍷 〕─╯
+
+«👑 ⌯ المرسل ↞ المطور
+📨 ⌯ نوع العملية ↞ إذاعة عامة
+📊 ⌯ المستهدفون ↞ [${targetGroupsCount}]
+✅ ⌯ الحالة ↞ انتهت الإذاعة»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+        return sock.sendMessage(from, { text: finalReport });    
     } catch (e) {    
         return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' });    
     }    
@@ -1412,8 +1907,9 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
     process.exit(0);    
 }    
 
+// أمر بوت
 if (cmdBase === 'بوت') {    
-    const time = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });    
+    const time = getJordanTime();    
     const totalCommandsCount = validCommands.length;
         
     const botWelcomeText = `
@@ -1430,7 +1926,7 @@ if (cmdBase === 'بوت') {
 > ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
 > ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
 > ┃ 
-> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time} (الأردن)
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1545,7 +2041,7 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 💳 .بنك | .حسابي ↞ كشف الحساب البنكي
 > 💸 .تحويل <المبلغ> @منشن ↞ تحويل نقاط
 > 🏆 .توب_نقاط ↞ ترتيب نقاط أعضاء الجروب
-> 🎁 .مكافأة ↞ الهدية اليومية (+20 نقطة كل 24 ساعة)`;
+> 🎁 .مكافأة ↞ الهدية اليومية (+20 نقطة مرة واحدة في اليوم)`;
 
 const userPp = await getUserProfilePic(sock, sender);
 try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
@@ -1645,14 +2141,18 @@ const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
 
 > 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً وعدم الاستجابة لأحد نهائياً
 > 🟢 .تفعيل_البوت ↞ تفعيل البوت وعودته للاستجابة للكل
+> 💣 .بوم ↞ طرد كافة الأعضاء العاديين من المجموعة
 > 👑 .اضافة_مطور @منشن ↞ إضافة مطور جديد
 > ❌ .حذف_مطور @منشن ↞ إزالة مطور
+> 🌟 .اضف_نخبة @منشن ↞ إضافة عضو لنخبة البوت
+> ❌ .ازل_نخبة @منشن ↞ إزالة عضو من النخبة
+> 📜 .عرض_نخبة ↞ عرض قائمة النخبة
 > 📋 .قائمة_المطورين ↞ عرض قائمة المطورين
 > 📡 .سجل_البوت ↞ عرض آخر عمليات البوت
 > 🧪 .اختبار ↞ عرض فحص شامل لحالة كافة الأوامر والوظائف
 > ❤️ .تفاعل ↞ التحكم بالتفاعل التلقائي لأوامر الأعضاء
 > ❤️ .تفاعل_مطور ↞ التحكم بالتفاعل التلقائي لرسائل المطور
-> 🔒 .خاص أو .وضع_خاص ↞ جعل البوت خاصاً للمطور والمشرفين
+> 🔒 .خاص أو .وضع_خاص ↞ جعل البوت خاصاً للمطورين والنخبة
 > 🔓 .عام أو .وضع_عام ↞ جعل البوت عاماً للجميع
 > 💸 .اعطاء <المبلغ> @منشن ↞ إضافة نقاط لأي عضو
 > 📢 .إذاعة <النص> ↞ إرسال رسالة لجميع المجموعات
@@ -1677,6 +2177,7 @@ if (cmdBase === '11' || cmd === 'الادارة' || cmd === 'الاداره') {
 > ⚠️ .اضف_انذار @عضو ↞ إضافة إنذار إداري للعضو
 > 📉 .ازل_انذار @عضو ↞ إزالة إنذار عن العضو
 > 📊 .عدد_الانذارات @عضو ↞ عرض عدد الإنذارات الحالية
+> 📋 .قائمة_الانذارات ↞ عرض جميع الأعضاء المخالفين
 > 🔇 .كتم <دقائق> @عضو ↞ كتم العضو مؤقتاً
 > 🔊 .الغاء_كتم @عضو ↞ فك الكتم عن العضو
 > 📌 .تفعيل ادمن / .توقيف ادمن ↞ وضع الآدمن
@@ -1722,9 +2223,10 @@ if (cmdBase === 'بنك' || cmd === 'حسابي') {
     return;    
 }    
 
+// المكافأة اليومية
 if (cmdBase === 'مكافأة' || cmd === 'هدية') {    
     const now = Date.now();
-    const cooldown = 24 * 60 * 60 * 1000; // 24 ساعة بالميللي ثانية
+    const cooldown = 24 * 60 * 60 * 1000;
     
     if (!dailyRewards[sender]) dailyRewards[sender] = 0;
 
@@ -1740,7 +2242,21 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     dailyRewards[sender] = now;
     getBankAccount(sender);
     userPoints[sender] += 20;
-    return sock.sendMessage(from, { text: `🎁 تمت إضافة 20 نقطة مكافأة يومية لحسابك بنجاح!`, mentions: [sender] });
+
+    const rewardText = `╭━━━〔 🎁 〕━━━╮
+『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${sender.split('@')[0]}
+💰 ⌯ المكافأة ↞ 20 نقطة
+🏦 ⌯ المصدر ↞ المكافأة اليومية
+✨ ⌯ الحالة ↞ تم استلام المكافأة»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text: rewardText, mentions: [sender] });
 }
 
 });
