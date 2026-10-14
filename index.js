@@ -7,6 +7,30 @@ import { characterImages, characterEdits, gamesData } from './database/data.js';
 // قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
 
+// موسوعة حكم وأقوال شخصيات الأنمي
+const animeQuotesList = [
+    { quote: "الذين يخالفون القوانين هم حثالة، لكن الذين يتخلون عن أصدقائهم هم أكثر من حثالة.", character: "أوتشيها أوبيتو / هاتاكي كاكاشي" },
+    { quote: "لا توجد أوهام في هذا العالم، هناك فقط واقع قاسي.", character: "أوتشيها مادارا" },
+    { quote: "إذا لم تقاتل، فلن تنتصر أبداً!", character: "إيرين ييغر" },
+    { quote: "اختر القرار الذي لن تندم عليه لاحقاً.", character: "ليفاي أكرمان" },
+    { quote: "الناس يعيشون حياتهم محكومين بما يعتقدون أنه صحيح وواقعي، لكن الواقع مجرد وهم.", character: "أوتشيها إيتاشي" },
+    { quote: "المكان الذي يفكر فيه شخص ما بك هو المكان الذي يمكنك أن تطلق عليه بيتك.", character: "جيرايا" },
+    { quote: "إذا كان العالم مليئاً بالورود، لما كانت هناك حاجة للقتال.", character: "غيلغامش" },
+    { quote: "الخوف ليس خطيئة، إنه يخبرك ما هي نقاط ضعفك، وبمجرد معرفتك بها يمكنك أن تصبح أقوى.", character: "جيلدارتس كلايف" },
+    { quote: "تصبح قويًا فقط عندما تكون لديك أشخاص تريد حمايتهم.", character: "نامي / هابو" },
+    { quote: "الاستسلام هو ما يقتل الناس، عندما يستسلم الناس يمتنون لكونهم عاجزين.", character: "ألوكارد" },
+    { quote: "في عالم القتلة، من يتردد يمت أولاً.", character: "كيلوا زولديك" },
+    { quote: "الذكريات هي شيء يجعلك تبتسم حتى في أشد الأوقات حزناً.", character: "مونكي دي لوفي" },
+    { quote: "العدالة ليست شيئاً يمكنك شراؤه بالمال، العدالة هي القوة التي تحمي الضغفاء.", character: "رورونوا زورو" },
+    { quote: "حتى لو كان العالم يكرهك، سأكون دائماً بجانبك.", character: "ميكاسا أكرمان" },
+    { quote: "المعرفة والإدراك مبهمان، وقد يكون ما نسميه واقعاً مجرد وهم.", character: "أوتشيها إيتاشي" },
+    { quote: "مهما كانت الصعوبات، طالما أنك تستمر في التقدم فستصل إلى مبتغاك.", character: "ناروتو أوزوماكي" },
+    { quote: "لا يهم كم أنت قوي، لا يمكنك أن تفعل كل شيء بمفردك.", character: "إتاشي أوتشيها" },
+    { quote: "القوة لا تأتي من جسد نقي، بل تأتي من إرادة لا تقهر.", character: "إيلوين" },
+    { quote: "لا تقيم الأشخاص بنائها على مظاهرهم، بل بناءً على أفعالهم.", character: "إل بيلولايت" },
+    { quote: "الخطأ ليس أن تقع، بل الخطأ أن تبقى في الأسفل.", character: "شانكس" }
+];
+
 // مستودع الغزل
 const ghazalsList = [
     "عيناكِ أرض لا خائن فيها، وجمالكِ حقيقة لا جدال فيها.",
@@ -57,7 +81,7 @@ const quotesList = [
 const quranList = [
     "﴿اللَّهُ لَا إِلٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ﴾",
     "﴿إِنَّ مَعَ الْعُسْرِ يُسْرًا﴾",
-    "﴿وَاصْبِرْ لِحُكْمِ رَبِّكَ فَإِنَّكَ بِأَعْيُ نِنَا﴾",
+    "﴿وَاصْبِرْ لِحُكْمِ رَبِّكَ فَإِنَّك بِأَعْيُنِنَا﴾",
     "﴿وَقُل رَّبِّ زِدْنِي عِلْمًا﴾",
     "﴿إِنَّ اللَّهَ مَعَ الصَّابِرِينَ﴾"
 ];
@@ -102,7 +126,6 @@ function logBotAction(action) {
 }
 
 let userPoints = {};
-// تخزين الإنذارات مع توقيت إضافتها
 let userWarnings = {}; // { userJid: [timestamp1, timestamp2, ...] }
 let bankAccounts = {};
 let activeGames = {};
@@ -112,7 +135,6 @@ let userMessagesCount = {};
 let groupSettings = {};
 let marriages = {};
 
-// دالة لتنظيف الإنذارات المنتهية (التي مر عليها أكثر من 48 ساعة)
 function cleanExpiredWarnings(userJid) {
     if (!userWarnings[userJid]) return;
     const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
@@ -123,13 +145,11 @@ function cleanExpiredWarnings(userJid) {
     }
 }
 
-// دالة لمعرفة عدد الإنذارات النشطة
 function getUserWarningCount(userJid) {
     cleanExpiredWarnings(userJid);
     return userWarnings[userJid] ? userWarnings[userJid].length : 0;
 }
 
-// دالة لإضافة إنذار بتوقيته الحالي
 function addWarningToUser(userJid) {
     cleanExpiredWarnings(userJid);
     if (!userWarnings[userJid]) userWarnings[userJid] = [];
@@ -137,7 +157,6 @@ function addWarningToUser(userJid) {
     return userWarnings[userJid].length;
 }
 
-// دالة لحذف إنذار واحد
 function removeOneWarningFromUser(userJid) {
     cleanExpiredWarnings(userJid);
     if (userWarnings[userJid] && userWarnings[userJid].length > 0) {
@@ -146,7 +165,6 @@ function removeOneWarningFromUser(userJid) {
     }
 }
 
-// تخزين الألقاب وحجوزات الألقاب لكل مجموعة على حدة
 let groupTitles = {};
 let groupReservedTitles = {};
 
@@ -493,7 +511,7 @@ if (isSenderExtraDev && devReactionEnabled) {
     } catch (e) {}    
 }    
 
-// نظام الحماية الشاملة الدقيقة (مع الشطب التلقائي للإنذارات بعد يومين)
+// نظام الحماية
 if (isGroup && !isSenderAdmin && !isSenderDev) {    
     const settings = getGroupSetting(from);    
     const mType = Object.keys(msg.message || {});    
@@ -990,7 +1008,7 @@ if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {
     }    
 }    
 
-// استمارات تفعيل وتوقيف الحماية
+// استمارات الحماية
 if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiLink = true;    
@@ -1094,7 +1112,6 @@ if (activeGames[from]) {
     }    
 }    
 
-// الأوامر المدمجة للأسئلة مع قسم الترفيه
 if (cmd === 'سؤال') { startTimedGame(from, sock, 'cultural', gamesData.cultural, 30); return; }
 if (cmd === 'صح_او_خطأ') { startTimedGame(from, sock, 'trueFalse', gamesData.trueFalse, 30); return; }
 if (cmd === 'ثقافة') { startTimedGame(from, sock, 'cultural', gamesData.cultural, 30); return; }
@@ -1214,9 +1231,11 @@ if (cmd === 'خيروك' || cmd === 'لوخيروك') {
     return sock.sendMessage(from, { text: `❓ *لعبة لو خيروك:*\n\n${item}` });    
 }    
 
+// أمر حكمة المعدل بدقة ليجلب من حكم شخصيات الأنمي الشاملة مع اسم الشخصية
 if (cmd === 'حكمة') {    
-    const quote = gamesData.quotes[Math.floor(Math.random() * gamesData.quotes.length)];    
-    return sock.sendMessage(from, { text: `📜 *حكمة / مقولة أسطورية:*\n\n${quote}` });    
+    const item = animeQuotesList[Math.floor(Math.random() * animeQuotesList.length)];    
+    const quoteFormatted = `📜 *مَوْسُوعَةُ حِكَمِ وَأَقْوَالِ الشَّخْصِيَّاتِ (الأنمي):*\n\n> "${item.quote}"\n\n👤 *الشَّخْصِيَّة:* \`${item.character}\``;
+    return sock.sendMessage(from, { text: quoteFormatted });    
 }    
 
 if (cmd === 'اكمل') { startTimedGame(from, sock, 'complete', gamesData.complete, 30); return; }    
@@ -1638,27 +1657,77 @@ if (cmdBase === 'حذف_مطور') {
     return sock.sendMessage(from, { text, mentions: targetUser ? [targetUser] : [] });    
 }    
 
-// أوامر النخبة
+// أمر اضف نخبة بالاستمارة المحددة بدقة
 if (cmdBase === 'اضف_نخبة') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
     const targetUser = getTargetUser(msg);
     if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.' });
-    vipUsers.push(targetUser.replace(/[^0-9]/g, ''));
-    return sock.sendMessage(from, { text: `✨ تم إضافة العضو @${targetUser.split('@')[0]} لنخبة البوت بنجاح!`, mentions: [targetUser] });
+    
+    const cleanNum = targetUser.replace(/[^0-9]/g, '');
+    if (!vipUsers.includes(cleanNum)) vipUsers.push(cleanNum);
+
+    const text = `╭━━━〔 👑 〕━━━╮
+『 إِضَـافَـةُ عُـضْـوٍ إِلَـى الـنُّـخْـبَـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${cleanNum}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+✨ ⌯ الرتبة ↞ نُخبة
+🛡️ ⌯ الصلاحية ↞ عضو نخبة
+✅ ⌯ الحالة ↞ تمت الإضافة بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
+// أمر ازل نخبة بالاستمارة المحددة بدقة
 if (cmdBase === 'ازل_نخبة') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
     const targetUser = getTargetUser(msg);
-    if (targetUser) vipUsers = vipUsers.filter(v => v !== targetUser.replace(/[^0-9]/g, ''));
-    return sock.sendMessage(from, { text: `❌ تم إزالة العضو من قائمة النخبة بنجاح.` });
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.' });
+    
+    const cleanNum = targetUser.replace(/[^0-9]/g, '');
+    vipUsers = vipUsers.filter(v => v !== cleanNum);
+
+    const text = `╭━━━〔 ♟️ 〕━━━╮
+『 إِزَالَـةُ عُـضْـوٍ مِنَ الـنُّـخْـبَـة 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+«👤 ⌯ العضو ↞ @${cleanNum}
+👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}
+📉 ⌯ الرتبة السابقة ↞ نُخبة
+🔓 ⌯ الإجراء ↞ سحب رتبة النخبة
+✅ ⌯ الحالة ↞ تمت الإزالة بنجاح»
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
+// أمر عرض نخبة لعرض الأرقام والمنشنات الحقيقية
 if (cmdBase === 'عرض_نخبة') {
-    let text = `🌟 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
-    if (vipUsers.length === 0) text += `> لا يوجد أعضاء نخبة مسجلين حالياً.`;
-    else vipUsers.forEach((v, idx) => { text += `${idx + 1}. @${v}\n`; });
-    return sock.sendMessage(from, { text, mentions: vipUsers.map(v => v + '@s.whatsapp.net') });
+    if (vipUsers.length === 0) return sock.sendMessage(from, { text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!' });
+
+    let text = `╭━━━〔 🌟 〕━━━╮
+『 قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+`;
+    let mentions = [];
+    vipUsers.forEach((v, idx) => {
+        const userJid = v + '@s.whatsapp.net';
+        text += `${idx + 1}. @${v}\n`;
+        mentions.push(userJid);
+    });
+
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
+    return sock.sendMessage(from, { text, mentions });
 }
 
 if (cmdBase === 'اختبار') {    
@@ -1812,11 +1881,31 @@ if (cmdBase === 'تحويل') {
     return sock.sendMessage(from, { text, mentions: [sender, targetUser] });    
 }    
 
+// أمر قائمة المطورين لعرض الأرقام والمنشنات الحقيقية
 if (cmdBase === 'قائمة_المطورين') {    
-    let listText = `📋 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:* \n1. الأساسي: \`${DEVELOPER_NUMBER}\`\n`;    
-    extraDevelopers.forEach((dev, idx) => { listText += `${idx + 2}. \`${dev}\`\n`; });    
+    let text = `╭━━━〔 ♟️ 〕━━━╮
+『 قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+👑 *المطور الأساسي:*
+> @${DEVELOPER_NUMBER}
+
+`;
+    let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
+
+    if (extraDevelopers.length > 0) {
+        text += `🛡️ *المطورون الفرعيون:*\n`;
+        extraDevelopers.forEach((dev, idx) => {
+            const devJid = dev + '@s.whatsapp.net';
+            text += `> ${idx + 1}. @${dev}\n`;
+            mentions.push(devJid);
+        });
+    }
+
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+
     const devPp = await getDeveloperProfilePic(sock);    
-    try { await sock.sendMessage(from, { image: { url: devPp }, caption: listText }); } catch (e) { await sock.sendMessage(from, { text: listText }); }    
+    try { await sock.sendMessage(from, { image: { url: devPp }, caption: text, mentions }); } catch (e) { await sock.sendMessage(from, { text, mentions }); }    
     return;    
 }    
 
@@ -1831,7 +1920,7 @@ if (cmdBase === 'اعطاء' || cmdBase === 'إعطاء') {
     return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
 }    
 
-// أمر اذاعة
+// أمر إذاعة المعدل تلقائياً للمجموعات المشتركة مع المطور الأساسي مع منشن جماعي خفي
 if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const bcText = trimmedBody.replace(/^\.(اذاعة|إذاعة)/i, '').trim();    
@@ -1846,11 +1935,13 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 
         for (let gId of groupKeys) {    
             const groupMeta = allGroups[gId];
+            // التحقق من تواجد المطور الأساسي والبوت في نفس المجموعة
             const isDevInGroup = groupMeta.participants.some(p => p.id.replace(/[^0-9]/g, '').includes(cleanDevNum));
 
             if (isDevInGroup) {
                 targetGroupsCount++;
                 const allGroupMentions = groupMeta.participants.map(p => p.id);
+                // منشن جماعي خفي دون كتابة المعرفات صراحة في النص
                 const hiddenMentionSpace = '‌'.repeat(allGroupMentions.length);
 
                 const broadcastFormatted = `╭━━━〔 📡 〕━━━╮
