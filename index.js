@@ -357,60 +357,67 @@ const { id, participants, action } = anu;
 const settings = getGroupSetting(id);
 
 if (action === 'add' && settings.welcome) {    
-        for (let user of participants) {    
-            const userPp = await getUserProfilePic(sock, user);    
-            const welcomeMsg = `*🌾┊تـرحـيـب:*
-
-*❋・────━【🗡】━────・❋*
-
-*- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلاند، أهـلاً وسـهـلاً ومـرحـبـاً بـك*
-
-*❋・────━【🗡】━────・❋*
-
-*🌙┆الـعـضـو ↜『@${user.split('@')[0]}』*
-*🌙┆مـسـؤول الألـقـاب ↜『ياموشي』*
-
-*❋・────━【🗡】━────・❋*
-
-*※ نــرجــوا مـنـك دخــول رابــط إعـلانـات نـقـابـة إنـجـلانـد 🗡️*
-
-*『 https://chat.whatsapp.com/IBy60bdcmcvCP8GPwtM1wq?s=cl&p=a&mlu=4&ilr=4 』*
-
-*❋・────━【🗡】━────・❋*
-
-*※ ونــرجــوا مــنــك أيــضــاً دخــول رابــط صـحـيـفـة ڤـيـنـلانـد ❄*
-
-*『 https://chat.whatsapp.com/KY5GUeANAvO8px1An1FZeV 』*
-
-*❋・────━【🗡】━────・❋*
-
-*🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
-
-*『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬NG𝑳𝑨ℕ𝐷』*`;
-
-await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
-}
-} else if (action === 'remove' && settings.goodbye) {
-for (let user of participants) {
-const userPp = await getUserProfilePic(sock, user);
-const goodbyeMsg = `🥀┊تـودـيـع الـعـضـو:
+    for (let user of participants) {    
+        const userPp = await getUserProfilePic(sock, user);    
+        const welcomeMsg = `🌾┊تـرحـيـب:
 
 ❋・────━【🗡】━────・❋
 
-- لـقـد رحـل عـنـا مـحـارب مـن أرض ڤـيـنـلاند، نـتـمـنـى لـه كـل الـتـوفـيـق
+- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلانـد، أهـلاً وسـهـلاً ومـرحـبـاً بـك، نـتـمـنـى أن تـكـون رحـلـتـك مـلـيـئـة بـالـمـجـد والـمـغـامـرات.
 
 ❋・────━【🗡】━────・❋
 
-🌙┆الـعـضـو الـمـغـادر ↜『@${user.split('@')[0]}』
+🌙┆الـعـضـو ↜『@${user.split('@')[0]}』
+
+❋・────━【🗡】━────・❋
+
+※ نــرجــوا مـنـك دخــول رابــط إعـلانـات نـقـابـة إنـجـلانـد 🗡️
+
+『 https://chat.whatsapp.com/IBy60bdcmcvCP8GPwtM1wq?s=cl&p=a&mlu=4&ilr=4 』
+
+❋・────━【🗡】━────・❋
+
+※ ونــرجــوا مــنــك أيــضــاً دخــول رابــط صـحـيـفـة ڤـيـنـلانـد ❄
+
+『 https://chat.whatsapp.com/KY5GUeANAvO8px1An1FZeV 』
 
 ❋・────━【🗡】━────・❋
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬NG𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
-await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
-}
+        await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
+    }
+} else if (action === 'remove' && settings.goodbye) {
+    for (let user of participants) {
+        const userPp = await getUserProfilePic(sock, user);
+        const goodbyeMsg = `🍂┊تـوديـع:
+
+❋・────━【🗡】━────・❋
+
+- مُـحـارب يـغـادر أرض ڤـيـنـلانـد، وتـنـطـوي صـفـحـة مـن رحـلـتـه بـيـنـنـا.
+
+❋・────━【🗡】━────・❋
+
+🌙┆الـعـضـو ↜『@${user.split('@')[0]}』
+
+❋・────━【🗡】━────・❋
+
+※ نـتـمـنـى لـك الـتـوفـيـق فـي رحـلـتـك الـقـادمـة، وتـبـقـى ذكـريـاتـك جـزءًا مـن تـاريـخ ڤـيـنـلانـد.
+
+❋・────━【🗡】━────・❋
+
+※ سـتـبـقـى أبـواب ڤـيـنـلانـد مـفـتـوحـة لـمـن أراد الـعـودة يـومًـا.
+
+❋・────━【🗡】━────・❋
+
+🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
+
+『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+
+        await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
+    }
 }
 } catch (e) {}
 });
@@ -456,7 +463,6 @@ if (globalBotStopped && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
-// فحص الوضع الخاص: إذا كان خاصاً، لا يستجيب ولا يتفاعل بإيموجي إلا للمطورين والنخبة
 if (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) {
     return;
 }
@@ -492,7 +498,6 @@ if (isSenderExtraDev && devReactionEnabled) {
     } catch (e) {}    
 }    
 
-// نظام الحماية
 if (isGroup && !isSenderAdmin && !isSenderDev) {    
     const settings = getGroupSetting(from);    
     const mType = Object.keys(msg.message || {});    
@@ -686,7 +691,6 @@ if (cmdBase === 'طرد') {
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.' }); }    
 }    
 
-// أمر بوم المحدث: طرد جميع الأعضاء والمشرفين دفعة واحدة مع استثناء رقم المطور ورقم البوت
 if (cmdBase === 'بوم') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطور الأساسي فقط!' });
     try {
@@ -694,7 +698,6 @@ if (cmdBase === 'بوم') {
         let devCleanNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
         let botCleanNum = sock.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : '';
 
-        // استثناء رقم المطور ورقم البوت فقط وتحديد الباقي للطرد الدفعة واحدة
         let usersToKick = meta.participants
             .map(p => p.id)
             .filter(id => {
@@ -708,10 +711,7 @@ if (cmdBase === 'بوم') {
         }
 
         await sock.sendMessage(from, { text: `💣 *جاري إخلاء المجموعـة وطرد الجميع دفعة واحدة (${usersToKick.length} عضو)...*` });
-        
-        // طرد الجميع في نفس الوقت دفعة واحدة دون تتابع أو ترتيب
         await sock.groupParticipantsUpdate(from, usersToKick, 'remove');
-        
         return sock.sendMessage(from, { text: `💥 تمت عملية الإخلاء الكلي بنجاح!` });
     } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر تنفيذ أمر الإخلاء.' }); }
 }
@@ -991,7 +991,7 @@ if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {
 
 - أَصْبَـحْـنا وَأَصبحَ المُـلكُ للهِ رَبِّ العـالَمـين ، اللّهُـمَّ إِنِّـي أسْـأَلُـكَ خَـيْرَ هـذا الـيَوْم ، فَـتْحَهُ ، وَنَصْـرَهُ ، وَنـورَهُ وَبَـرَكَتَـهُ ، وَهُـداهُ ، وَأَعـوذُ بِـكَ مِـنْ شَـرِّ ما فـيهِ وَشَـرِّ ما بَعْـدَه.
 
-- اللّهُـمَّ عالِـمَ الغَـيْبِ وَالشّـهادَةِ فاطِـرَ السّماواتِ وَالأرْضِ رَبَّ كـلِّ شَـيءٍ وَمَليـكَه ، أَشْهَـدُ أَنْ لا إِلـهَ إِلاّ أَنْت ، أَعـوذُ بِكَ مِن شَـرِّ نَفْسـي وَمِن شَـرِّ الشَّيْـطانِ وَشِـرْكِه ، وَأَنْ أَقْتَـرِفَ عَلـى نَفْسـي سوءاً أَوْ أَجُـرَّهُ إِلـى مُسْـلِم.
+- اللّهُـمَّ عالِـمَ الغَـيْبِ وَالشّـهادَةِ فاطِـرَ السّماواتِ وَالأرْضِ رَبَّ كـلِّ شَـيءٍ وَمَليـكَه ، أَشْهَـدُ أَنْ لا إِلـهَ إِلاّ أَنْت ، أَعـوذُ بِكَ مِن شَـرِّ نَفْسـي وَمِن شَـرِّ الشَّيْـطانِ وَشِـرْكِه ، وَأَنْ أَقْتَـرِفَ عَلـى نَفْسـي سوءاً أَوْ أَجُـرَّهُ إِلـى مُسْـلِم.
 
 - أَعـوذُ بِكَلِمـاتِ اللّهِ التّـامّـاتِ مِنْ شَـرِّ ما خَلَـق.
 
@@ -1007,7 +1007,7 @@ if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {
 
 - لا إله إلّا الله وَحْدَهُ لا شَريْكَ لهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءِ قَدِيرِ.
 
-- اللَّهُمَّ أَنْتَ رَبِّي لا إِلَهَ إِلا أَنْتَ ، عَلَيْكَ تَوَكَّلْتُ ، وَأَنْتَ رَبُّ الْعَرْشِ الْكَرِيمِ , مَا شَاءَ اللَّهُ كَانَ ، وَمَا لَمْ يَشَأْ لَمْ يَكُنْ ، وَلا حَوْلَ وَلا قُوَّةَ إِلا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ , أَعْلَمُ أَنَّ اللَّهَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ ، وَأَنَّ الله قَدْ أَحَاطَ بِكُلِّ شَيْءٍ عِلْمًا , اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي ، وَمِنْ شَرِّ كُلِّ دَابَّةٍ أْت آخِذٌ بِنَاصِيَتِهَا ، إِنَّ رَبِّي عَلَى صِرَاطٍ مُسْتَقِيمٍ.
+- اللَّهُمَّ أَنْتَ رَبِّي لا إِلَهَ إِلا أَنْتَ ، عَلَيْكَ تَوَكَّلْتُ ، وَأَنْتَ رَبُّ الْعَرْشِ الْكَرِيمِ , مَا شَاءَ اللَّهُ كَانَ ، وَمَا لَمْ يَشَأْ لَمْ يَكُنْ ، وَلا حَوْلَ وَلا قُوَّةَ إِلا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ , أَعْلَمُ أَنَّ اللَّهَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ ، وَأَنَّ الله قَدْ أَحَاطَ بِكُلِّ شَيْءٍ عِلْمًا , اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي ، وَمِنْ شَرِّ كُلِّ دَابَّةٍ أَنْتَ آخِذٌ بِنَاصِيَتِهَا ، إِنَّ رَبِّي عَلَى صِرَاطٍ مُسْتَقِيمٍ.
 
 - سُبْحَانَ اللَّهِ وَبِحَمْدِهِ.
 
@@ -1473,6 +1473,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
     process.exit(0);    
 }    
 
+// أمر بوت (مع تضمين رابط قناة البوت بشكل خفي غير مرئي في نص الاستمارة)
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
     const botWelcomeText = `
@@ -1494,13 +1495,14 @@ if (cmdBase === 'بوت') {
 📌 *.الاوامر*  أو  *.اقسام*
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-`.trim();
+`.trim() + `\n\nhttps://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d`;
 
 const botPp = await getBotProfilePic(sock);
 try { await sock.sendMessage(from, { image: { url: botPp }, caption: botWelcomeText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: botWelcomeText }); }
 return;
 }
 
+// أمر الاوامر / اقسام (مع تضمين رابط قناة البوت بشكل خفي غير مرئي في نص الاستمارة)
 if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
@@ -1516,7 +1518,7 @@ if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' |
 > 👑 \`.10\` ↞ الألقاب
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-💡 *اكتب رقم القسم للوصول السريع!*`;
+💡 *اكتب رقم القسم للوصول السريع!*` + `\n\nhttps://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d`;
 
 const devPp = await getDeveloperProfilePic(sock);
 try { await sock.sendMessage(from, { image: { url: devPp }, caption: menuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: menuText }); }
@@ -1658,7 +1660,9 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 📋 .قائمة_الانذارات ↞ المخالفون
 > 🔇 .كتم <دقائق> @عضو ↞ كتم
 > 🔊 .الغاء_كتم @عضو ↞ فك الكتم
-> 🔗 .الرابط ↞ رابط المجموعة`;
+> 🔗 .الرابط ↞ رابط المجموعة
+> 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
+> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
     try { await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: adminMenuText }); }
     return;
