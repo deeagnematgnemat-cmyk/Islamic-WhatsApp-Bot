@@ -580,6 +580,8 @@ if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
 
 if (activeGames[from] && !trimmedBody.startsWith('.')) {
     const game = activeGames[from];
+    if (game.isCompleted) return;
+    
     let isCorrect = false;
 
     if (game.type === 'typing') {
@@ -610,9 +612,11 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
     }
 
     if (isCorrect) {
+        game.isCompleted = true;
         clearTimeout(game.timer);
         getBankAccount(sender);
         userPoints[sender] += 10;
+        const gameTypeToRestart = game.type;
         delete activeGames[from];
 
         await sock.sendMessage(from, { 
@@ -621,7 +625,9 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         });
 
         setTimeout(() => {
-            restartSameGame(sock, from, game.type);
+            if (!activeGames[from]) {
+                restartSameGame(sock, from, gameTypeToRestart);
+            }
         }, 1500);
         return;
     } else {
@@ -1111,49 +1117,54 @@ if (cmd.startsWith('حزمة')) {
 }
 
 async function restartSameGame(sock, from, gameType) {
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
+
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
 
     if (gameType === 'typing') {
         const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'typing') {
+            if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
                 await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الكلمة كانت:* \`${word}\`` });
             }
         }, 30000);
         const sent = await sock.sendMessage(from, { text: `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية:\n\n👉 *${word}*` });
-        activeGames[from] = { type: 'typing', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'disassemble') {
         const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'disassemble') {
+            if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
                 await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
             }
         }, 30000);
         const sent = await sock.sendMessage(from, { text: `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية:\n\n👉 *${word}*` });
-        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'arrange') {
         const shuffled = shuffleString(word);
         const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'arrange') {
+            if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
                 await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
             }
         }, 30000);
         const sent = await sock.sendMessage(from, { text: `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة:\n\n👉 *[ ${shuffled} ]*` });
-        activeGames[from] = { type: 'arrange', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'guess') {
         const randomNum = Math.floor(Math.random() * 50) + 1;
         const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'guess') {
+            if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
                 await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
             }
         }, 30000);
         const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!` });
-        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
     }
 }
 
@@ -1208,9 +1219,13 @@ if (cmd === 'خيروك' || cmd === 'لوخيروك') {
 }    
 
 if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'typing') {
+        if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الكلمة كانت:* \`${word}\`` });
         }
@@ -1218,14 +1233,18 @@ if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
 
     const promptText = `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية بدقة سرعة:\n\n👉 *${word}*`;
     return sock.sendMessage(from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: 'typing', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
 
 if (cmdBase === 'تفكيك') {
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'disassemble') {
+        if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
         }
@@ -1233,16 +1252,20 @@ if (cmdBase === 'تفكيك') {
 
     const promptText = `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية وإعادة كتابتها بحروف مفصولة بمسافات:\n\n👉 *${word}*`;
     return sock.sendMessage(from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
 
 if (cmd === 'رتب') {
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
     const shuffled = shuffleString(word);
 
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'arrange') {
+        if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
         }
@@ -1250,16 +1273,20 @@ if (cmd === 'رتب') {
 
     const promptText = `🔤 *فَـعَـالِـيَّـةُ تَـرْتِـيـبِ الـحُـرُوفِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة لتكوين اسم أنمي أو شخصية صحيحة:\n\n👉 *[ ${shuffled} ]*`;
     return sock.sendMessage(from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: 'arrange', answer: word, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
 
 if (cmd === 'حرف') {    
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const letters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];    
     const randomLetter = letters[Math.floor(Math.random() * letters.length)];    
     
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'letter_characters') {
+        if (activeGames[from] && activeGames[from].type === 'letter_characters' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية!*` });
         }
@@ -1267,7 +1294,7 @@ if (cmd === 'حرف') {
 
     const promptText = `🔠 *فَـعَـالِـيَّـةُ الـحَـرْفِ (الوقت: 45 ثانية):*\n\nالحرف المطلوب: [ *${randomLetter}* ]\n\n📌 *المطلوب:* اكتب 3 أسماء شخصيات أنمي تبدأ بهذا الحرف في رسالة واحدة!`;
     return sock.sendMessage(from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: 'letter_characters', requiredLetter: randomLetter, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'letter_characters', requiredLetter: randomLetter, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
 
@@ -1278,32 +1305,40 @@ if (cmd === 'حكمة') {
 }    
 
 if (cmd === 'خمن') { 
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const randomNum = Math.floor(Math.random() * 50) + 1;
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'guess') {
+        if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
         }
     }, 30000);
     return sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!` }).then(sent => {
-        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
 
 if (cmdBase === 'حزورة' || cmdBase === 'لغز') { 
+    if (activeGames[from]) {
+        clearTimeout(activeGames[from].timer);
+        delete activeGames[from];
+    }
     const riddles = [
         { q: "شيء يلبسه الملك وليس له ذراعين فما هو؟", a: "التاج" },
         { q: "شيء يمشي بلا أرجل ويدخل الأذنين؟", a: "الصوت" }
     ];
     const item = riddles[Math.floor(Math.random() * riddles.length)];
     const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'riddles') {
+        if (activeGames[from] && activeGames[from].type === 'riddles' && !activeGames[from].isCompleted) {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الجواب الصحيح:* \`${item.a}\`` });
         }
     }, 30000);
     return sock.sendMessage(from, { text: `🧩 *لغز وحزورة:*\n\n${item.q}` }).then(sent => {
-        activeGames[from] = { type: 'riddles', answer: item.a, timer: timer, msgId: sent.key.id };
+        activeGames[from] = { type: 'riddles', answer: item.a, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
 
