@@ -6,6 +6,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import http from 'http';
 
 ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
 
@@ -395,7 +396,7 @@ if (action === 'add' && settings.welcome) {
 
 ❋・────━【🗡】━────・❋
 
-※ ونــرجــوا مــنــك أيــضــاً دخــول رابـط صـحـيـفـة ڤـيـنـلانـد ❄
+※ ونــرجــوا مـنـك أيــضــاً دخــول رابـط صـحـيـفـة ڤـيـنـلانـد ❄
 
 『 https://chat.whatsapp.com/KY5GUeANAvO8px1An1FZeV 』
 
@@ -1599,7 +1600,7 @@ if (cmdBase === 'اختبار') {
     let statusEmoji = isBotActive ? '🟢' : '🔴';
     let testReport = `🧪 *فَـحْـصُ وَاسْـتِـعْـرَاضُ حَـالَـةِ أَوْامِـرِ الـبُـوتِ:*\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
     validCommands.forEach((c, idx) => { testReport += `> ${idx + 1}. \`.${c}\` ↞ ${statusEmoji}\n`; });
-    testReport += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n📊 *إجمالي الأوامر الفعالة:* \`${validCommands.length}\` أمر\n🟢 حالة النظام: [ممتازة]`;
+    testReport += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐\n📊 *إجمالي الأوامر الفعالة:* \`${validCommands.length}\` أمر\n🟢 حالة النظام: [ممتازة]`;
     const devPp = await getDeveloperProfilePic(sock);
     try { await sock.sendMessage(from, { image: { url: devPp }, caption: testReport }); } catch (e) { await sock.sendMessage(from, { text: testReport }); }
     return;
@@ -1677,7 +1678,7 @@ if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase =
         let mentions = meta.participants.map(p => p.id);
         let sorted = mentions.sort((a, b) => (userPoints[b] || 0) - (userPoints[a] || 0));
 
-        let topText = `╭━━━〔 🏆 〕━━━╮\n『 قَـائِـمَـةُ أَعْـلَى الـنِّـقَـاط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;    
+        let topText = `╭━━━〔 🏆 〕━━━╮\n『 قَـائِـمَـةُ أَعْلَى الـنِّـقَـاط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;    
         sorted.forEach((u, index) => { 
             let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
             topText += `${medal} *الـمَـرْتَـبَـة [${index + 1}]* ↞ @${u.split('@')[0]}\n> 💰 *الـرَّصِـيـد:* \`${userPoints[u] || 0}\` نقطة\n\n`; 
@@ -1809,14 +1810,12 @@ if (cmdBase === 'بوت') {
 
 const botPp = await getBotProfilePic(sock);
 try { 
-    // إرسال استمارة البوت الأصلية مع الأقسام أسفلها مباشرة
     await sock.sendMessage(from, { 
         image: { url: botPp }, 
         caption: botWelcomeText, 
         mentions: [sender]
     }); 
     
-    // زر قناة المطور المستقل القابل للضغط أسفل الاستمارة والأقسام
     await sock.sendMessage(from, {
         text: `📢 *قناة المطور الرسمية:*`,
         contextInfo: {
@@ -2031,3 +2030,11 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 }
 
 startBot();
+
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Eren Bot is running successfully!\n');
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP Server is running on port ${PORT}`);
+});
