@@ -17,7 +17,7 @@ const animeDatabase = [
     "غوكو", "فيجيتا", "غوهان", "ترانكس", "بيكولو", "كوريرين", "تينيشهان", "يامتشا", "بولما", "بيروس", "وايس",
     "فريزا", "سيل", "بوو", "برولي", "هيت", "جيرين", "توppo", "كالي", "كيفلا", "كبتاين",
     "تانجيرو", "نيزوكو", "زينيتسو", "إينوسكي", "غيومي", "سانيمي", "غييو", "شينوبو", "ميتسوري", "أوباناي",
-    "مويتشيرو", "رينغوكو", "تنجين", "أكازا", "دوما", "كوكوشيبو", "موزان", "يوريتشي", "تاماโย", "موزان",
+    "مويتشيرو", "رينغوكو", "تنجين", "أكازا", "دوما", "كوكوشيبو", "موزان", "يوريتشي", "تاماโย",
     "غون", "كيلوا", "كورابيكا", "ليوريو", "هيسوكا", "إيلومي", "كرولو", "نيتيرو", "ميرويم", "بيتو",
     "يوبي", "بوف", "زينو", "سيلفا", "بيسكيت", "جين", "كايتو", "ماتشي", "فينكس", "نوبوناغا",
     "إيتادوري", "ميغومي", "نوبارا", "غوجو", "سكونا", "مواكي", "باندا", "توجي", "نانامي", "غيتو",
@@ -26,7 +26,7 @@ const animeDatabase = [
     "سايتاما", "جينوس", "غاروس", "تاتسوماكي", "فوبوكي", "بانغ", "أتوميك", "كينغ", "ميتال", "زومبي مان",
     "ديكو", "باكوغو", "تودوروكي", "أولمايت", "أيزاوا", "شيغاراكي", "دابي", "توغا", "أوفورأول", "إنديفور",
     "هواكس", "ميريو", "نجيرة", "أماجيكي", "كاميناري", "كيريشيما", "أوراراكا", "تسويو", "جيرو", "ياويوروزو",
-    "كيلوا", "كورابيكا", "كاراسونو", "هيناتا", "كاغياما", "تسوكيشيما", "نيشينويا", "تاناكا", "أويكوا", "إيواديزومي",
+    "كاراسونو", "هيناتا", "كاغياما", "تسوكيشيما", "نيشينويا", "تاناكا", "أويكوا", "إيواديزومي",
     "بوكوتو", "آكاآشي", "كوروو", "كينما", "أوشيجيما", "تندو", "أتسومو", "أوسامو", "كيتا", "ساكوسا",
     "الشيفرة", "سبارو", "لولوش", "سوزاكو", "سي سي", "شيرلي", "ناليلي", "كارين", "شنايزل", "كوروروجي",
     "نورمان", "إيما", "راي", "إيزابيلا", "كرون", "دون", "جيلدا", "فيل", "زرفان", "أوليفر",
@@ -151,7 +151,7 @@ function logBotAction(action) {
 let userPoints = {};
 let userWarnings = {};
 let bankAccounts = {};
-let activeGames = {};
+let activeGames = {}; 
 let dailyRewards = {};
 let mutedUsers = {};
 let userMessagesCount = {};
@@ -194,7 +194,6 @@ let commandReactionEmoji = '⚡';
 let devReactionEnabled = true;
 let devReactionEmoji = '👑';
 
-// قائمة الأوامر المعتمدة الكاملة (مع إضافة أوامر الملصقات الجديدة)
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
@@ -203,7 +202,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'الاوامر', 'اوامر', 'منيو', 'اقسام',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -220,8 +219,7 @@ const validCommands = [
 'نكتة', 'ماذا_لو', 'قول',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
-'تنصيب', 'تنصيب_جديد', 'كود_التنصيب', 'حالة_التنصيب', 'إيقاف_التنصيب', 'حذف_الجلسة', 'نسخي',
-'ملصق', 's', 'لصورة', 'toimage', 'ملصق_متحرك', 'ملصق_رابط', 'ملصق_نصي', 'ملصق_بحث', 'مساعدة_الملصقات'
+'ملصق', 's', 'لصورة', 'toimage', 'ملصق_متحرك', 'فيديو_لملصق', 'متحرك_لفيديو', 'ملصق_رابط', 'ملصق_نصي', 'حزمة', 'مساعدة_الملصقات'
 ];
 
 function isValidCmd(fullCmd) {
@@ -277,7 +275,6 @@ return 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
 }
 }
 
-// دالة خلط الحروف لأمر رتب
 function shuffleString(str) {
     let arr = str.split('');
     for (let i = arr.length - 1; i > 0; i--) {
@@ -287,7 +284,6 @@ function shuffleString(str) {
     return arr.join(' ');
 }
 
-// دالة تفكيك الكلمة بحروف بينها مسافات
 function disassembleWord(str) {
     return str.split('').join(' ');
 }
@@ -326,54 +322,13 @@ const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
 return mentioned || quoted || null;
 }
 
-// دالة لبدء فعالية ترفيهية عشوائية تلقائياً عند الإجابة الصحيحة
-async function startRandomMiniGame(sock, from) {
-    const gameTypes = ['typing', 'disassemble', 'arrange', 'guess'];
-    const chosenType = gameTypes[Math.floor(Math.random() * gameTypes.length)];
-    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
-
-    if (chosenType === 'typing') {
-        const timer = setTimeout(async () => {
-            if (activeGames[from]) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *الكلمة كانت:* \`${word}\`` });
-            }
-        }, 30000);
-        const promptText = `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية بدقة سرعة:\n\n👉 *${word}*`;
-        const sent = await sock.sendMessage(from, { text: promptText });
-        activeGames[from] = { type: 'typing', answer: word, timer: timer, msgId: sent.key.id };
-    } else if (chosenType === 'disassemble') {
-        const timer = setTimeout(async () => {
-            if (activeGames[from]) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
-            }
-        }, 30000);
-        const promptText = `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية وإعادة كتابتها بحروف مفصولة بمسافات:\n\n👉 *${word}*`;
-        const sent = await sock.sendMessage(from, { text: promptText });
-        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, msgId: sent.key.id };
-    } else if (chosenType === 'arrange') {
-        const shuffled = shuffleString(word);
-        const timer = setTimeout(async () => {
-            if (activeGames[from]) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
-            }
-        }, 30000);
-        const promptText = `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة لتكوين اسم أنمي أو شخصية صحيحة:\n\n👉 *[ ${shuffled} ]*`;
-        const sent = await sock.sendMessage(from, { text: promptText });
-        activeGames[from] = { type: 'arrange', answer: word, timer: timer, msgId: sent.key.id };
-    } else if (chosenType === 'guess') {
-        const randomNum = Math.floor(Math.random() * 50) + 1;
-        const timer = setTimeout(async () => {
-            if (activeGames[from]) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
-            }
-        }, 30000);
-        const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين التلقائية:* خمن الرقم الصحيح من 1 إلى 50!` });
-        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, msgId: sent.key.id };
-    }
+function cleanTextForComparison(str) {
+    if (!str) return '';
+    return str.toString()
+        .replace(/[أإآاىئؤة]/g, 'ا')
+        .replace(/[\u064b-\u065f]/g, '')
+        .replace(/\s+/g, '')
+        .toLowerCase();
 }
 
 async function startBot() {
@@ -426,7 +381,7 @@ if (action === 'add' && settings.welcome) {
 
 ❋・────━【🗡】━────・❋
 
-- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلانـد، أهـلاً وسـهـلاً ومـرحـبـاً بـك، نـتـمـنـى أن تـكـون رحـلـتـك مـلـيـئـة بـالـمـجـد والـمـغـامـرات.
+- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلانـد، أهـلاً وسـهـلاً ومـرحـبـاً بـك، نـتـمـنـى أن تـكـون رحـلـتـك مـلـيـئـة بـالـمـجـد وَالـمـغـامـرات.
 
 ❋・────━【🗡】━────・❋
 
@@ -616,52 +571,57 @@ if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
     }    
 }    
 
-// معالجة الألعاب والفعاليات النشطة مع بدء فعالية أخرى تلقائياً عند الإجابة الصحيحة
-if (activeGames[from]) {    
-    const game = activeGames[from];    
+if (activeGames[from] && !trimmedBody.startsWith('.')) {
+    const game = activeGames[from];
+    let isCorrect = false;
 
-    if (game.type === 'disassemble') {
+    if (game.type === 'typing') {
+        const userClean = cleanTextForComparison(trimmedBody);
+        const correctClean = cleanTextForComparison(game.answer);
+        if (userClean === correctClean) isCorrect = true;
+    } else if (game.type === 'disassemble') {
         const expectedDisassembled = disassembleWord(game.answer).replace(/[أإآاىئؤة]/g, 'ا').toLowerCase();
         const userDisassembledInput = trimmedBody.split('').join(' ').replace(/\s+/g, ' ').trim().replace(/[أإآاىئؤة]/g, 'ا').toLowerCase();
-
-        if (userDisassembledInput === expectedDisassembled || trimmedBody.replace(/\s+/g, ' ') === disassembleWord(game.answer)) {
-            clearTimeout(game.timer);    
-            getBankAccount(sender);    
-            userPoints[sender] += 10;    
-            delete activeGames[from];    
-            await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة وتفكيك أسطوري!* @${sender.split('@')[0]}\n💡 *تفكيك الكلمة:* \`${disassembleWord(game.answer)}\`\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });    
-            setTimeout(() => startRandomMiniGame(sock, from), 1500);
-            return;
+        if (userDisassembledInput === expectedDisassembled || cleanTextForComparison(trimmedBody) === cleanTextForComparison(game.answer)) {
+            isCorrect = true;
         }
+    } else if (game.type === 'arrange') {
+        const userClean = cleanTextForComparison(trimmedBody);
+        const correctClean = cleanTextForComparison(game.answer);
+        if (userClean === correctClean) isCorrect = true;
+    } else if (game.type === 'guess') {
+        if (trimmedBody.trim() === game.answer) isCorrect = true;
+    } else if (game.type === 'riddles') {
+        const userClean = cleanTextForComparison(trimmedBody);
+        const correctClean = cleanTextForComparison(game.answer);
+        if (userClean.includes(correctClean) || correctClean.includes(userClean)) isCorrect = true;
     } else if (game.type === 'letter_characters') {
         const charNames = trimmedBody.split(/[\n,،-]+/).map(s => s.trim()).filter(s => s.length > 0);
         const reqLetter = game.requiredLetter.replace(/[أإآا]/g, 'ا');
         const validChars = charNames.filter(c => c.replace(/[أإآا]/g, 'ا').startsWith(reqLetter));
-
-        if (validChars.length >= 3) {
-            clearTimeout(game.timer);    
-            getBankAccount(sender);    
-            userPoints[sender] += 10;    
-            delete activeGames[from];    
-            await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\nأتيت بـ 3 شخصيات تبدأ بحرف (${game.requiredLetter})\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
-            setTimeout(() => startRandomMiniGame(sock, from), 1500);
-            return;
-        }
-    } else {
-        const cleanUserAns = trimmedBody.replace(/[أإآاىئؤة]/g, 'ا').replace(/\s+/g, '').toLowerCase();    
-        const cleanCorrectAns = game.answer.replace(/[أإآاىئؤة]/g, 'ا').replace(/\s+/g, '').toLowerCase();    
-
-        if (cleanUserAns === cleanCorrectAns) {    
-            clearTimeout(game.timer);    
-            getBankAccount(sender);    
-            userPoints[sender] += 10;    
-            delete activeGames[from];    
-            await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\n💡 *الجواب:* \`${game.answer}\`\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });    
-            setTimeout(() => startRandomMiniGame(sock, from), 1500);
-            return;    
-        }    
+        if (validChars.length >= 3) isCorrect = true;
     }
-}    
+
+    if (isCorrect) {
+        clearTimeout(game.timer);
+        getBankAccount(sender);
+        userPoints[sender] += 10;
+        delete activeGames[from];
+
+        await sock.sendMessage(from, { 
+            text: `✅ إجابة صحيحة!\n🏆 اللاعب: @${sender.split('@')[0]}\n💰 النقاط المكتسبة: +10 نقاط`, 
+            mentions: [sender] 
+        });
+
+        setTimeout(() => {
+            restartSameGame(sock, from, game.type);
+        }, 1500);
+        return;
+    } else {
+        await sock.sendMessage(from, { text: `❌ إجابة خاطئة! حاول مجدداً.` }, { quoted: msg });
+        return;
+    }
+}
 
 if (!trimmedBody.startsWith('.')) return;    
 
@@ -938,101 +898,12 @@ if (activeGames[from]) {
     }    
 }    
 
-// قسم التنصيب
-if (cmd === 'تنصيب') {
-    const installationMenu = `╭━━━〔 ♟️ 〕━━━╮
-『 شَـرْحُ قِـسْـمِ الـتَّـنْـصِـيـب 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-❋・────━【♟️】━────・❋
-
-📌 *أولاً: ما هو قسم التنصيب؟*
-قسم التنصيب هو قسم مخصص لربط حساب واتساب آخر بالبوت، بحيث يستطيع صاحب الحساب تشغيل نسخة مستقلة من البوت على حسابه، باستخدام كود الاقتران (Pairing Code).
-
-⚙️ *ثانياً: أوامر قسم التنصيب المتاحة:*
-> 📱 \`.تنصيب_جديد <رقم الهاتف>\` ↞ لبدء عملية ربط حساب جديد وإنشاء كود الاقتران.
-> 🔑 \`.كود_التنصيب\` ↞ لطلب كود الاقتران للحساب الذي يجري ربطه.
-> 📊 \`.حالة_التنصيب\` ↞ التحقق من حالة الجلسة والاتصال.
-> 🛑 \`.إيقاف_التنصيب\` ↞ إيقاف النسخة الإضافية.
-> 🗑️ \`.حذف_الجلسة\` ↞ حذف بيانات جلسة محددة.
-> 📂 \`.نسخي\` ↞ عرض النسخ التي تملك صلاحية إدارتها.
-
-❋・────━【♟️】━────・❋
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, { text: installationMenu });
-}
-
-if (cmd.startsWith('تنصيب_جديد') || cmd.startsWith('كود_التنصيب')) {
-    const parts = trimmedBody.split(' ');
-    const phoneNum = parts[1] || sender.replace(/[^0-9]/g, '');
-
-    try {
-        await sock.sendMessage(from, { text: `⏳ *جاري طلب كود الاقتران الفعلي الحقيقي من سيرفر واتساب للرقم (${phoneNum})...*` });
-        
-        let pairingCode = await sock.requestPairingCode(phoneNum);
-        pairingCode = pairingCode?.match(/.{1,4}/g)?.join('-') || pairingCode;
-        
-        const codeMsg = `╭━━━〔 🔑 〕━━━╮
-『 كُـودُ اقْـتِـرَانِ التَّـنْـصِـيـب 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-«📱 ⌯ الرقم المستهدف ↞ ${phoneNum}
-🔑 ⌯ كود الاقتران ↞ *[ ${pairingCode} ]*
-⏳ ⌯ الحالة ↞ جاهز للاستخدام»
-
-❋・────━【♟️】━────・❋
-※ *تعليمات الاستخدام:*
-1. اذهب إلى واتساب ← الإعدادات.
-2. الأجهزة المرتبطة ← ربط جهاز.
-3. الربط باستخدام رقم الهاتف.
-4. أدخل الكود أعلاه بدقة.
-❋・────━【♟️】━────・❋
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
-
-        return sock.sendMessage(from, { text: codeMsg });
-    } catch (e) {
-        return sock.sendMessage(from, { text: `❌ فشل طلب كود الاقتران، تأكد من كتابة الرقم بشكل صحيح مع مفتاح الدولة (بدون + أو مسافات).` });
-    }
-}
-
-if (cmd === 'حالة_التنصيب') {
-    return sock.sendMessage(from, { text: `📊 *حالة التنصيب:* النظام يعمل بكفاءة والجلسة الأساسية متصلة بنجاح 🟢` });
-}
-
-if (cmd === 'إيقاف_التنصيب') {
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!' });
-    return sock.sendMessage(from, { text: `🛑 *تم إيقاف النسخة الإضافية بنجاح.*` });
-}
-
-if (cmd === 'حذف_الجلسة') {
-    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطور الأساسي فقط!' });
-    return sock.sendMessage(from, { text: `🗑️ *تم حذف بيانات الجلسة وإلغاء الربط بنجاح.*` });
-}
-
-if (cmd === 'نسخي') {
-    return sock.sendMessage(from, { text: `📂 *النسخ المرتبطة:* لديك نسخة أساسية واحدة قيد التشغيل حالياً (Eren Bot).` });
-}
-
-// قسم الملصقات المتكامل والمتوافق مع Railway
 if (cmd === 'مساعدة_الملصقات') {
-    const stickerHelpText = `╭━━━〔 🎨 〕━━━╮
-『 قِـسْـمُ الـمَـلْـصَـقَـات 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة المُرد عليها إلى ملصق.
-> 🖼️ \`.لصورة\` أو \`.toimage\` ↞ تحويل الملصق المُرد عليه إلى صورة.
-> 🔗 \`.ملصق_رابط <الرابط>\` ↞ صنع ملصق من رابط صورة مباشر.
-> ✍️ \`.ملصق_نصي <النص>\` ↞ صنع ملصق نصي أنيق.
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    const stickerHelpText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة إلى ملصق.\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق إلى صورة.\n> 🔗 \`.ملصق_رابط <الرابط>\` ↞ إنشاء ملصق من رابط صورة مباشر.\n> ✍️ \`.ملصق_نصي <النص>\` ↞ إنشاء ملصق نصي أنيق.\n> 🎞️ \`.ملصق_متحرك\` ↞ إنشاء ملصق متحرك (فيديو/صورة متحركة).\n> 🎬 \`.فيديو_لملصق\` ↞ تحويل فيديو إلى ملصق متحرك.\n> 🎥 \`.متحرك_لفيديو\` ↞ تحويل ملصق متحرك إلى فيديو قابل للتشغيل.\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات للشخصية (ناروتو، إيرين، إيتاتشي...).\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text: stickerHelpText });
 }
 
-if (cmd === 'ملصق' || cmd === 's' || cmd === 'ملصق_متحرك') {
+if (cmd === 'ملصق' || cmd === 's') {
     try {
         const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
         const mime = Object.keys(qMsg)[0];
@@ -1074,7 +945,11 @@ if (cmd.startsWith('ملصق_رابط')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\`` });
     }
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+        const contentType = response.headers['content-type'] || '';
+        if (!contentType.includes('image')) {
+            return sock.sendMessage(from, { text: `❌ الرابط المدخل لايؤدي إلى صورة صالحة أو مباشرة!` });
+        }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
@@ -1085,7 +960,7 @@ if (cmd.startsWith('ملصق_رابط')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ فشل جلب الصورة من الرابط أو أن الرابط غير مباشر.` });
+        return sock.sendMessage(from, { text: `❌ تعذر جلب الصورة من الرابط، تأكد من صحة الرابط وأن الخادم يدعم التنزيل المباشر.` });
     }
 }
 
@@ -1095,9 +970,8 @@ if (cmd.startsWith('ملصق_نصي')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_نصي <النص المطلوب>\`` });
     }
     try {
-        // استخدام خدمة توليد صور نصية مجانية وموثوقة عبر API عام
         const imgApiUrl = `https://api.lolhuman.xyz/api/text2image?apikey=gapis&text=${encodeURIComponent(textQuery)}`;
-        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer' });
+        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer', timeout: 10000 });
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
@@ -1108,12 +982,136 @@ if (cmd.startsWith('ملصق_نصي')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        // بديل محلي في حال تعذر API الخارجي عبر إرسال ملصق نصي مبسط
-        return sock.sendMessage(from, { text: `⚠️ عذراً، خدمة الملصق النصي تتطلب نصاً أقصر أو تحقق من الاتصال بالخدمة.` });
+        return sock.sendMessage(from, { text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً عبر الخدمة السحابية. يرجى تجربة نص أقصر.` });
     }
 }
 
-// 1. أمر الزواج
+if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
+    try {
+        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
+        const mime = Object.keys(qMsg)[0];
+        if (!['videoMessage', 'documentMessage'].includes(mime) && !qMsg.videoMessage) {
+            return sock.sendMessage(from, { text: `📌 يرجى إرسال فيديو قصير أو الرد عليه بكلمة \`.ملصق_متحرك\`` });
+        }
+        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        
+        const sticker = new Sticker(mediaStream, {
+            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            author: DEVELOPER_NAME,
+            type: StickerTypes.CROPPED,
+            categories: ['✨', '🍷'],
+            quality: 30
+        });
+        const buffer = await sticker.toBuffer();
+        return sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الفيديو إلى ملصق متحرك، تأكد من أن مدة الفيديو قصيرة ولا تتجاوز الحجم المسموح.` });
+    }
+}
+
+if (cmd === 'متحرك_لفيديو') {
+    try {
+        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!qMsg || !qMsg.stickerMessage) {
+            return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق متحرك بكلمة \`.متحرك_لفيديو\` لتحويله.` });
+        }
+        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        return sock.sendMessage(from, { video: mediaStream, caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو بنجاح!*`, ptt: false }, { quoted: msg });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى فيديو، تأكد أن الملصق يحتوي على حركة.` });
+    }
+}
+
+if (cmd.startsWith('حزمة')) {
+    const characterName = trimmedBody.replace(/^\.حزمة/i, '').trim();
+    if (!characterName) {
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` });
+    }
+    try {
+        await sock.sendMessage(from, { text: `⏳ *جاري البحث عن حزمة ملصقات لـ (${characterName}) وجلبها...*` });
+        
+        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
+        const res = await axios.get(searchApi, { timeout: 10000 });
+        const results = res.data?.result;
+
+        if (!results || !Array.isArray(results) || results.length === 0) {
+            return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزمة ملصقات مطابقة للشخصية (${characterName}). جرب اسم شخصية أخرى.` });
+        }
+
+        let countSent = 0;
+        for (let i = 0; i < Math.min(results.length, 4); i++) {
+            try {
+                let imgUrl = results[i];
+                let stickerObj = new Sticker(imgUrl, {
+                    pack: `حزمة: ${characterName}`,
+                    author: DEVELOPER_NAME,
+                    type: StickerTypes.DEFAULT,
+                    quality: 40
+                });
+                let stBuffer = await stickerObj.toBuffer();
+                await sock.sendMessage(from, { sticker: stBuffer });
+                countSent++;
+                await new Promise(r => setTimeout(r, 800));
+            } catch (err) {}
+        }
+
+        if (countSent > 0) {
+            return sock.sendMessage(from, { text: `✅ *تم جلب وإرسال (${countSent}) ملصقاً لحزمة (${characterName}) بنجاح!*` });
+        } else {
+            return sock.sendMessage(from, { text: `❌ تعذر معالجة ملصقات هذه الحزمة.` });
+        }
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ عذراً، خدمة جلب الحزم غير متوفرة مؤقتاً أو حدث خطأ في الاتصال بالمصدر.` });
+    }
+}
+
+async function restartSameGame(sock, from, gameType) {
+    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
+
+    if (gameType === 'typing') {
+        const timer = setTimeout(async () => {
+            if (activeGames[from] && activeGames[from].type === 'typing') {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الكلمة كانت:* \`${word}\`` });
+            }
+        }, 30000);
+        const sent = await sock.sendMessage(from, { text: `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية:\n\n👉 *${word}*` });
+        activeGames[from] = { type: 'typing', answer: word, timer: timer, msgId: sent.key.id };
+
+    } else if (gameType === 'disassemble') {
+        const timer = setTimeout(async () => {
+            if (activeGames[from] && activeGames[from].type === 'disassemble') {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
+            }
+        }, 30000);
+        const sent = await sock.sendMessage(from, { text: `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية:\n\n👉 *${word}*` });
+        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, msgId: sent.key.id };
+
+    } else if (gameType === 'arrange') {
+        const shuffled = shuffleString(word);
+        const timer = setTimeout(async () => {
+            if (activeGames[from] && activeGames[from].type === 'arrange') {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
+            }
+        }, 30000);
+        const sent = await sock.sendMessage(from, { text: `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة:\n\n👉 *[ ${shuffled} ]*` });
+        activeGames[from] = { type: 'arrange', answer: word, timer: timer, msgId: sent.key.id };
+
+    } else if (gameType === 'guess') {
+        const randomNum = Math.floor(Math.random() * 50) + 1;
+        const timer = setTimeout(async () => {
+            if (activeGames[from] && activeGames[from].type === 'guess') {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
+            }
+        }, 30000);
+        const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!` });
+        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, msgId: sent.key.id };
+    }
+}
+
 if (cmd === 'زواج') {    
     try {
         const meta = await sock.groupMetadata(from);
@@ -1149,7 +1147,6 @@ if (cmd === 'زواج') {
     } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر إتمام عقد الزواج.' }); }
 }    
 
-// 2. أمر صراحة
 if (cmd === 'صراحة') {    
     try {    
         const meta = await sock.groupMetadata(from);    
@@ -1160,17 +1157,15 @@ if (cmd === 'صراحة') {
     } catch (e) { return sock.sendMessage(from, { text: `💬 *سُـؤَالُ صَـرَاحَـة:* ${sarahaQuestions[0]}` }); }    
 }    
 
-// 3. أمر خيروك
 if (cmd === 'خيروك' || cmd === 'لوخيروك') {    
     const q = khayrokQuestions[Math.floor(Math.random() * khayrokQuestions.length)];
     return sock.sendMessage(from, { text: `❓ *لَـعْـبَـةُ لَـوْ خَـيَّـرُوكَ:* \n\n> ${q}` });    
 }    
 
-// 4. أمر كتابة
 if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'typing') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الكلمة كانت:* \`${word}\`` });
         }
@@ -1182,12 +1177,10 @@ if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
     });
 }
 
-// 5. أمر تفكيك
 if (cmdBase === 'تفكيك') {
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
-    
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'disassemble') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
         }
@@ -1199,13 +1192,12 @@ if (cmdBase === 'تفكيك') {
     });
 }
 
-// 6. أمر رتب
 if (cmd === 'رتب') {
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
     const shuffled = shuffleString(word);
 
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'arrange') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
         }
@@ -1217,13 +1209,12 @@ if (cmd === 'رتب') {
     });
 }
 
-// 7. أمر حرف
 if (cmd === 'حرف') {    
     const letters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];    
     const randomLetter = letters[Math.floor(Math.random() * letters.length)];    
     
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'letter_characters') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية!*` });
         }
@@ -1244,7 +1235,7 @@ if (cmd === 'حكمة') {
 if (cmd === 'خمن') { 
     const randomNum = Math.floor(Math.random() * 50) + 1;
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'guess') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
         }
@@ -1261,7 +1252,7 @@ if (cmdBase === 'حزورة' || cmdBase === 'لغز') {
     ];
     const item = riddles[Math.floor(Math.random() * riddles.length)];
     const timer = setTimeout(async () => {
-        if (activeGames[from]) {
+        if (activeGames[from] && activeGames[from].type === 'riddles') {
             delete activeGames[from];
             await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الجواب الصحيح:* \`${item.a}\`` });
         }
@@ -1296,11 +1287,11 @@ if (cmd === 'حديث') {
 }    
 
 if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {    
-    return sock.sendMessage(from, { text: `*╎أذكـار 🌙私╎*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...` });    
+    return sock.sendMessage(from, { text: `*╎أذكـار 🌙私*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...` });    
 }    
 
 if (cmd === 'اذكار_المساء' || cmd === 'أذكار_المساء') {    
-    return sock.sendMessage(from, { text: `*أذكار الـمـسـاء 🌙*\n\n- اللهم انت ربي لا اله الا انتخلقتني وانا عبدك...` });    
+    return sock.sendMessage(from, { text: `*أذكار الـمـسـاء 🌙*\n\n- اللهم انت ربي لا اله الا انت خلقتني وانا عبدك...` });    
 }    
 
 if (cmd === 'أذكار' || cmd === 'اذكار') {    
@@ -1718,12 +1709,17 @@ if (cmdBase === 'بوت') {
 > ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
 > ┃ 📊︙عدد الأوامر → ${validCommands.length} أمراً
 > ┃ 
-> ┃ ⌯🚀︙الـتـوقـيـت → ${time} (الأردن)
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 ⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
 اكتب الأمر: 👇
+
 📌 *.الاوامر*  أو  *.اقسام*
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
@@ -1762,8 +1758,7 @@ if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' |
 > ⚡ \`.8\` ↞ الادارة
 > 🔍 \`.9\` ↞ الكشف
 > 👑 \`.10\` ↞ الألقاب
-> ♟️ \`.11\` ↞ التنصيب
-> 🎨 \`.12\` ↞ الملصقات
+> 🎨 \`.11\` ↞ الملصقات
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
@@ -1950,40 +1945,8 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقاب') {
     return;
 }
 
-if (cmdBase === '11' || cmd === 'التنصيب') {
-    const installMenuText = `╭━━━〔 ♟️ 〕━━━╮
-『 قِـسْـمُ الـتَّـنْـصِـيـب 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-> 📱 \`.تنصيب\` ↞ شرح قسم التنصيب
-> 📱 \`.تنصيب_جديد <الرقم>\` ↞ ربط حساب جديد
-> 🔑 \`.كود_التنصيب\` ↞ طلب كود الاقتران
-> 📊 \`.حالة_التنصيب\` ↞ التحقق من الحالة
-> 🛑 \`.إيقاف_التنصيب\` ↞ إيقاف النسخة
-> 🗑️ \`.حذف_الجلسة\` ↞ حذف جلسة
-> 📂 \`.نسخي\` ↞ عرض النسخ
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: installMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: installMenuText }); }
-    return;
-}
-
-if (cmdBase === '12' || cmd === 'الملصقات' || cmd === 'مساعدة_الملصقات') {
-    const stickerMenuText = `╭━━━〔 🎨 〕━━━╮
-『 قِـسْـمُ الـمَـلْـصَـقَـات 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل إلى ملصق
-> 🖼️ \`.لصورة\` ↞ تحويل الملصق لصورة
-> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط
-> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+if (cmdBase === '11' || cmd === 'الملصقات' || cmd === 'مساعدة_الملصقات') {
+    const stickerMenuText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل إلى ملصق\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق لصورة\n> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط\n> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي\n> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك\n> 🎬 \`.فيديو_لملصق\` ↞ فيديو إلى ملصق متحرك\n> 🎥 \`.متحرك_لفيديو\` ↞ ملصق متحرك إلى فيديو\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     const userPp = await getUserProfilePic(sock, sender);
     try { await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: stickerMenuText }); }
     return;
