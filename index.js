@@ -2,6 +2,13 @@ import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaile
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from 'ffmpeg-static';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+ffmpeg.setFfmpegPath(ffmpegInstaller);
 
 // قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
@@ -945,10 +952,10 @@ if (cmd.startsWith('ملصق_رابط')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\`` });
     }
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
         const contentType = response.headers['content-type'] || '';
         if (!contentType.includes('image')) {
-            return sock.sendMessage(from, { text: `❌ الرابط المدخل لايؤدي إلى صورة صالحة أو مباشرة!` });
+            return sock.sendMessage(from, { text: `❌ الرابط المدخل لا يؤدي إلى صورة مباشرة صالحة!` });
         }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
@@ -960,7 +967,7 @@ if (cmd.startsWith('ملصق_رابط')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ تعذر جلب الصورة من الرابط، تأكد من صحة الرابط وأن الخادم يدعم التنزيل المباشر.` });
+        return sock.sendMessage(from, { text: `❌ تعذر جلب الصورة من الرابط، تأكد من أن الرابط مباشر وصالح.` });
     }
 }
 
@@ -971,7 +978,11 @@ if (cmd.startsWith('ملصق_نصي')) {
     }
     try {
         const imgApiUrl = `https://api.lolhuman.xyz/api/text2image?apikey=gapis&text=${encodeURIComponent(textQuery)}`;
-        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer', timeout: 10000 });
+        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer', timeout: 15000 });
+        const contentType = response.headers['content-type'] || '';
+        if (!contentType.includes('image')) {
+            return sock.sendMessage(from, { text: `❌ فشل توليد صورة النص من الخدمة السحابية.` });
+        }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
@@ -982,7 +993,7 @@ if (cmd.startsWith('ملصق_نصي')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, { text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً عبر الخدمة السحابية. يرجى تجربة نص أقصر.` });
+        return sock.sendMessage(from, { text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً. يرجى تجربة نص قصير آخر.` });
     }
 }
 
@@ -1005,7 +1016,7 @@ if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
         const buffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ فشل تحويل الفيديو إلى ملصق متحرك، تأكد من أن مدة الفيديو قصيرة ولا تتجاوز الحجم المسموح.` });
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الفيديو إلى ملصق متحرك.` });
     }
 }
 
@@ -1015,10 +1026,43 @@ if (cmd === 'متحرك_لفيديو') {
         if (!qMsg || !qMsg.stickerMessage) {
             return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق متحرك بكلمة \`.متحرك_لفيديو\` لتحويله.` });
         }
+        
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        return sock.sendMessage(from, { video: mediaStream, caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو بنجاح!*`, ptt: false }, { quoted: msg });
+        
+        const tempDir = os.tmpdir();
+        const inputWebp = path.join(tempDir, `input_${Date.now()}.webp`);
+        const outputMp4 = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+        fs.writeFileSync(inputWebp, mediaStream);
+
+        await new Promise((resolve, reject) => {
+            ffmpeg(inputWebp)
+                .inputFormat('webp')
+                .outputOptions([
+                    '-pix_fmt yuv420p',
+                    '-c:v libx264',
+                    '-movflags +faststart',
+                    '-loop 0'
+                ])
+                .toFormat('mp4')
+                .on('end', resolve)
+                .on('error', reject)
+                .save(outputMp4);
+        });
+
+        const videoBuffer = fs.readFileSync(outputMp4);
+        try { fs.unlinkSync(inputWebp); fs.unlinkSync(outputMp4); } catch (e) {}
+
+        return sock.sendMessage(from, { 
+            video: videoBuffer, 
+            caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو صالح ويعمل بكفاءة!*`, 
+            mimetype: 'video/mp4',
+            ptt: false 
+        }, { quoted: msg });
+
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى فيديو، تأكد أن الملصق يحتوي على حركة.` });
+        console.error('خطأ تحويل المتحرك لفيديو:', e);
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق المتحرك إلى فيديو صالح.` });
     }
 }
 
@@ -1028,21 +1072,22 @@ if (cmd.startsWith('حزمة')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` });
     }
     try {
-        await sock.sendMessage(from, { text: `⏳ *جاري البحث عن حزمة ملصقات لـ (${characterName}) وجلبها...*` });
-        
         const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
-        const res = await axios.get(searchApi, { timeout: 10000 });
+        const res = await axios.get(searchApi, { timeout: 15000 });
         const results = res.data?.result;
 
         if (!results || !Array.isArray(results) || results.length === 0) {
-            return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزمة ملصقات مطابقة للشخصية (${characterName}). جرب اسم شخصية أخرى.` });
+            return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزمة ملصقات للشخصية (${characterName}).` });
         }
 
         let countSent = 0;
-        for (let i = 0; i < Math.min(results.length, 4); i++) {
+        for (let i = 0; i < Math.min(results.length, 3); i++) {
             try {
                 let imgUrl = results[i];
-                let stickerObj = new Sticker(imgUrl, {
+                let imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 10000 });
+                let imgBuffer = Buffer.from(imgRes.data);
+                
+                let stickerObj = new Sticker(imgBuffer, {
                     pack: `حزمة: ${characterName}`,
                     author: DEVELOPER_NAME,
                     type: StickerTypes.DEFAULT,
@@ -1051,17 +1096,17 @@ if (cmd.startsWith('حزمة')) {
                 let stBuffer = await stickerObj.toBuffer();
                 await sock.sendMessage(from, { sticker: stBuffer });
                 countSent++;
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1000));
             } catch (err) {}
         }
 
         if (countSent > 0) {
-            return sock.sendMessage(from, { text: `✅ *تم جلب وإرسال (${countSent}) ملصقاً لحزمة (${characterName}) بنجاح!*` });
+            return sock.sendMessage(from, { text: `✅ *تم إرسال (${countSent}) ملصقات حقيقية بنجاح لشخصية (${characterName})!*` });
         } else {
-            return sock.sendMessage(from, { text: `❌ تعذر معالجة ملصقات هذه الحزمة.` });
+            return sock.sendMessage(from, { text: `❌ تعذر تحميل وتشكيل ملصقات هذه الحزمة.` });
         }
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ عذراً، خدمة جلب الحزم غير متوفرة مؤقتاً أو حدث خطأ في الاتصال بالمصدر.` });
+        return sock.sendMessage(from, { text: `❌ عذراً، خدمة جلب الحزم غير متوفرة حالياً.` });
     }
 }
 
