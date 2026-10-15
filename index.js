@@ -156,7 +156,6 @@ let commandReactionEmoji = '⚡';
 let devReactionEnabled = true;
 let devReactionEmoji = '👑';
 
-// قائمة الأوامر المحدثة (بدون قسم الرياضة والذكاء الاصطناعي وبدون آية وسورة)
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
@@ -387,7 +386,7 @@ if (action === 'add' && settings.welcome) {
 
 *🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
 
-*『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』*`;
+*『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬NG𝑳𝑨ℕ𝐷』*`;
 
 await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
 }
@@ -408,7 +407,7 @@ const goodbyeMsg = `🥀┊تـودـيـع الـعـضـو:
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 1 ⊰🗡⊱ 𝑬NG𝑳𝑨ℕ𝐷』`;
 
 await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
 }
@@ -454,6 +453,13 @@ let trimmedBody = body.trim();
 let lowerBody = trimmedBody.toLowerCase();    
 
 if (globalBotStopped && !isSenderDev) return;
+
+const groupSettingsForCheck = getGroupSetting(from);
+
+// فحص الوضع الخاص: إذا كان خاصاً، لا يستجيب ولا يتفاعل بإيموجي إلا للمطورين والنخبة
+if (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) {
+    return;
+}
 
 if (isGroup && !isFromMe) {    
     const groupSt = getGroupSetting(from);    
@@ -591,11 +597,6 @@ if (!isGroup) {
 }    
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
-const groupSettingsForCheck = getGroupSetting(from);    
-
-if (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) {    
-    return;    
-}    
 
 if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
@@ -685,16 +686,33 @@ if (cmdBase === 'طرد') {
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.' }); }    
 }    
 
+// أمر بوم المحدث: طرد جميع الأعضاء والمشرفين دفعة واحدة مع استثناء رقم المطور ورقم البوت
 if (cmdBase === 'بوم') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطور الأساسي فقط!' });
     try {
         const meta = await sock.groupMetadata(from);
-        const membersToKick = meta.participants.filter(p => p.admin !== 'admin' && p.admin !== 'superadmin').map(p => p.id);
-        await sock.sendMessage(from, { text: `💣 *جاري إخلاء المجموعـة وطرد ${membersToKick.length} عضو...*` });
-        for (let userJid of membersToKick) {
-            try { await sock.groupParticipantsUpdate(from, [userJid], 'remove'); } catch (e) {}
+        let devCleanNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
+        let botCleanNum = sock.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : '';
+
+        // استثناء رقم المطور ورقم البوت فقط وتحديد الباقي للطرد الدفعة واحدة
+        let usersToKick = meta.participants
+            .map(p => p.id)
+            .filter(id => {
+                let cleanId = id.replace(/[^0-9]/g, '');
+                return !cleanId.includes(devCleanNum) && !devCleanNum.includes(cleanId) &&
+                       !cleanId.includes(botCleanNum) && !botCleanNum.includes(cleanId);
+            });
+
+        if (usersToKick.length === 0) {
+            return sock.sendMessage(from, { text: `⚠️ لا توجد أعضاء آخرين لطردهم.` });
         }
-        return sock.sendMessage(from, { text: `💥 تمت عملية الإخلاء بنجاح!` });
+
+        await sock.sendMessage(from, { text: `💣 *جاري إخلاء المجموعـة وطرد الجميع دفعة واحدة (${usersToKick.length} عضو)...*` });
+        
+        // طرد الجميع في نفس الوقت دفعة واحدة دون تتابع أو ترتيب
+        await sock.groupParticipantsUpdate(from, usersToKick, 'remove');
+        
+        return sock.sendMessage(from, { text: `💥 تمت عملية الإخلاء الكلي بنجاح!` });
     } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر تنفيذ أمر الإخلاء.' }); }
 }
 
@@ -796,7 +814,6 @@ if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل جلب الرابط تأكد أن البوت مشرف.' }); }    
 }    
 
-// استمارات الحماية
 if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط') {    
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiLink = true;    
@@ -907,11 +924,7 @@ if (cmd === 'خمن') { startTimedGame(from, sock, 'guess', ["7", "15", "42", "9
 if (cmd === 'عكس') { startNextSameGame(from, sock, 'reverseGame', [{word: "نيراي", answer: "يريان"}]); return; }    
 if (cmdBase === 'حزورة' || cmdBase === 'لغز') { startTimedGame(from, sock, 'riddles', ["شيء يلبسه الملك وليس له ذراعين فما هو؟ التاج"], 30); return; }    
 
-// ==========================================
-// قسم اسلامي (جلب 5 آيات عشوائية أو تالية، الأذكار المطلوبة كاملة)
-// ==========================================
 if (cmd === 'قران' || cmd === 'قرآن') {    
-    // جلب 5 آيات عشوائية من القاموس الكبير
     let selectedAyat = [];
     let tempDb = [...quranDatabase];
     for (let i = 0; i < 5; i++) {
@@ -935,7 +948,6 @@ if (cmd === 'حديث') {
     return sock.sendMessage(from, { text: `☪️ *حديث نبوي شريف:*\n\n${randomHadith}` });    
 }    
 
-// أذكار الصباح بالشكل المطلوب تماماً
 if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {    
     return sock.sendMessage(from, { text: `*╎أذكـار 🌙私╎*
 
@@ -995,14 +1007,13 @@ if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {
 
 - لا إله إلّا الله وَحْدَهُ لا شَريْكَ لهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءِ قَدِيرِ.
 
-- اللَّهُمَّ أَنْتَ رَبِّي لا إِلَهَ إِلا أَنْتَ ، عَلَيْكَ تَوَكَّلْتُ ، وَأَنْتَ رَبُّ الْعَرْشِ الْكَرِيمِ , مَا شَاءَ اللَّهُ كَانَ ، وَمَا لَمْ يَشَأْ لَمْ يَكُنْ ، وَلا حَوْلَ وَلا قُوَّةَ إِلا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ , أَعْلَمُ أَنَّ اللَّهَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ ، وَأَنَّ الله قَدْ أَحَاطَ بِكُلِّ شَيْءٍ عِلْمًا , اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي ، وَمِنْ شَرِّ كُلِّ دَابَّةٍ أَنْتَ آخِذٌ بِنَاصِيَتِهَا ، إِنَّ رَبِّي عَلَى صِرَاطٍ مُسْتَقِيمٍ.
+- اللَّهُمَّ أَنْتَ رَبِّي لا إِلَهَ إِلا أَنْتَ ، عَلَيْكَ تَوَكَّلْتُ ، وَأَنْتَ رَبُّ الْعَرْشِ الْكَرِيمِ , مَا شَاءَ اللَّهُ كَانَ ، وَمَا لَمْ يَشَأْ لَمْ يَكُنْ ، وَلا حَوْلَ وَلا قُوَّةَ إِلا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ , أَعْلَمُ أَنَّ اللَّهَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ ، وَأَنَّ الله قَدْ أَحَاطَ بِكُلِّ شَيْءٍ عِلْمًا , اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي ، وَمِنْ شَرِّ كُلِّ دَابَّةٍ أْت آخِذٌ بِنَاصِيَتِهَا ، إِنَّ رَبِّي عَلَى صِرَاطٍ مُسْتَقِيمٍ.
 
 - سُبْحَانَ اللَّهِ وَبِحَمْدِهِ.
 
 *￭─╼━╾─══─┇￮𑀄🌙𑀄￮┇─══─╼━╾─￭*` });    
 }    
 
-// أذكار المساء بالشكل المطلوب تماماً
 if (cmd === 'اذكار_المساء' || cmd === 'أذكار_المساء') {    
     return sock.sendMessage(from, { text: `*أذكار الـمـسـاء 🌙*
 
@@ -1017,7 +1028,6 @@ if (cmd === 'اذكار_المساء' || cmd === 'أذكار_المساء') {
 *￭─╼━╾─══─┇￮𑀄🌙𑀄￮┇─══─╼━╾─￭*` });    
 }    
 
-// أذكار الاستيقاظ
 if (cmd === 'اذكار_الاستيقاظ') {
     return sock.sendMessage(from, { text: `*╎أذكـار 🌙私𝕎*
 
@@ -1032,7 +1042,6 @@ if (cmd === 'اذكار_الاستيقاظ') {
 *￭─╼━╾─══─┇￮𑀄🌙𑀄￮┇─══─╼━╾─￭*` });
 }
 
-// أذكار الصلاة
 if (cmd === 'اذكار_الصلاة') {
     return sock.sendMessage(from, { text: `*╎أذكـار 🌙私𝕎*
 
@@ -1045,7 +1054,6 @@ if (cmd === 'اذكار_الصلاة') {
 *￭─╼━╾─══─┇￮𑀄🌙𑀄￮┇─══─╼━╾─￭*` });
 }
 
-// أذكار المسجد
 if (cmd === 'اذكار_المسجد') {
     return sock.sendMessage(from, { text: `*╎أذكـار 🌙私𝕎*
 
@@ -1137,7 +1145,6 @@ if (cmd === 'توب_التفاعل') {
     } catch (e) { return sock.sendMessage(from, { text: `❌ تعذر جلب توب التفاعل.` }); }
 }
 
-// قسم الألقاب
 if (cmd.startsWith('اضافة_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!' });
     const targetUser = getTargetUser(msg);
@@ -1227,7 +1234,6 @@ if (cmdBase === 'تفاعل_مطور') {
     return sock.sendMessage(from, { text: `🟢 تم تحديث تفاعل المطور.` });    
 }    
 
-// أمر اضافة مطور
 if (cmdBase === 'اضافة_مطور') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const targetUser = getTargetUser(msg);    
@@ -1272,7 +1278,6 @@ if (cmdBase === 'ازل_نخبة') {
     return sock.sendMessage(from, { text, mentions: [targetUser, sender] });
 }
 
-// أمر عرض نخبة (منشن فقط للأشخاص الحقيقيين المضافين)
 if (cmdBase === 'عرض_نخبة') {
     if (vipUsers.length === 0) return sock.sendMessage(from, { text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!' });
     let text = `👑 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
@@ -1395,7 +1400,6 @@ if (cmdBase === 'تحويل') {
     return sock.sendMessage(from, { text, mentions: [sender, targetUser] });    
 }    
 
-// أمر قائمة المطورين (منشن فقط للحسابات الحقيقية المضافة والمطور الأساسي)
 if (cmdBase === 'قائمة_المطورين') {    
     let text = `👑 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:*\n\n> @${DEVELOPER_NUMBER}\n`;
     let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
@@ -1420,7 +1424,6 @@ if (cmdBase === 'اعطاء' || cmdBase === 'إعطاء') {
     return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser] }, { quoted: msg });    
 }    
 
-// أمر .اذاعة باستمارة أنيقة ومريحة ومرتبة
 if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });    
     const bcText = trimmedBody.replace(/^\.(اذاعة|إذاعة)/i, '').trim();    
@@ -1446,7 +1449,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
 │ ✅ الحالة: تم استلام البث بنجاح
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
         }    
@@ -1458,7 +1461,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1498,7 +1501,6 @@ try { await sock.sendMessage(from, { image: { url: botPp }, caption: botWelcomeT
 return;
 }
 
-// الترتيب الصحيح للأقسام بعد التعديل والحذف
 if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' || cmd === 'اقسام') {    
     const menuText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
@@ -1572,7 +1574,6 @@ try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuTe
 return;
 }
 
-// القسم الرابع أصبح "اسلامي" فقط (مع الشرح بجانب الأوامر كما طلبت تماماً)
 if (cmdBase === '4') {
     const islamText = `🕌 *اسلامي:*
 
