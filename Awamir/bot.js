@@ -14,7 +14,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         mediaMessage = null;
     }
 
-    // 2. نص الاستمارة بنفس الشكل المطلوب
+    // 2. نص الاستمارة الأساسي والتصميم
     const captionText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
@@ -32,7 +32,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 
 ⚙️ *اضغط على القائمة التفاعلية أدناه لاختيار القسم الفعّال:*`;
 
-    // 3. بناء الأزرار والقائمة التفاعلية
+    // 3. بناء الواجهة والأزرار التفاعلية الحقيقية
     const interactiveMessage = {
         body: { text: captionText },
         footer: { text: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』" },
@@ -44,7 +44,6 @@ let handler = async (m, { conn, usedPrefix }) => {
         nativeFlowMessage: {
             buttons: [
                 {
-                    // القائمة التفاعلية لاختيار الأقسام الـ11
                     name: "single_select",
                     buttonParamsJson: JSON.stringify({
                         title: "📜 اختر قسمًا من القائمة",
@@ -59,7 +58,7 @@ let handler = async (m, { conn, usedPrefix }) => {
                                     { title: "😂 5. قسم الضحك", description: "نكت، تساؤلات خيالية ومقولات", id: `${usedPrefix}5` },
                                     { title: "👥 6. قسم المجموعات", description: "ألقاب الجروب، التفاعلات والتوب", id: `${usedPrefix}6` },
                                     { title: "♟️ 7. قسم المطور", description: "أوامر التحكم بالمطور والنظام", id: `${usedPrefix}7` },
-                                    { title: "⚡ 8. قسم الإدارة", description: "قفل وفتح الجروب، الطرد والترقية", id: `${usedPrefix}8` },
+                                    { title: "⚡ 8. الإدارة", description: "قفل وفتح الجروب، الطرد والترقية", id: `${usedPrefix}8` },
                                     { title: "🔎 9. قسم الكشف", description: "كشف وسائط العرض لمرة واحدة", id: `${usedPrefix}9` },
                                     { title: "👑 10. قسم الألقاب", description: "إضافة وحجز الألقاب للأعضاء", id: `${usedPrefix}10` },
                                     { title: "🎨 11. قسم الملصقات", description: "صنع ملصقات نصية، متحركة وحزم", id: `${usedPrefix}11` }
@@ -69,7 +68,6 @@ let handler = async (m, { conn, usedPrefix }) => {
                     })
                 },
                 {
-                    // زر قناة المطور المباشر
                     name: "cta_url",
                     buttonParamsJson: JSON.stringify({
                         display_text: "📢 قناة المطور",
@@ -81,7 +79,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         }
     };
 
-    // 4. إرسال الرسالة عبر الخادم
+    // 4. إرسال الرسالة التفاعلية عبر السيرفر
     const msg = generateWAMessageFromContent(
         m.chat,
         {
@@ -102,4 +100,3 @@ handler.tags = ['main'];
 handler.command = /^بوت$/i;
 
 export default handler;
-
