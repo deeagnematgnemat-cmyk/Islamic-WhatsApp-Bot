@@ -3,12 +3,12 @@ import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-ffmpeg.setFfmpegPath(ffmpegInstaller);
+// استخدام مسار نظام التشغيل مباشرة لتجنب أخطاء الوحدات المفقودة في السيرفر
+ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
 
 // قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
