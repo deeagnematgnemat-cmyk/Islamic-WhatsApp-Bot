@@ -473,14 +473,8 @@ if (isGroup && !isFromMe && !isSenderDev) {
     } catch (e) {}    
 }    
 
-// التقاط الرد من القائمة التفاعلية أو الأزرار
-let rawBody = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
-const listResponseMessage = msg.message.listResponseMessage || msg.message.buttonsResponseMessage || msg.message.templateButtonReplyMessage;
-if (listResponseMessage) {
-    rawBody = listResponseMessage.selectedRowId || listResponseMessage.selectedButtonId || rawBody;
-}
-
-let trimmedBody = rawBody.trim();    
+const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';    
+let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
 if (globalBotStopped && !isSenderDev) return;
@@ -496,7 +490,7 @@ if (isGroup && !isFromMe) {
     if (groupSt.antiOtherBots) {    
         const isBotMsg = (msg.key.id && (msg.key.id.startsWith('BAE5') || msg.key.id.length < 18)) ||     
                          (msg.message.botInvokeMessage || msg.message.templateButtonReplyMessage || msg.message.interactiveResponseMessage) ||    
-                         (trimmedBody.startsWith('!') || trimmedBody.startsWith('#') || trimmedBody.startsWith('/') || trimmedBody.startsWith('.') && !isValidCmd(trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا').split(' ')[0]));    
+                         (body.startsWith('!') || body.startsWith('#') || body.startsWith('/') || body.startsWith('.') && !isValidCmd(body.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا').split(' ')[0]));    
             
         if (isBotMsg) {    
             try {    
@@ -638,15 +632,12 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
     }
 }
 
-let isCommand = trimmedBody.startsWith('.');
-let cmd = isCommand ? trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا') : trimmedBody.toLowerCase().trim().replace(/[أإآا]/g, 'ا');
+if (!trimmedBody.startsWith('.')) return;    
+
+let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
 let cmdBase = cmd.split(' ')[0];    
 
-if (!isCommand && !['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'].includes(cmdBase)) {
-    if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;
-}
-
-if (isCommand && !isValidCmd(cmdBase) && !isValidCmd(cmd)) return;
+if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
 if (commandReactionEnabled) {    
     try {    
@@ -1803,30 +1794,47 @@ if (cmdBase === 'بوت') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 ⚙️ *لِـعَـرْضِ كَـافَّـةِ أَقْـسَـامِ الأَوَامِـرِ وَالإِدَارَةِ:*
-اكتب الأمر: 👇
+اكتب رقم القسم من 1 إلى 11 أدناه 👇
 
-📌 *.الاوامر*  أو  *.اقسام*
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
+1. 🛡️ الحماية
+2. 🎉 الترفيه
+3. 💳 البنك والنقاط
+4. 🕌 إسلامي
+5. 😂 الضحك
+6. 👥 المجموعات
+7. ♟️ المطور
+8. ⚡ الإدارة
+9. 🔎 الكشف
+10. 👑 الألقاب
+11. 🎨 الملصقات`;
 
 const botPp = await getBotProfilePic(sock);
 try { 
     await sock.sendMessage(from, { 
         image: { url: botPp }, 
         caption: botWelcomeText, 
-        mentions: [sender],
+        mentions: [sender]
+    }); 
+    
+    // زر قناة المطور مستقل وقابل للضغط أسفل الأقسام مباشرة
+    await sock.sendMessage(from, {
+        text: `📢 *قناة المطور الرسمية:*`,
         contextInfo: {
             externalAdReply: {
-                title: "📌 عرض القناة والأوامر الرسمية",
-                body: "انقر هنا لمتابعة القناة الرسمية",
+                title: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』",
+                body: "انقر للانضمام إلى قناة المطور الرسمية",
                 mediaType: 1,
-                renderLargerThumbnail: false,
-                thumbnailUrl: botPp,
+                renderLargerThumbnail: true,
+                thumbnailUrl: await getDeveloperProfilePic(sock),
                 sourceUrl: BOT_CHANNEL_URL
             }
         }
-    }); 
-} catch (e) { await sock.sendMessage(from, { text: botWelcomeText }); }
+    });
+} catch (e) { 
+    await sock.sendMessage(from, { text: botWelcomeText }); 
+}
 return;
 }
 
@@ -1845,158 +1853,13 @@ if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' |
         { title: "11. 🎨 الملصقات", rowId: "11", description: "تحويل الصور والفيديوهات لملصقات، ملصقات متحركة وحزم" }
     ];
 
-    const listMessage = {
-        text: `📋 قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة:\n\nاختر القسم المطلوب من القائمة أدناه لعرض أوامره كاملة:`,
-        footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-        title: '📂 أقسام البوت التفاعلية',
-        buttonText: '📌 اضغط هنا للاختيار',
-        sections: [
-            {
-                title: 'الأقسام المتاحة',
-                rows: sectionsList
-            }
-        ]
-    };
-
-    try {
-        await sock.sendMessage(from, listMessage);
-        // إرسال زر قناة المطور أسفل القائمة حصراً
-        await sock.sendMessage(from, {
-            text: `📢 *قناة المطور الرسمية:*`,
-            contextInfo: {
-                externalAdReply: {
-                    title: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』",
-                    body: "انقر للانضمام إلى قناة المطور الرسمية",
-                    mediaType: 1,
-                    renderLargerThumbnail: true,
-                    thumbnailUrl: await getDeveloperProfilePic(sock),
-                    sourceUrl: BOT_CHANNEL_URL
-                }
-            }
-        });
-    } catch (e) {
-        // بديلة نصية في حال لم تدعم بعض الإصدارات القوائم التفاعلية المباشرة
-        let fallbackText = `📋 قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة:\n\n`;
-        sectionsList.forEach(s => {
-            fallbackText += `> \`${s.rowId}\`. ${s.title}\n`;
-        });
-        fallbackText += `\n📌 اكتب رقم القسم (من 1 إلى 11) لعرض أوامره!\n\n📢 قناة المطور:\n${BOT_CHANNEL_URL}`;
-        await sock.sendMessage(from, { text: fallbackText });
-    }
+    let fallbackText = `📋 قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة:\n\n`;
+    sectionsList.forEach(s => {
+        fallbackText += `> \`${s.rowId}\`. ${s.title}\n`;
+    });
+    fallbackText += `\n📌 اكتب رقم القسم (من 1 إلى 11) لعرض أوامره!\n\n📢 قناة المطور:\n${BOT_CHANNEL_URL}`;
+    await sock.sendMessage(from, { text: fallbackText });
     return;
-}
-
-if (['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'].includes(cmdBase)) {
-    const secNum = cmdBase;
-    let secContent = '';
-    
-    if (secNum === '1') {
-        const settings = getGroupSetting(from);
-        secContent = `🛡️ *1. قسم الحماية (لهذه المجموعة):*\n\n` +
-            `🔗 حماية الروابط: [${settings.antiLink ? '🟢 مفعلة' : '🔴 معطلة'}]\n> تفعيل: \`.حظر_رابط\` | سماح: \`.سماح_رابط\`\n\n` +
-            `🤬 حماية الشتم: [${settings.antiBadWords ? '🟢 مفعلة' : '🔴 معطلة'}]\n> تفعيل: \`.حظر_شتم\` | سماح: \`.سماح_شتم\`\n\n` +
-            `📇 حماية جهات الاتصال: [${settings.antiContact ? '🟢 مفعلة' : '🔴 معطلة'}]\n> تفعيل: \`.حظر_جهات\` | سماح: \`.سماح_جهات\`\n\n` +
-            `⚙️ تصفير الإنذارات: \`.صفر @العضو\``;
-    } else if (secNum === '2') {
-        secContent = `🎉 *2. قسم الترفيه والألعاب والفعاليات الأسطورية:*\n\n` +
-            `> ❓ \`.خيروك\` ↞ لو خيروك بين أمرين\n` +
-            `> 📜 \`.حكمة\` ↞ حكم وأقوال شخصيات الأنمي\n` +
-            `> 💍 \`.زواج\` ↞ إعلان عقد زواج عشوائي ومنشن\n` +
-            `> 🧩 \`.تفكيك\` ↞ فعالية تفكيك كلمات الأنمي (+10 نقاط)\n` +
-            `> ✍️ \`.كتابه\` ↞ فعالية سرعة الكتابة بدقة (+10 نقاط)\n` +
-            `> 💬 \`.صراحة\` ↞ أسئلة صراحة وجريئة للأعضاء\n` +
-            `> 🔤 \`.رتب\` ↞ ترتيب الحروف المبعثرة\n` +
-            `> 🎯 \`.خمن\` ↞ تخمين الأرقام الصحيحة\n` +
-            `> 🔠 \`.حرف\` ↞ تحدي كتابة شخصيات بحرف معين\n` +
-            `> 🚪 \`.انسحب\` ↞ إلغاء الفعالية الحالية`;
-    } else if (secNum === '3') {
-        secContent = `💳 *3. قسم البنك والنقاط:*\n\n` +
-            `> 💳 \`.بنك\` أو \`.حسابي\` ↞ كشف رصيدك البنكي ونقاطك\n` +
-            `> 💸 \`.تحويل <المبلغ> @منشن\` ↞ تحويل نقاط لعضو آخر\n` +
-            `> 🏆 \`.توب_نقاط\` ↞ عرض قائمة أغنى الأعضاء بالنقاط\n` +
-            `> 🎁 \`.مكافأة\` أو \`.هدية\` ↞ استلام الهدية اليومية (+20 نقطة)`;
-    } else if (secNum === '4') {
-        secContent = `🕌 *4. قسم إسلامي:*\n\n` +
-            `> 📖 \`.قران\` ↞ جلب 5 آيات من القرآن الكريم\n` +
-            `> 🤲 \`.دعاء\` ↞ أدعية مباركة عشوائية\n` +
-            `> 📿 \`.ذكر\` ↞ أذكار مباركة عشوائية\n` +
-            `> ☪️ \`.حديث\` ↞ أحاديث نبوية شريفة\n` +
-            `> ☀️ \`.اذكار_الصباح\` ↞ أذكار الصباح كاملة\n` +
-            `> 🌙 \`.اذكار_المساء\` ↞ أذكار المساء كاملة\n` +
-            `> 🥀 \`.اذكار_الاستيقاظ\` ↞ أذكار الاستيقاظ من النوم\n` +
-            `> 🕌 \`.اذكار_الصلاة\` ↞ أذكار بعد الصلاة\n` +
-            `> 🏛️ \`.اذكار_المسجد\` ↞ أذكار دخول وخروج المسجد`;
-    } else if (secNum === '5') {
-        secContent = `😂 *5. قسم الضحك:*\n\n` +
-            `> 🤣 \`.نكتة\` ↞ نكتة مضحكة وتغيير جو\n` +
-            `> 🤔 \`.ماذا_لو\` ↞ مواقف وتساؤلات خيالية ممتعة\n` +
-            `> 🗣️ \`.قول\` ↞ حكمة اليوم المميزة`;
-    } else if (secNum === '6') {
-        secContent = `👥 *6. قسم المجموعات:*\n\n` +
-            `> 💍 \`.زواج\` ↞ زواج عشوائي لأعضاء الجروب\n` +
-            `> 🌹 \`.غزل @منشن\` ↞ إرسال بيت غزل للعضو\n` +
-            `> 💞 \`.ثنائي\` ↞ اختيار ثنائي أسطوري متطابق\n` +
-            `> 👑 \`.ملك_المجموعة\` ↞ اختيار ملك الجروب اليومي\n` +
-            `> 🧸 \`.كيوت_المجموعة\` ↞ اختيار العضو الأكثر لطافة\n` +
-            `> 📩 \`.رسائلي\` ↞ معرفة عدد رسائلك المرسلة اليوم\n` +
-            `> 📊 \`.توب_التفاعل\` ↞ عرض إحصائيات وترتيب تفاعل الأعضاء`;
-    } else if (secNum === '7') {
-        secContent = `♟️ *7. قسم المطور:*\n\n` +
-            `> 🔴 \`.ايقاف_البوت\` ↞ إيقاف البوت كلياً عن العمل\n` +
-            `> 🟢 \`.تفعيل_البوت\` ↞ إعادة تفعيل البوت\n` +
-            `> 💣 \`.بوم\` ↞ إخلاء المجموعة وطرد الأعضاء\n` +
-            `> 👑 \`.اضافة_مطور @منشن\` ↞ منح صلاحية مطور\n` +
-            `> ❌ \`.حذف_مطور @منشن\` ↞ سحب صلاحية مطور\n` +
-            `> 🌟 \`.اضف_نخبة @منشن\` ↞ إضافة عضو للنخبة\n` +
-            `> ❌ \`.ازل_نخبة @منشن\` ↞ سحب رتبة النخبة\n` +
-            `> 📜 \`.عرض_نخبة\` ↞ عرض قائمة النخبة\n` +
-            `> 📋 \`.قائمة_المطورين\` ↞ عرض المطورين\n` +
-            `> 📡 \`.سجل_البوت\` ↞ عرض آخر سجلات العمليات\n` +
-            `> 🧪 \`.اختبار\` ↞ فحص حالة الأوامر\n` +
-            `> 📢 \`.إذاعة <النص>\` ↞ إرسال بث عام لكل المجموعات\n` +
-            `> 🔄 \`.ريستارت\` ↞ إعادة تشغيل البوت`;
-    } else if (secNum === '8') {
-        secContent = `⚡ *8. قسم الإدارة:*\n\n` +
-            `> 🔒 \`.قفل\` أو \`.غلق\` ↞ إغلاق الشات للمشرفين فقط\n` +
-            `> 🔓 \`.فتح\` ↞ فتح الشات للجميع\n` +
-            `> 🗑️ \`.حذف\` ↞ حذف رسالة محددة بالرد عليها\n` +
-            `> 📢 \`.الكل\` أو \`.منشن\` ↞ منشن جماعي لكل أعضاء الجروب\n` +
-            `> 👑 \`.رفع @عضو\` ↞ ترقية العضو إلى مشرف\n` +
-            `> 📉 \`.تنزيل @عضو\` ↞ سحب الإشراف\n` +
-            `> 🚨 \`.طرد @عضو\` ↞ طرد العضو من المجموعة\n` +
-            `> ⚠️ \`.اضف_انذار @عضو\` ↞ تسجيل إنذار (طرد عند 3)\n` +
-            `> 📉 \`.ازل_انذار @عضو\` ↞ حذف إنذار عن العضو\n` +
-            `> 📊 \`.عدد_الانذارات @عضو\` ↞ كشف عدد الإنذارات\n` +
-            `> 📋 \`.قائمة_الانذارات\` ↞ عرض الأعضاء المخالفين\n` +
-            `> 🔇 \`.كتم <دقائق> @عضو\` ↞ إسكات عضو لمدة محددة\n` +
-            `> 🔊 \`.الغاء_كتم @عضو\` ↞ فك الكتم عن العضو\n` +
-            `> 🔗 \`.الرابط\` ↞ جلب رابط الدعوة الخاص بالمجموعة\n` +
-            `> 🟢/🔴 \`.تفعيل ترحيب\` / \`.توقيف ترحيب\` ↞ التحكم بالترحيب\n` +
-            `> 🟢/🔴 \`.تفعيل توديع\` / \`.توقيف توديع\` ↞ التحكم بالتوديع`;
-    } else if (secNum === '9') {
-        secContent = `🔎 *9. قسم الكشف:*\n\n` +
-            `> 🔓 \`.كشف\` ↞ قم بالرد على أي صورة أو فيديو مرسل بوضع (عرض لمرة واحدة) لاستخراجها وحفظها فوراً.`;
-    } else if (secNum === '10') {
-        secContent = `👑 *10. قسم الألقاب:*\n\n` +
-            `> ✍️ \`.اضافة_لقب @العضو اللقب\` ↞ تسجيل لقب مميز لعضو\n` +
-            `> ❌ \`.ازالة_لقب @العضو\` ↞ إزالة لقب العضو\n` +
-            `> 🔒 \`.حجز_لقب @العضو اللقب\` ↞ حجز لقب خاص\n` +
-            `> 🔓 \`.الغاء_حجز_لقب @العضو\` ↞ إلغاء حجز اللقب\n` +
-            `> 📋 \`.قائمة_الالقاب\` ↞ عرض الألقاب المسجلة\n` +
-            `> 🔒 \`.قائمة_الالقاب_المحجوزة\` ↞ عرض الألقاب المحجوزة`;
-    } else if (secNum === '11') {
-        secContent = `🎨 *11. قسم الملصقات:*\n\n` +
-            `> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة أو الفيديو إلى ملصق\n` +
-            `> 🖼️ \`.لصورة\` ↞ تحويل الملصق إلى صورة عادية\n` +
-            `> 🔗 \`.ملصق_رابط <الرابط>\` ↞ إنشاء ملصق من رابط مباشر\n` +
-            `> ✍️ \`.ملصق_نصي <النص>\` ↞ تصميم ملصق نصي أنيق\n` +
-            `> 🎞️ \`.ملصق_متحرك\` ↞ تحويل فيديو إلى ملصق متحرك\n` +
-            `> 🎥 \`.متحرك_لفيديو\` ↞ تحويل ملصق متحرك إلى فيديو\n` +
-            `> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات جاهزة للأنمي`;
-    }
-
-    secContent += `\n\n📌 *للرجوع لقائمة الأقسام الرئيسية، اكتب:* \`.الاوامر\`\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`;
-    return sock.sendMessage(from, { text: secContent }, { quoted: msg });
 }
 
 if (cmdBase === '1') {    
@@ -2083,7 +1946,7 @@ if (cmdBase === '6') {
 > 🌹 .غزل @منشن ↞ بيت غزل
 > 💞 .ثنائي ↞ ثنائي عشوائي
 > 👑 .ملك_المجموعة ↞ ملك الجروب
-> 🧸 .كيوت_المجموعة ↞ كيوت الجروب
+> 🧸 .كيوت_المجموعة 획 كيوت الجروب
 > 📩 .رسائلي ↞ عدد رسائلك
 > 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
     const userPp = await getUserProfilePic(sock, sender);
@@ -2185,7 +2048,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     getBankAccount(sender);
     userPoints[sender] += 20;
 
-    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${sender.split('@')[0]}\n💰 ⌯ المكافأة ↞ 20 نقطة\n✨ ⌯ الحالة ↞ تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text: rewardText, mentions: [sender] });
 }
 
