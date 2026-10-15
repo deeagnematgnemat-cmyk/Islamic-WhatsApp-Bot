@@ -192,7 +192,7 @@ let commandReactionEmoji = '⚡';
 let devReactionEnabled = true;
 let devReactionEmoji = '👑';
 
-// قائمة الأوامر المعتمدة (مع إضافة أوامر التنصيب الجديدة)
+// قائمة الأوامر المعتمدة الكاملة
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
@@ -321,6 +321,56 @@ function getTargetUser(msg) {
 const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
 const quoted = msg.message.extendedTextMessage?.contextInfo?.participant;
 return mentioned || quoted || null;
+}
+
+// دالة لبدء فعالية ترفيهية عشوائية تلقائياً عند الإجابة الصحيحة
+async function startRandomMiniGame(sock, from) {
+    const gameTypes = ['typing', 'disassemble', 'arrange', 'guess'];
+    const chosenType = gameTypes[Math.floor(Math.random() * gameTypes.length)];
+    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
+
+    if (chosenType === 'typing') {
+        const timer = setTimeout(async () => {
+            if (activeGames[from]) {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *الكلمة كانت:* \`${word}\`` });
+            }
+        }, 30000);
+        const promptText = `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية بدقة سرعة:\n\n👉 *${word}*`;
+        const sent = await sock.sendMessage(from, { text: promptText });
+        activeGames[from] = { type: 'typing', answer: word, timer: timer, msgId: sent.key.id };
+    } else if (chosenType === 'disassemble') {
+        const timer = setTimeout(async () => {
+            if (activeGames[from]) {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` });
+            }
+        }, 30000);
+        const promptText = `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية وإعادة كتابتها بحروف مفصولة بمسافات:\n\n👉 *${word}*`;
+        const sent = await sock.sendMessage(from, { text: promptText });
+        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, msgId: sent.key.id };
+    } else if (chosenType === 'arrange') {
+        const shuffled = shuffleString(word);
+        const timer = setTimeout(async () => {
+            if (activeGames[from]) {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية التلقائية!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` });
+            }
+        }, 30000);
+        const promptText = `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ الـتِّـلْـقَـائِـيَّـةُ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة لتكوين اسم أنمي أو شخصية صحيحة:\n\n👉 *[ ${shuffled} ]*`;
+        const sent = await sock.sendMessage(from, { text: promptText });
+        activeGames[from] = { type: 'arrange', answer: word, timer: timer, msgId: sent.key.id };
+    } else if (chosenType === 'guess') {
+        const randomNum = Math.floor(Math.random() * 50) + 1;
+        const timer = setTimeout(async () => {
+            if (activeGames[from]) {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` });
+            }
+        }, 30000);
+        const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين التلقائية:* خمن الرقم الصحيح من 1 إلى 50!` });
+        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, msgId: sent.key.id };
+    }
 }
 
 async function startBot() {
@@ -563,7 +613,7 @@ if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
     }    
 }    
 
-// معالجة الألعاب والفعاليات النشطة
+// معالجة الألعاب والفعاليات النشطة مع بدء فعالية أخرى تلقائياً عند الإجابة الصحيحة
 if (activeGames[from]) {    
     const game = activeGames[from];    
 
@@ -577,6 +627,7 @@ if (activeGames[from]) {
             userPoints[sender] += 10;    
             delete activeGames[from];    
             await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة وتفكيك أسطوري!* @${sender.split('@')[0]}\n💡 *تفكيك الكلمة:* \`${disassembleWord(game.answer)}\`\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });    
+            setTimeout(() => startRandomMiniGame(sock, from), 1500);
             return;
         }
     } else if (game.type === 'letter_characters') {
@@ -589,7 +640,9 @@ if (activeGames[from]) {
             getBankAccount(sender);    
             userPoints[sender] += 10;    
             delete activeGames[from];    
-            return sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\nأتيت بـ 3 شخصيات تبدأ بحرف (${game.requiredLetter})\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
+            await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\nأتيت بـ 3 شخصيات تبدأ بحرف (${game.requiredLetter})\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });
+            setTimeout(() => startRandomMiniGame(sock, from), 1500);
+            return;
         }
     } else {
         const cleanUserAns = trimmedBody.replace(/[أإآاىئؤة]/g, 'ا').replace(/\s+/g, '').toLowerCase();    
@@ -601,6 +654,7 @@ if (activeGames[from]) {
             userPoints[sender] += 10;    
             delete activeGames[from];    
             await sock.sendMessage(from, { text: `🎉 *إجابة صحيحة يا أسطورة!* @${sender.split('@')[0]}\n💡 *الجواب:* \`${game.answer}\`\n💰 *كسبت 10 نقاط!*`, mentions: [sender] });    
+            setTimeout(() => startRandomMiniGame(sock, from), 1500);
             return;    
         }    
     }
@@ -881,7 +935,7 @@ if (activeGames[from]) {
     }    
 }    
 
-// أوامر قسم التنصيب الجديدة
+// أوامر قسم التنصيب الجديدة مع طلب كود اقتران فعلي
 if (cmd === 'تنصيب') {
     const installationMenu = `╭━━━〔 ♟️ 〕━━━╮
 『 شَـرْحُ قِـسْـمِ الـتَّـنْـصِـيـب 』
@@ -911,9 +965,10 @@ if (cmd.startsWith('تنصيب_جديد') || cmd.startsWith('كود_التنصي
     const phoneNum = parts[1] || sender.replace(/[^0-9]/g, '');
 
     try {
-        await sock.sendMessage(from, { text: `⏳ *جاري توليد كود الاقتران للرقم (${phoneNum})...*` });
-        // محاكاة أو طلب كود الاقتران الحقيقي عبر بايليس
-        const pairingCode = Math.floor(100000 + Math.random() * 900000).toString().match(/.{1,3}/g).join('-');
+        await sock.sendMessage(from, { text: `⏳ *جاري طلب كود الاقتران الفعلي الحقيقي من سيرفر واتساب للرقم (${phoneNum})...*` });
+        
+        let pairingCode = await sock.requestPairingCode(phoneNum);
+        pairingCode = pairingCode?.match(/.{1,4}/g)?.join('-') || pairingCode;
         
         const codeMsg = `╭━━━〔 🔑 〕━━━╮
 『 كُـودُ اقْـتِـرَانِ التَّـنْـصِـيـب 』
@@ -933,10 +988,9 @@ if (cmd.startsWith('تنصيب_جديد') || cmd.startsWith('كود_التنصي
 
 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
 
-        // إرسال الكود فوراً برسالة خاصة أو في الجروب
         return sock.sendMessage(from, { text: codeMsg });
     } catch (e) {
-        return sock.sendMessage(from, { text: `❌ فشل توليد كود الاقتران، تأكد من صحة رقم الهاتف.` });
+        return sock.sendMessage(from, { text: `❌ فشل طلب كود الاقتران، تأكد من كتابة الرقم بشكل صحيح مع مفتاح الدولة (بدون + أو مسافات).` });
     }
 }
 
@@ -1141,7 +1195,7 @@ if (cmd === 'حديث') {
 }    
 
 if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {    
-    return sock.sendMessage(from, { text: `*╎أذكـار 🌙私🕎*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...` });    
+    return sock.sendMessage(from, { text: `*╎أذكـار 🌙私╎*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...` });    
 }    
 
 if (cmd === 'اذكار_المساء' || cmd === 'أذكار_المساء') {    
@@ -1581,8 +1635,8 @@ try {
         mentions: [sender],
         contextInfo: {
             externalAdReply: {
-                title: "📌 القناة الرسمية للبوت والأوامر",
-                body: "انقر هنا لمتابعة القناة والأوامر الرسمية",
+                title: "📌 عرض القناة والأوامر الرسمية",
+                body: "انقر هنا لمتابعة القناة الرسمية",
                 mediaType: 1,
                 renderLargerThumbnail: false,
                 thumbnailUrl: botPp,
@@ -1620,8 +1674,8 @@ try {
         mentions: [sender],
         contextInfo: {
             externalAdReply: {
-                title: "📌 القناة الرسمية للبوت والأوامر",
-                body: "انقر هنا لمتابعة القناة والأوامر الرسمية",
+                title: "📌 عرض القناة والأوامر الرسمية",
+                body: "انقر هنا لمتابعة القناة الرسمية",
                 mediaType: 1,
                 renderLargerThumbnail: false,
                 thumbnailUrl: devPp,
@@ -1795,7 +1849,9 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقاب') {
 }
 
 if (cmdBase === '11' || cmd === 'التنصيب') {
-    const installMenuText = `♟️ *قِـسْـمُ الـتَّـنْـصِـيـب:*
+    const installMenuText = `╭━━━〔 ♟️ 〕━━━╮
+『 قِـسْـمُ الـتَّـنْـصِـيـب 』
+╰━━━〔 ⚜️ 〕━━━╯
 
 > 📱 \`.تنصيب\` ↞ شرح قسم التنصيب
 > 📱 \`.تنصيب_جديد <الرقم>\` ↞ ربط حساب جديد
@@ -1803,7 +1859,11 @@ if (cmdBase === '11' || cmd === 'التنصيب') {
 > 📊 \`.حالة_التنصيب\` ↞ التحقق من الحالة
 > 🛑 \`.إيقاف_التنصيب\` ↞ إيقاف النسخة
 > 🗑️ \`.حذف_الجلسة\` ↞ حذف جلسة
-> 📂 \`.نسخي\` ↞ عرض النسخ`;
+> 📂 \`.نسخي\` ↞ عرض النسخ
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     const userPp = await getUserProfilePic(sock, sender);
     try { await sock.sendMessage(from, { image: { url: userPp }, caption: installMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: installMenuText }); }
     return;
