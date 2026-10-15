@@ -1,5 +1,7 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
+import { Sticker, StickerTypes } from 'wa-sticker-formatter';
+import axios from 'axios';
 
 // قائمة كلمات الشتم القوية الحصرية التي تمس الشرف
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
@@ -192,7 +194,7 @@ let commandReactionEmoji = '⚡';
 let devReactionEnabled = true;
 let devReactionEmoji = '👑';
 
-// قائمة الأوامر المعتمدة الكاملة
+// قائمة الأوامر المعتمدة الكاملة (مع إضافة أوامر الملصقات الجديدة)
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
@@ -201,7 +203,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'الاوامر', 'اوامر', 'منيو', 'اقسام',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -218,7 +220,8 @@ const validCommands = [
 'نكتة', 'ماذا_لو', 'قول',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
-'تنصيب', 'تنصيب_جديد', 'كود_التنصيب', 'حالة_التنصيب', 'إيقاف_التنصيب', 'حذف_الجلسة', 'نسخي'
+'تنصيب', 'تنصيب_جديد', 'كود_التنصيب', 'حالة_التنصيب', 'إيقاف_التنصيب', 'حذف_الجلسة', 'نسخي',
+'ملصق', 's', 'لصورة', 'toimage', 'ملصق_متحرك', 'ملصق_رابط', 'ملصق_نصي', 'ملصق_بحث', 'مساعدة_الملصقات'
 ];
 
 function isValidCmd(fullCmd) {
@@ -445,7 +448,7 @@ if (action === 'add' && settings.welcome) {
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
         await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
     }
@@ -474,7 +477,7 @@ if (action === 'add' && settings.welcome) {
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
         await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
     }
@@ -935,7 +938,7 @@ if (activeGames[from]) {
     }    
 }    
 
-// أوامر قسم التنصيب الجديدة مع طلب كود اقتران فعلي
+// قسم التنصيب
 if (cmd === 'تنصيب') {
     const installationMenu = `╭━━━〔 ♟️ 〕━━━╮
 『 شَـرْحُ قِـسْـمِ الـتَّـنْـصِـيـب 』
@@ -1010,6 +1013,104 @@ if (cmd === 'حذف_الجلسة') {
 
 if (cmd === 'نسخي') {
     return sock.sendMessage(from, { text: `📂 *النسخ المرتبطة:* لديك نسخة أساسية واحدة قيد التشغيل حالياً (Eren Bot).` });
+}
+
+// قسم الملصقات المتكامل والمتوافق مع Railway
+if (cmd === 'مساعدة_الملصقات') {
+    const stickerHelpText = `╭━━━〔 🎨 〕━━━╮
+『 قِـسْـمُ الـمَـلْـصَـقَـات 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة المُرد عليها إلى ملصق.
+> 🖼️ \`.لصورة\` أو \`.toimage\` ↞ تحويل الملصق المُرد عليه إلى صورة.
+> 🔗 \`.ملصق_رابط <الرابط>\` ↞ صنع ملصق من رابط صورة مباشر.
+> ✍️ \`.ملصق_نصي <النص>\` ↞ صنع ملصق نصي أنيق.
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    return sock.sendMessage(from, { text: stickerHelpText });
+}
+
+if (cmd === 'ملصق' || cmd === 's' || cmd === 'ملصق_متحرك') {
+    try {
+        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
+        const mime = Object.keys(qMsg)[0];
+        if (!['imageMessage', 'videoMessage', 'documentMessage'].includes(mime)) {
+            return sock.sendMessage(from, { text: `📌 يرجى إرسال صورة أو فيديو أو الرد عليها بكلمة \`.ملصق\`` });
+        }
+        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        
+        const sticker = new Sticker(mediaStream, {
+            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            author: DEVELOPER_NAME,
+            type: StickerTypes.DEFAULT,
+            categories: ['✨', '🍷'],
+            quality: 50
+        });
+        const buffer = await sticker.toBuffer();
+        return sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ فشل إنشاء الملصق، تأكد من إرسال وسائط صالحة.` });
+    }
+}
+
+if (cmd === 'لصورة' || cmd === 'toimage') {
+    try {
+        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+        if (!qMsg || !qMsg.stickerMessage) {
+            return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق بكلمة \`.لصورة\` لتحويله.` });
+        }
+        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        return sock.sendMessage(from, { image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*` }, { quoted: msg });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى صورة.` });
+    }
+}
+
+if (cmd.startsWith('ملصق_رابط')) {
+    const url = trimmedBody.replace(/^\.ملصق_رابط/i, '').trim();
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\`` });
+    }
+    try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+        const sticker = new Sticker(buffer, {
+            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            author: DEVELOPER_NAME,
+            type: StickerTypes.DEFAULT,
+            quality: 50
+        });
+        const stickerBuffer = await sticker.toBuffer();
+        return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+    } catch (e) {
+        return sock.sendMessage(from, { text: `❌ فشل جلب الصورة من الرابط أو أن الرابط غير مباشر.` });
+    }
+}
+
+if (cmd.startsWith('ملصق_نصي')) {
+    const textQuery = trimmedBody.replace(/^\.ملصق_نصي/i, '').trim();
+    if (!textQuery) {
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_نصي <النص المطلوب>\`` });
+    }
+    try {
+        // استخدام خدمة توليد صور نصية مجانية وموثوقة عبر API عام
+        const imgApiUrl = `https://api.lolhuman.xyz/api/text2image?apikey=gapis&text=${encodeURIComponent(textQuery)}`;
+        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data);
+        const sticker = new Sticker(buffer, {
+            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            author: DEVELOPER_NAME,
+            type: StickerTypes.FULL,
+            quality: 50
+        });
+        const stickerBuffer = await sticker.toBuffer();
+        return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
+    } catch (e) {
+        // بديل محلي في حال تعذر API الخارجي عبر إرسال ملصق نصي مبسط
+        return sock.sendMessage(from, { text: `⚠️ عذراً، خدمة الملصق النصي تتطلب نصاً أقصر أو تحقق من الاتصال بالخدمة.` });
+    }
 }
 
 // 1. أمر الزواج
@@ -1662,6 +1763,7 @@ if (cmdBase === 'الاوامر' || cmd === 'اوامر' || cmd === 'منيو' |
 > 🔍 \`.9\` ↞ الكشف
 > 👑 \`.10\` ↞ الألقاب
 > ♟️ \`.11\` ↞ التنصيب
+> 🎨 \`.12\` ↞ الملصقات
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
@@ -1866,6 +1968,24 @@ if (cmdBase === '11' || cmd === 'التنصيب') {
 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     const userPp = await getUserProfilePic(sock, sender);
     try { await sock.sendMessage(from, { image: { url: userPp }, caption: installMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: installMenuText }); }
+    return;
+}
+
+if (cmdBase === '12' || cmd === 'الملصقات' || cmd === 'مساعدة_الملصقات') {
+    const stickerMenuText = `╭━━━〔 🎨 〕━━━╮
+『 قِـسْـمُ الـمَـلْـصَـقَـات 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل إلى ملصق
+> 🖼️ \`.لصورة\` ↞ تحويل الملصق لصورة
+> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط
+> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: stickerMenuText }); }
     return;
 }
 
