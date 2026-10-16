@@ -455,28 +455,6 @@ const sender = isFromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.what
 
 const cleanSenderNum = sender.replace(/[^0-9]/g, '');    
 
-const buttonResponseId = msg.message.buttonsResponseMessage?.selectedButtonId || msg.message.templateButtonReplyMessage?.selectedId || msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
-if (buttonResponseId) {
-    if (buttonResponseId === 'menu_sections' || buttonResponseId.includes('الأقسام')) {
-        const settings = getGroupSetting(from);
-        const userPp = await getUserProfilePic(sock, sender);
-        const text1 = `🛡️ *الحماية (لهذه المجموعة):*
-
-🔗 1. حماية الروابط: [${settings.antiLink ? '🟢 مفعلة' : '🔴 معطلة'}]
-> تفعيل: .حظر_رابط | سماح: .سماح_رابط
-
-🤬 2. حماية الشتم: [${settings.antiBadWords ? '🟢 مفعلة' : '🔴 معطلة'}]
-> تفعيل: .حظر_شتم | سماح: .سماح_شتم
-
-📇 3. حماية جهات الاتصال: [${settings.antiContact ? '🟢 مفعلة' : '🔴 معطلة'}]
-> تفعيل: .حظر_جهات | سماح: .سماح_جهات
-
-⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
-        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) {}
-        return;
-    }
-}
-
 if (isGroup) {    
     const todayKey = getJordanDateKey();    
     if (!userMessagesCount[from]) userMessagesCount[from] = {};    
@@ -1778,14 +1756,14 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
         }    
 
-        const finalReport = `╭━━〔 📡 𝑹𝑬𝑷𝑶𝑹𝑻 〕━━⬣
+        finalReport = `╭━━〔 📡 𝑹𝑬𝑷𝑶𝑹𝑻 〕━━⬣
 
 │ 📊 تَقْرِيرُ الإِذَاعَةِ الشَّامِلَةِ:
 │ تم إرسال البث بنجاح تامة!
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1835,38 +1813,25 @@ try {
     await sock.sendMessage(from, { 
         image: { url: botPp }, 
         caption: botWelcomeText, 
-        mentions: [sender],
-        footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-        buttons: [
-            { buttonId: 'menu_sections', buttonText: { displayText: '📂 الأقسام' }, type: 1 },
-            { buttonId: 'dev_channel', buttonText: { displayText: '📢 قناة المطور' }, type: 1 }
-        ],
-        headerType: 4
+        mentions: [sender]
     }); 
-} catch (errButtons) {
-    try {
-        await sock.sendMessage(from, { 
-            image: { url: botPp }, 
-            caption: botWelcomeText, 
-            mentions: [sender]
-        }); 
-        
-        await sock.sendMessage(from, {
-            text: `📢 *قناة المطور الرسمية:*`,
-            contextInfo: {
-                externalAdReply: {
-                    title: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』",
-                    body: "انقر للانضمام إلى قناة المطور الرسمية مباشرة",
-                    mediaType: 1,
-                    renderLargerThumbnail: true,
-                    thumbnailUrl: await getDeveloperProfilePic(sock),
-                    sourceUrl: BOT_CHANNEL_URL
-                }
+    
+    // إرسال زر الأقسام وقناة المطور كمعاينة رابط تفاعلي تظهر بشكل أزرار ممتازة ومتوافقة تماماً مع Baileys
+    await sock.sendMessage(from, {
+        text: `📂 *الأقسام الرئيسية و📢 قناة المطور الرسمية:*`,
+        contextInfo: {
+            externalAdReply: {
+                title: "『✦』 📂 𝐸𝓇𝑒𝓃 𝑩𝑶𝑻 - 🔓 اضغط هنا لفتح الأقسام",
+                body: "انقر هنا أو اكتب الأرقام من 1 إلى 11 للوصول المباشر للأقسام",
+                mediaType: 1,
+                renderLargerThumbnail: true,
+                thumbnailUrl: botPp,
+                sourceUrl: BOT_CHANNEL_URL
             }
-        });
-    } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText }); 
-    }
+        }
+    });
+} catch (e) { 
+    await sock.sendMessage(from, { text: botWelcomeText }); 
 }
 return;
 }
@@ -2057,7 +2022,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     getBankAccount(sender);
     userPoints[sender] += 20;
 
-    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text: rewardText, mentions: [sender] });
 }
 
