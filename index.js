@@ -1982,7 +1982,7 @@ if (cmdBase === '9' || cmd === 'الكاشف') {
     return;    
 }    
 
-if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقاب') {
+if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
     const titleMenuText = `👑 *قسم الألقاب:*
 
 > ✍️ \`.اضافة_لقب @العضو اللقب\`
@@ -2031,7 +2031,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 
 startBot();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Eren Bot is running successfully!\n');
