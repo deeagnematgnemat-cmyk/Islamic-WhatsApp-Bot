@@ -406,7 +406,11 @@ if (action === 'add' && settings.welcome) {
 
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
-        await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
+        try {
+            await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
+        } catch (err) {
+            await sock.sendMessage(id, { text: welcomeMsg, mentions: [user] });
+        }
     }
 } else if (action === 'remove' && settings.goodbye) {
     for (let user of participants) {
@@ -435,7 +439,11 @@ if (action === 'add' && settings.welcome) {
 
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
-        await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
+        try {
+            await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
+        } catch (err) {
+            await sock.sendMessage(id, { text: goodbyeMsg, mentions: [user] });
+        }
     }
 }
 } catch (e) {}
@@ -1810,11 +1818,15 @@ if (cmdBase === 'بوت') {
 
 const botPp = await getBotProfilePic(sock);
 try { 
-    await sock.sendMessage(from, { 
-        image: { url: botPp }, 
-        caption: botWelcomeText, 
-        mentions: [sender]
-    }); 
+    try {
+        await sock.sendMessage(from, { 
+            image: { url: botPp }, 
+            caption: botWelcomeText, 
+            mentions: [sender]
+        }); 
+    } catch (err) {
+        await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender] });
+    }
     
     await sock.sendMessage(from, {
         text: `📂 *الأقسام الرئيسية و📢 قناة المطور الرسمية:*`,
@@ -1850,7 +1862,15 @@ if (cmdBase === '1') {
 > تفعيل: .حظر_جهات | سماح: .سماح_جهات
 
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: text1 }); }
+try { 
+    try {
+        await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+    } catch (err) {
+        await sock.sendMessage(from, { text: text1, mentions: [sender] });
+    }
+} catch (e) { 
+    await sock.sendMessage(from, { text: text1 }); 
+}
 return;
 }
 
@@ -1868,7 +1888,15 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 > 🔠 .حرف ↞ كلمات بالحرف
 > 🚪 .انسحب ↞ إلغاء الفعالية`;
 const userPp = await getUserProfilePic(sock, sender);
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: entAndGamesText }); }
+try { 
+    try {
+        await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); 
+    } catch (err) {
+        await sock.sendMessage(from, { text: entAndGamesText, mentions: [sender] });
+    }
+} catch (e) { 
+    await sock.sendMessage(from, { text: entAndGamesText }); 
+}
 return;
 }
 
@@ -1880,7 +1908,15 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 🏆 .توب_نقاط ↞ ترتيب النقاط
 > 🎁 .مكافأة ↞ الهدية اليومية (+20 نقطة)`;
 const userPp = await getUserProfilePic(sock, sender);
-try { await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: bankMenuText }); }
+try { 
+    try {
+        await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); 
+    } catch (err) {
+        await sock.sendMessage(from, { text: bankMenuText, mentions: [sender] });
+    }
+} catch (e) { 
+    await sock.sendMessage(from, { text: bankMenuText }); 
+}
 return;
 }
 
@@ -1897,7 +1933,15 @@ if (cmdBase === '4') {
 > 🕌 .اذكار_الصلاة ↞ أذكار بعد الصلاة المفروضة
 > 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد`;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: islamText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: islamText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: islamText }); 
+    }
     return;
 }
 
@@ -1908,7 +1952,15 @@ if (cmdBase === '5') {
 > 🤔 .ماذا_لو ↞ تساؤلات خيالية
 > 🗣️ .قول ↞ حكمة اليوم`;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: funText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: funText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: funText }); 
+    }
     return;
 }
 
@@ -1923,7 +1975,15 @@ if (cmdBase === '6') {
 > 📩 .رسائلي ↞ عدد رسائلك
 > 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: groupExtText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: groupExtText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: groupExtText }); 
+    }
     return;
 }
 
@@ -1947,7 +2007,15 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 📢 .إذاعة <النص> ↞ إذاعة عامة
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     const devPp = await getDeveloperProfilePic(sock);
-    try { await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: devMenuText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: devMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: devMenuText }); 
+    }
     return;
 }
 
@@ -1971,14 +2039,30 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: adminMenuText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: adminMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: adminMenuText }); 
+    }
     return;
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
     const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
     const userPp = await getUserProfilePic(sock, sender);    
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: detectorMenuText }); }    
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: detectorMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: detectorMenuText }); 
+    }    
     return;    
 }    
 
@@ -1992,21 +2076,45 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
 > 📋 \`.قائمة_الالقاب\`
 > 🔒 \`.قائمة_الالقاب_المحجوزة\``;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: titleMenuText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: titleMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: titleMenuText }); 
+    }
     return;
 }
 
 if (cmdBase === '11' || cmd === 'الملصقات' || cmd === 'مساعدة_الملصقات') {
     const stickerMenuText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل إلى ملصق\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق لصورة\n> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط\n> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي\n> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك\n> 🎬 \`.فيديو_لملصق\` ↞ فيديو إلى ملصق متحرك\n> 🎥 \`.متحرك_لفيديو\` ↞ ملصق متحرك إلى فيديو\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     const userPp = await getUserProfilePic(sock, sender);
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: stickerMenuText }); }
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: stickerMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: stickerMenuText }); 
+    }
     return;
 }
 
 if (cmdBase === 'بنك' || cmd === 'حسابي') {    
     const userPp = await getUserProfilePic(sock, sender);    
     const accText = `💳 *كَـشْـفُ الحِـسَـابِ:* \n> رصيدك: *${userPoints[sender]} نقطة*`;    
-    try { await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: accText, mentions: [sender] }); }    
+    try { 
+        try {
+            await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender] }); 
+        } catch (err) {
+            await sock.sendMessage(from, { text: accText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sock.sendMessage(from, { text: accText, mentions: [sender] }); 
+    }    
     return;    
 }    
 
