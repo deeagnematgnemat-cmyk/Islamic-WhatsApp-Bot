@@ -1756,7 +1756,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
         }    
 
-        finalReport = `╭━━〔 📡 𝑹𝑬𝑷𝑶𝑹𝑻 〕━━⬣
+        const finalReport = `╭━━〔 📡 𝑹𝑬𝑷𝑶𝑹𝑻 〕━━⬣
 
 │ 📊 تَقْرِيرُ الإِذَاعَةِ الشَّامِلَةِ:
 │ تم إرسال البث بنجاح تامة!
@@ -1816,7 +1816,6 @@ try {
         mentions: [sender]
     }); 
     
-    // إرسال زر الأقسام وقناة المطور كمعاينة رابط تفاعلي تظهر بشكل أزرار ممتازة ومتوافقة تماماً مع Baileys
     await sock.sendMessage(from, {
         text: `📂 *الأقسام الرئيسية و📢 قناة المطور الرسمية:*`,
         contextInfo: {
