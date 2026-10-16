@@ -455,6 +455,30 @@ const sender = isFromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.what
 
 const cleanSenderNum = sender.replace(/[^0-9]/g, '');    
 
+// معالجة الضغط على الأزرار التفاعلية إن وجدت
+const buttonResponseId = msg.message.buttonsResponseMessage?.selectedButtonId || msg.message.templateButtonReplyMessage?.selectedId || msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
+if (buttonResponseId) {
+    if (buttonResponseId === 'menu_sections' || buttonResponseId.includes('الأقسام')) {
+        // تنفيذ عرض الأقسام تماماً مثل الرقم 1
+        const settings = getGroupSetting(from);
+        const userPp = await getUserProfilePic(sock, sender);
+        const text1 = `🛡️ *الحماية (لهذه المجموعة):*
+
+🔗 1. حماية الروابط: [${settings.antiLink ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_رابط | سماح: .سماح_رابط
+
+🤬 2. حماية الشتم: [${settings.antiBadWords ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_شتم | سماح: .سماح_شتم
+
+📇 3. حماية جهات الاتصال: [${settings.antiContact ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_جهات | سماح: .سماح_جهات
+
+⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender] }); } catch (e) {}
+        return;
+    }
+}
+
 if (isGroup) {    
     const todayKey = getJordanDateKey();    
     if (!userMessagesCount[from]) userMessagesCount[from] = {};    
@@ -1751,7 +1775,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
 │ ✅ الحالة: تم استلام البث بنجاح
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
         }    
@@ -1763,7 +1787,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1810,27 +1834,43 @@ if (cmdBase === 'بوت') {
 
 const botPp = await getBotProfilePic(sock);
 try { 
+    // إرسال الرسالة مع الأزرار التفاعلية والاعلان الخارجي لقناة المطور
     await sock.sendMessage(from, { 
         image: { url: botPp }, 
         caption: botWelcomeText, 
-        mentions: [sender]
+        mentions: [sender],
+        footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+        buttons: [
+            { buttonId: 'menu_sections', buttonText: { displayText: '📂 الأقسام' }, type: 1 },
+            { buttonId: 'dev_channel', buttonText: { displayText: '📢 قناة المطور' }, type: 1 }
+        ],
+        headerType: 4
     }); 
-    
-    await sock.sendMessage(from, {
-        text: `📢 *قناة المطور الرسمية:*`,
-        contextInfo: {
-            externalAdReply: {
-                title: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』",
-                body: "انقر للانضمام إلى قناة المطور الرسمية مباشرة",
-                mediaType: 1,
-                renderLargerThumbnail: true,
-                thumbnailUrl: await getDeveloperProfilePic(sock),
-                sourceUrl: BOT_CHANNEL_URL
+} catch (errButtons) {
+    console.error('⚠️ خطأ في إرسال الأزرار المباشرة، جاري الإرسال بالطريقة البديلة:', errButtons);
+    try {
+        await sock.sendMessage(from, { 
+            image: { url: botPp }, 
+            caption: botWelcomeText, 
+            mentions: [sender]
+        }); 
+        
+        await sock.sendMessage(from, {
+            text: `📢 *قناة المطور الرسمية:*`,
+            contextInfo: {
+                externalAdReply: {
+                    title: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』",
+                    body: "انقر للانضمام إلى قناة المطور الرسمية مباشرة",
+                    mediaType: 1,
+                    renderLargerThumbnail: true,
+                    thumbnailUrl: await getDeveloperProfilePic(sock),
+                    sourceUrl: BOT_CHANNEL_URL
+                }
             }
-        }
-    });
-} catch (e) { 
-    await sock.sendMessage(from, { text: botWelcomeText }); 
+        });
+    } catch (e) { 
+        await sock.sendMessage(from, { text: botWelcomeText }); 
+    }
 }
 return;
 }
@@ -2036,5 +2076,5 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Eren Bot is running successfully!\n');
 }).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server is running on port ${PORT}`);
+    console.log(`🌐 HTTP Server is running on port `${PORT}`);
 });
