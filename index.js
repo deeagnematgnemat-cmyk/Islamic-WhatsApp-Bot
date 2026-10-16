@@ -361,12 +361,14 @@ console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e);
 }
-}, 8000);
+}, 5000);
 }
 
 sock.ev.on('connection.update', (u) => {
 if (u.connection === 'close') {
-if (u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
+if (u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+    setTimeout(startBot, 3000);
+}
 } else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
 });
 
