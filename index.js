@@ -455,11 +455,9 @@ const sender = isFromMe ? (sock.user?.id ? sock.user.id.split(':')[0] + '@s.what
 
 const cleanSenderNum = sender.replace(/[^0-9]/g, '');    
 
-// معالجة الضغط على الأزرار التفاعلية إن وجدت
 const buttonResponseId = msg.message.buttonsResponseMessage?.selectedButtonId || msg.message.templateButtonReplyMessage?.selectedId || msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
 if (buttonResponseId) {
     if (buttonResponseId === 'menu_sections' || buttonResponseId.includes('الأقسام')) {
-        // تنفيذ عرض الأقسام تماماً مثل الرقم 1
         const settings = getGroupSetting(from);
         const userPp = await getUserProfilePic(sock, sender);
         const text1 = `🛡️ *الحماية (لهذه المجموعة):*
@@ -1787,7 +1785,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1834,7 +1832,6 @@ if (cmdBase === 'بوت') {
 
 const botPp = await getBotProfilePic(sock);
 try { 
-    // إرسال الرسالة مع الأزرار التفاعلية والاعلان الخارجي لقناة المطور
     await sock.sendMessage(from, { 
         image: { url: botPp }, 
         caption: botWelcomeText, 
@@ -1847,7 +1844,6 @@ try {
         headerType: 4
     }); 
 } catch (errButtons) {
-    console.error('⚠️ خطأ في إرسال الأزرار المباشرة، جاري الإرسال بالطريقة البديلة:', errButtons);
     try {
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
@@ -2016,7 +2012,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`.كشف\` لفكها فوراً.`;    
+    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
     const userPp = await getUserProfilePic(sock, sender);    
     try { await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); } catch (e) { await sock.sendMessage(from, { text: detectorMenuText }); }    
     return;    
@@ -2076,5 +2072,5 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Eren Bot is running successfully!\n');
 }).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server is running on port `${PORT}`);
+    console.log(`🌐 HTTP Server is running on port ${PORT}`);
 });
