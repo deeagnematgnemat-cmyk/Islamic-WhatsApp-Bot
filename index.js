@@ -144,8 +144,8 @@ const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 
-// تم تحديث روابط الصور برابط مباشر ومستقر تماماً
-const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/6P3L4KY/eren-commands-img.jpg'; // رابط مباشر للصورة التي أرسلتها
+// رابط الصورة الجديد المباشر الذي طلبته لأمر .بوت
+const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/cX1wjpLn/1001256689-1.png';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -159,15 +159,25 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
+// دالة إضافية لجعل الرسائل تظهر كأنها معاد توجيهها وتحمل بطاقة القناة في الأسفل مع زر عرض القناة
 function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
-        externalAdReply: {
-            title: "قناة المطور الرسمية 📌",
-            body: "انقر هنا لمتابعة القناة والانضمام إلينا",
-            mediaType: 1,
-            thumbnailUrl: customThumbnailUrl,
-            sourceUrl: BOT_CHANNEL_URL,
-            renderLargerThumbnail: true
+        contextInfo: {
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363321456123489@newsletter',
+                newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
+                serverMessageId: 100
+            },
+            externalAdReply: {
+                title: "قناة المطور الرسمية 📌",
+                body: "انقر هنا لمتابعة القناة والانضمام إلينا",
+                mediaType: 1,
+                thumbnailUrl: customThumbnailUrl,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: true
+            }
         }
     };
 }
