@@ -142,6 +142,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 const BOT_PROFILE_IMAGE_URL = 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
 
 let extraDevelopers = []; 
@@ -156,15 +157,17 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// دالة مساعدة لإنشاء خيارات الرسائل المعاد توجيهها (Forwarded Message)
-function createForwardedOptions(extra = {}) {
+// دالة لإنشاء خيارات الرسائل مع إضافة بطاقة القناة في الأسفل (externalAdReply) كأنها معاد توجيهها من القناة
+function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
-        contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            ...extra.contextInfo
-        },
-        ...extra
+        externalAdReply: {
+            title: "قناة المطور الرسمية 📌",
+            body: "انقر هنا لمتابعة القناة والانضمام إلينا",
+            mediaType: 1,
+            thumbnailUrl: customThumbnailUrl,
+            sourceUrl: BOT_CHANNEL_URL,
+            renderLargerThumbnail: true
+        }
     };
 }
 
@@ -445,9 +448,9 @@ if (action === 'add' && settings.welcome) {
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
         try {
-            await sock.sendMessage(id, createForwardedOptions({ image: { url: userPp }, caption: welcomeMsg, mentions: [user] }));
+            await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user], ...getChannelAdOptions(sock, userPp) });
         } catch (err) {
-            await sock.sendMessage(id, createForwardedOptions({ text: welcomeMsg, mentions: [user] }));
+            await sock.sendMessage(id, { text: welcomeMsg, mentions: [user], ...getChannelAdOptions(sock) });
         }
     }
 } else if (action === 'remove' && settings.goodbye) {
@@ -478,9 +481,9 @@ if (action === 'add' && settings.welcome) {
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
         try {
-            await sock.sendMessage(id, createForwardedOptions({ image: { url: userPp }, caption: goodbyeMsg, mentions: [user] }));
+            await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user], ...getChannelAdOptions(sock, userPp) });
         } catch (err) {
-            await sock.sendMessage(id, createForwardedOptions({ text: goodbyeMsg, mentions: [user] }));
+            await sock.sendMessage(id, { text: goodbyeMsg, mentions: [user], ...getChannelAdOptions(sock) });
         }
     }
 }
@@ -595,13 +598,13 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
             const activeWarnings = addWarningToUser(sender);
 
             if (activeWarnings >= 3) {    
-                await sock.sendMessage(from, createForwardedOptions({ text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] }));    
+                await sock.sendMessage(from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender], ...getChannelAdOptions(sock) });    
                 await sock.groupParticipantsUpdate(from, [sender], 'remove');    
                 delete userWarnings[sender];    
             } else {    
                 let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
                 if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
-                await sock.sendMessage(from, createForwardedOptions({ text: alertMsg, mentions: [sender] }));    
+                await sock.sendMessage(from, { text: alertMsg, mentions: [sender], ...getChannelAdOptions(sock) });    
             }    
             return;    
         } catch (e) {}    
@@ -612,9 +615,9 @@ if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
     if (activeGames[from]) {    
         clearTimeout(activeGames[from].timer);    
         delete activeGames[from];    
-        return sock.sendMessage(from, createForwardedOptions({ text: `🚪 *تم إلغاء الفعالية بنجاح!*`, mentions: [sender] }));    
+        return sock.sendMessage(from, { text: `🚪 *تم إلغاء الفعالية بنجاح!*`, mentions: [sender], ...getChannelAdOptions(sock) });    
     } else {    
-        return sock.sendMessage(from, createForwardedOptions({ text: `📌 لا توجد فعالية قيد التشغيل حالياً لإلغائها.` }));    
+        return sock.sendMessage(from, { text: `📌 لا توجد فعالية قيد التشغيل حالياً لإلغائها.`, ...getChannelAdOptions(sock) });    
     }    
 }    
 
@@ -659,10 +662,11 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         const gameTypeToRestart = game.type;
         delete activeGames[from];
 
-        await sock.sendMessage(from, createForwardedOptions({ 
+        await sock.sendMessage(from, { 
             text: `✅ إجابة صحيحة!\n🏆 اللاعب: @${sender.split('@')[0]}\n💰 النقاط المكتسبة: +10 نقاط`, 
-            mentions: [sender] 
-        }));
+            mentions: [sender],
+            ...getChannelAdOptions(sock)
+        });
 
         setTimeout(() => {
             if (!activeGames[from]) {
@@ -691,32 +695,32 @@ if (commandReactionEnabled) {
 logBotAction(`استخدام أمر (${cmd}) من قبل العضو ${cleanSenderNum}`);    
 
 if (!isGroup) {    
-    return sock.sendMessage(from, createForwardedOptions({ text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` }));    
+    return sock.sendMessage(from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!`, ...getChannelAdOptions(sock) });    
 }    
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
 if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
-        return sock.sendMessage(from, createForwardedOptions({ text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' }));    
+        return sock.sendMessage(from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!', ...getChannelAdOptions(sock) });    
     }    
 }    
 
 if (cmdBase === 'قفل' || cmd === 'غلق') {    
     await sock.groupSettingUpdate(from, 'announcement');    
     const text = `╭━━━〔 🔒 〕━━━╮\n『 إِغْـلَاقُ الـمَـجْـمُـوعَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔒 ⌯ الإجراء ↞ إغلاق المجموعة\n🛡️ ⌯ الحالة ↞ تم إغلاق المجموعة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'فتح') {    
     await sock.groupSettingUpdate(from, 'not_announcement');    
     const text = `╭━━━〔 🔓 〕━━━╮\n『 فَـتْـحُ الـمَـجْـمُـوعَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔓 ⌯ الإجراء ↞ فتح المجموعة\n✨ ⌯ الحالة ↞ أصبحت المجموعة مفتوحة للجميع»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'حذف' || cmdBase === 'مسح') {    
     const q = msg.message.extendedTextMessage?.contextInfo;    
-    if (!q) return sock.sendMessage(from, createForwardedOptions({ text: '📌 رد على الرسالة المراد حذفها.' }));    
+    if (!q) return sock.sendMessage(from, { text: '📌 رد على الرسالة المراد حذفها.', ...getChannelAdOptions(sock) });    
     try { await sock.sendMessage(from, { delete: { remoteJid: from, id: q.stanzaId, participant: q.participant } }); } catch (e) {}    
     return;    
 }    
@@ -748,44 +752,44 @@ if (cmdBase === 'الكل' || cmdBase === 'منشن') {
             text += `> 👤 @${id.split('@')[0]}\n`;
             mentions.push(id);
         });
-        return sock.sendMessage(from, createForwardedOptions({ text, mentions }));    
+        return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });    
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: '❌ تعذر تنفيذ المنشن الجماعي.' }));
+        return sock.sendMessage(from, { text: '❌ تعذر تنفيذ المنشن الجماعي.', ...getChannelAdOptions(sock) });
     }
 }    
 
 if (cmdBase === 'رفع' || cmdBase === 'ترقية') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'promote');    
         const text = `╭━━━〔 👑 〕━━━╮\n『 تَـرْقِـيَـةٌ إِدَارِيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🏆 ⌯ الرتبة الجديدة ↞ مشرف\n✨ ⌯ الحالة ↞ تمت الترقية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-        return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل رفع العضو، تأكد أن البوت مشرف ولديه الصلاحيات.' })); }    
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: '❌ فشل رفع العضو، تأكد أن البوت مشرف ولديه الصلاحيات.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل @عضو`', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'demote');    
         const text = `╭━━━〔 ♟️ 〕━━━╮\n『 سَـحْـبُ الـصَّـلَاحِـيَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📉 ⌯ الرتبة السابقة ↞ مشرف\n👤 ⌯ الرتبة الحالية ↞ عضو\n✅ ⌯ الحالة ↞ تمت إزالة الإشراف بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-        return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل تنزيل العضو، تأكد أن البوت مشرف.' })); }    
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: '❌ فشل تنزيل العضو، تأكد أن البوت مشرف.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmdBase === 'طرد') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
         const text = `╭━━━〔 ⚔️ 〕━━━╮\n『 قَـرَارُ الإِبْـعَـاد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📌 ⌯ الإجراء ↞ الطرد من المجموعة\n⚖️ ⌯ السبب ↞ مخالفة قوانين المجموعة\n✅ ⌯ الحالة ↞ تمت عملية الطرد بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-        return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.' })); }    
+        return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: '❌ فشل طرد العضو، تأكد أن البوت مشرف.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmdBase === 'بوم') {
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطور الأساسي فقط!' }));
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطور الأساسي فقط!', ...getChannelAdOptions(sock) });
     try {
         const meta = await sock.groupMetadata(from);
         let devCleanNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
@@ -800,55 +804,55 @@ if (cmdBase === 'بوم') {
             });
 
         if (usersToKick.length === 0) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `⚠️ لا توجد أعضاء آخرين لطردهم.` }));
+            return sock.sendMessage(from, { text: `⚠️ لا توجد أعضاء آخرين لطردهم.`, ...getChannelAdOptions(sock) });
         }
 
-        await sock.sendMessage(from, createForwardedOptions({ text: `💣 *جاري إخلاء المجموعـة وطرد الجميع دفعة واحدة (${usersToKick.length} عضو)...*` }));
+        await sock.sendMessage(from, { text: `💣 *جاري إخلاء المجموعـة وطرد الجميع دفعة واحدة (${usersToKick.length} عضو)...*`, ...getChannelAdOptions(sock) });
         await sock.groupParticipantsUpdate(from, usersToKick, 'remove');
-        return sock.sendMessage(from, createForwardedOptions({ text: `💥 تمت عملية الإخلاء الكلي بنجاح!` }));
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ تعذر تنفيذ أمر الإخلاء.' })); }
+        return sock.sendMessage(from, { text: `💥 تمت عملية الإخلاء الكلي بنجاح!`, ...getChannelAdOptions(sock) });
+    } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر تنفيذ أمر الإخلاء.', ...getChannelAdOptions(sock) }); }
 }
 
 if (cmdBase === 'اضف_انذار') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.اضف_انذار @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.اضف_انذار @عضو`', ...getChannelAdOptions(sock) });    
     const activeWarnings = addWarningToUser(targetUser);
 
     if (activeWarnings >= 3) {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
         delete userWarnings[targetUser];    
-        return sock.sendMessage(from, createForwardedOptions({ text: `🚨 @${targetUser.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات!`, mentions: [targetUser] }));    
+        return sock.sendMessage(from, { text: `🚨 @${targetUser.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات!`, mentions: [targetUser], ...getChannelAdOptions(sock) });    
     }    
 
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِنْـذَارٌ إِدَارِيّ 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📌 ⌯ السبب ↞ مخالفة قوانين المجموعة\n🔢 ⌯ عدد التحذيرات ↞ [${activeWarnings}/3]\n⚠️ ⌯ الحالة ↞ تم تسجيل التحذير»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'ازل_انذار' || cmdBase === 'حذف_انذار') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل_انذار @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل_انذار @عضو`', ...getChannelAdOptions(sock) });    
     removeOneWarningFromUser(targetUser);
     const text = `╭━━━〔 ✅ 〕━━━╮\n『 إِلْـغَـاءُ الإِنْـذَار 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🧾 ⌯ الإجراء ↞ حذف التحذير\n✨ ⌯ الحالة ↞ تمت إعادة ضبط التحذيرات»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'صفر') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.صفر @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.صفر @عضو`', ...getChannelAdOptions(sock) });    
     delete userWarnings[targetUser];    
-    return sock.sendMessage(from, createForwardedOptions({ text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser] }));    
+    return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'عدد_الانذارات') {    
     const targetUser = getTargetUser(msg) || sender;    
     const count = getUserWarningCount(targetUser);
-    return sock.sendMessage(from, createForwardedOptions({ text: `📊 عدد الإنذارات الفعالة: *${count} / 3*`, mentions: [targetUser] }), { quoted: msg });    
+    return sock.sendMessage(from, { text: `📊 عدد الإنذارات الفعالة: *${count} / 3*`, mentions: [targetUser], ...getChannelAdOptions(sock) }, { quoted: msg });    
 }    
 
 if (cmdBase === 'قائمة_الانذارات') {
     let allUsers = Object.keys(userWarnings);
     let activeWarnedUsers = allUsers.filter(u => getUserWarningCount(u) > 0);
-    if (activeWarnedUsers.length === 0) return sock.sendMessage(from, createForwardedOptions({ text: '📋 لا يوجد أي عضو لديه إنذارات نشطة حالياً!' }));
+    if (activeWarnedUsers.length === 0) return sock.sendMessage(from, { text: '📋 لا يوجد أي عضو لديه إنذارات نشطة حالياً!', ...getChannelAdOptions(sock) });
 
     let text = `╭━━━〔 ⚠️ 〕━━━╮\n『 قَـائِـمَـةُ الإِنْـذَارَاتِ 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;
     let mentions = [];
@@ -858,44 +862,44 @@ if (cmdBase === 'قائمة_الانذارات') {
         mentions.push(u);
     });
     text += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions }));
+    return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'كتم') {    
     const parts = trimmedBody.split(' ');    
     const mins = parseInt(parts[1]);    
     const targetUser = getTargetUser(msg);    
-    if (isNaN(mins) || !targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: `.كتم <دقائق> @عضو`' }));    
+    if (isNaN(mins) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.كتم <دقائق> @عضو`', ...getChannelAdOptions(sock) });    
     if (!mutedUsers[from]) mutedUsers[from] = {};    
     mutedUsers[from][targetUser] = Date.now() + (mins * 60 * 1000);    
     const text = `╭━━━〔 🔇 〕━━━╮\n『 إِسْـكَـاتُ عُـضْـو 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔇 ⌯ الإجراء ↞ تفعيل الكتم\n⏳ ⌯ المدة ↞ [${mins} دقيقة]\n✅ ⌯ الحالة ↞ تم تنفيذ الكتم»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.الغاء_كتم @عضو`' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.الغاء_كتم @عضو`', ...getChannelAdOptions(sock) });    
     if (mutedUsers[from]) delete mutedUsers[from][targetUser];    
     const text = `╭━━━〔 🔊 〕━━━╮\n『 إِلْـغَـاءُ الـكَـتْـم 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔊 ⌯ الإجراء ↞ إلغاء الكتم\n✅ ⌯ الحالة ↞ أصبح العضو غير مكتوم»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));    
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
 }    
 
-if (cmd === 'تفعيل ادمن') { getGroupSetting(from).adminOnly = true; return sock.sendMessage(from, createForwardedOptions({ text: '🟢 تم تفعيل وضع الآدمن.' })); }    
-if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; return sock.sendMessage(from, createForwardedOptions({ text: '🔴 تم إيقاف وضع الآدمن.' })); }    
-if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; return sock.sendMessage(from, createForwardedOptions({ text: '🟢 تم تفعيل الترحيب.' })); }    
-if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; return sock.sendMessage(from, createForwardedOptions({ text: '🔴 تم إيقاف الترحيب.' })); }    
-if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; return sock.sendMessage(from, createForwardedOptions({ text: '🟢 تم تفعيل التوديع.' })); }    
-if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; return sock.sendMessage(from, createForwardedOptions({ text: '🔴 تم إيقاف التوديع.' })); }    
+if (cmd === 'تفعيل ادمن') { getGroupSetting(from).adminOnly = true; return sock.sendMessage(from, { text: '🟢 تم تفعيل وضع الآدمن.', ...getChannelAdOptions(sock) }); }    
+if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; return sock.sendMessage(from, { text: '🔴 تم إيقاف وضع الآدمن.', ...getChannelAdOptions(sock) }); }    
+if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; return sock.sendMessage(from, { text: '🟢 تم تفعيل الترحيب.', ...getChannelAdOptions(sock) }); }    
+if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; return sock.sendMessage(from, { text: '🔴 تم إيقاف الترحيب.', ...getChannelAdOptions(sock) }); }    
+if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; return sock.sendMessage(from, { text: '🟢 تم تفعيل التوديع.', ...getChannelAdOptions(sock) }); }    
+if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; return sock.sendMessage(from, { text: '🔴 تم إيقاف التوديع.', ...getChannelAdOptions(sock) }); }    
 
 if (cmd.startsWith('تغيير_الاسم')) {    
     const newName = trimmedBody.replace(/^\.تغيير_الاسم/i, '').trim();    
-    if (!newName) return sock.sendMessage(from, createForwardedOptions({ text: '📌 يرجى كتابة الاسم الجديد.' }));    
-    try { await sock.groupUpdateSubject(from, newName); return sock.sendMessage(from, createForwardedOptions({ text: `✅ تم تغيير اسم المجموعة إلى: *${newName}*` })); } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل التغيير تأكد أن البوت مشرف.' })); }    
+    if (!newName) return sock.sendMessage(from, { text: '📌 يرجى كتابة الاسم الجديد.', ...getChannelAdOptions(sock) });    
+    try { await sock.groupUpdateSubject(from, newName); return sock.sendMessage(from, { text: `✅ تم تغيير اسم المجموعة إلى: *${newName}*`, ...getChannelAdOptions(sock) }); } catch (e) { return sock.sendMessage(from, { text: '❌ فشل التغيير تأكد أن البوت مشرف.', ...getChannelAdOptions(sock) }); }    
 }    
 if (cmd.startsWith('تغيير_الوصف')) {    
     const newDesc = trimmedBody.replace(/^\.تغيير_الوصف/i, '').trim();    
-    if (!newDesc) return sock.sendMessage(from, createForwardedOptions({ text: '📌 يرجى كتابة الوصف الجديد.' }));    
-    try { await sock.groupUpdateDescription(from, newDesc); return sock.sendMessage(from, createForwardedOptions({ text: `✅ تم تغيير وصف المجموعة بنجاح!` })); } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل التغيير تأكد أن البوت مشرف.' })); }    
+    if (!newDesc) return sock.sendMessage(from, { text: '📌 يرجى كتابة الوصف الجديد.', ...getChannelAdOptions(sock) });    
+    try { await sock.groupUpdateDescription(from, newDesc); return sock.sendMessage(from, { text: `✅ تم تغيير وصف المجموعة بنجاح!`, ...getChannelAdOptions(sock) }); } catch (e) { return sock.sendMessage(from, { text: '❌ فشل التغيير تأكد أن البوت مشرف.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {    
@@ -903,56 +907,56 @@ if (cmd === 'رابط_الجروب' || cmd === 'الرابط') {
         const code = await sock.groupInviteCode(from);    
         const groupMeta = await sock.groupMetadata(from);
         const text = `╭━━━〔 🔗 〕━━━╮\n『 رَابِـطُ الـمَـجْـمُـوعَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👥 ⌯ المجموعة ↞ ${groupMeta.subject}\n👑 ⌯ الطلب بواسطة ↞ @${sender.split('@')[0]}\n🔗 ⌯ الرابط ↞ https://chat.whatsapp.com/${code}\n✅ ⌯ الحالة ↞ تم جلب الرابط»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-        return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل جلب الرابط تأكد أن البوت مشرف.' })); }    
+        return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: '❌ فشل جلب الرابط تأكد أن البوت مشرف.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmdBase === 'حظر_رابط' || cmdBase === 'حظر رابط') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiLink = true;    
     const text = `╭━━━〔 🛡️ 〕━━━╮\n『 تَـفْـعِـيـلُ مَـانِـعِ الروابط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ منع الروابط\n✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiLink = false;    
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 تَـعْـطِـيـلُ مَـانِـعِ الروابط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ الروابط\n⛔ ⌯ الحالة ↞ تم تعطيل الحماية»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'حظر_شتم' || cmdBase === 'حظر شتم' || cmdBase === 'حظر_سب') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiBadWords = true;    
     const text = `╭━━━〔 🛡️ 〕━━━╮\n『 تَـفْـعِـيـلُ مَـانِـعِ الشتم والسب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ منع الشتم والسب\n✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'سماح_شتم' || cmdBase === 'سماح شتم' || cmdBase === 'سماح_سب') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiBadWords = false;    
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 تَـعْـطِـيـلُ مَـانِـعِ الشتم والسب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ الشتم والسب\n⛔ ⌯ الحالة ↞ تم تعطيل الحماية»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'حظر_جهات' || cmdBase === 'حظر جهات') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiContact = true;    
     const text = `╭━━━〔 🛡️ 〕━━━╮\n『 تَـفْـعِـيـلُ مَـانِـعِ جهات الاتصال 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ منع جهات الاتصال\n✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'سماح_جهات' || cmdBase === 'سماح جهات') {    
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ متاح للمشرفين والمطور فقط!' }));    
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ متاح للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).antiContact = false;    
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 تَـعْـطِـيـلُ مَـانِـعِ جهات الاتصال 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ جهات الاتصال\n⛔ ⌯ الحالة ↞ تم تعطيل الحماية»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender] }));    
+    return sock.sendMessage(from, { text, mentions: [sender], ...getChannelAdOptions(sock) });    
 }    
 
 if (activeGames[from]) {    
     if (['صراحة', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'زواج'].includes(cmdBase)) {    
-        return sock.sendMessage(from, createForwardedOptions({ text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` }));    
+        return sock.sendMessage(from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.`, ...getChannelAdOptions(sock) });    
     }    
 }    
 
 if (cmd === 'مساعدة_الملصقات') {
     const stickerHelpText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة إلى ملصق.\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق إلى صورة.\n> 🔗 \`.ملصق_رابط <الرابط>\` ↞ إنشاء ملصق من رابط صورة مباشر.\n> ✍️ \`.ملصق_نصي <النص>\` ↞ إنشاء ملصق نصي أنيق.\n> 🎞️ \`.ملصق_متحرك\` ↞ إنشاء ملصق متحرك (فيديو/صورة متحركة).\n> 🎬 \`.فيديو_لملصق\` ↞ تحويل فيديو إلى ملصق متحرك.\n> 🎥 \`.متحرك_لفيديو\` ↞ تحويل ملصق متحرك إلى فيديو قابل للتشغيل.\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات للشخصية (ناروتو، إيرين، إيتاتشي...).\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text: stickerHelpText }));
+    return sock.sendMessage(from, { text: stickerHelpText, ...getChannelAdOptions(sock) });
 }
 
 if (cmd === 'ملصق' || cmd === 's') {
@@ -960,7 +964,7 @@ if (cmd === 'ملصق' || cmd === 's') {
         const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
         const mime = Object.keys(qMsg)[0];
         if (!['imageMessage', 'videoMessage', 'documentMessage'].includes(mime)) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `📌 يرجى إرسال صورة أو فيديو أو الرد عليها بكلمة \`.ملصق\`` }));
+            return sock.sendMessage(from, { text: `📌 يرجى إرسال صورة أو فيديو أو الرد عليها بكلمة \`.ملصق\``, ...getChannelAdOptions(sock) });
         }
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
         
@@ -974,7 +978,7 @@ if (cmd === 'ملصق' || cmd === 's') {
         const buffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ فشل إنشاء الملصق، تأكد من إرسال وسائط صالحة.` }));
+        return sock.sendMessage(from, { text: `❌ فشل إنشاء الملصق، تأكد من إرسال وسائط صالحة.`, ...getChannelAdOptions(sock) });
     }
 }
 
@@ -982,25 +986,25 @@ if (cmd === 'لصورة' || cmd === 'toimage') {
     try {
         const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
         if (!qMsg || !qMsg.stickerMessage) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `📌 يرجى الرد على ملصق بكلمة \`.لصورة\` لتحويله.` }));
+            return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق بكلمة \`.لصورة\` لتحويله.`, ...getChannelAdOptions(sock) });
         }
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        return sock.sendMessage(from, createForwardedOptions({ image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*` }), { quoted: msg });
+        return sock.sendMessage(from, { image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*`, ...getChannelAdOptions(sock) }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ فشل تحويل الملصق إلى صورة.` }));
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى صورة.`, ...getChannelAdOptions(sock) });
     }
 }
 
 if (cmd.startsWith('ملصق_رابط')) {
     const url = trimmedBody.replace(/^\.ملصق_رابط/i, '').trim();
     if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\`` }));
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\``, ...getChannelAdOptions(sock) });
     }
     try {
         const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
         const contentType = response.headers['content-type'] || '';
         if (!contentType.includes('image')) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `❌ الرابط المدخل لا يؤدي إلى صورة مباشرة صالحة!` }));
+            return sock.sendMessage(from, { text: `❌ الرابط المدخل لا يؤدي إلى صورة مباشرة صالحة!`, ...getChannelAdOptions(sock) });
         }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
@@ -1012,21 +1016,21 @@ if (cmd.startsWith('ملصق_رابط')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ تعذر جلب الصورة من الرابط، تأكد من أن الرابط مباشر وصالح.` }));
+        return sock.sendMessage(from, { text: `❌ تعذر جلب الصورة من الرابط، تأكد من أن الرابط مباشر وصالح.`, ...getChannelAdOptions(sock) });
     }
 }
 
 if (cmd.startsWith('ملصق_نصي')) {
     const textQuery = trimmedBody.replace(/^\.ملصق_نصي/i, '').trim();
     if (!textQuery) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `📌 الاستخدام الصحيح: \`.ملصق_نصي <النص المطلوب>\`` }));
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.ملصق_نصي <النص المطلوب>\``, ...getChannelAdOptions(sock) });
     }
     try {
         const imgApiUrl = `https://api.lolhuman.xyz/api/text2image?apikey=gapis&text=${encodeURIComponent(textQuery)}`;
         const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer', timeout: 15000 });
         const contentType = response.headers['content-type'] || '';
         if (!contentType.includes('image')) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `❌ فشل توليد صورة النص من الخدمة السحابية.` }));
+            return sock.sendMessage(from, { text: `❌ فشل توليد صورة النص من الخدمة السحابية.`, ...getChannelAdOptions(sock) });
         }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
@@ -1038,7 +1042,7 @@ if (cmd.startsWith('ملصق_نصي')) {
         const stickerBuffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً. يرجى تجربة نص قصير آخر.` }));
+        return sock.sendMessage(from, { text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً. يرجى تجربة نص قصير آخر.`, ...getChannelAdOptions(sock) });
     }
 }
 
@@ -1047,7 +1051,7 @@ if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
         const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
         const mime = Object.keys(qMsg)[0];
         if (!['videoMessage', 'documentMessage'].includes(mime) && !qMsg.videoMessage) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `📌 يرجى إرسال فيديو قصير أو الرد عليه بكلمة \`.ملصق_متحرك\`` }));
+            return sock.sendMessage(from, { text: `📌 يرجى إرسال فيديو قصير أو الرد عليه بكلمة \`.ملصق_متحرك\``, ...getChannelAdOptions(sock) });
         }
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
         
@@ -1061,7 +1065,7 @@ if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
         const buffer = await sticker.toBuffer();
         return sock.sendMessage(from, { sticker: buffer }, { quoted: msg });
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ فشل تحويل الفيديو إلى ملصق متحرك.` }));
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الفيديو إلى ملصق متحرك.`, ...getChannelAdOptions(sock) });
     }
 }
 
@@ -1069,7 +1073,7 @@ if (cmd === 'متحرك_لفيديو') {
     try {
         const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
         if (!qMsg || !qMsg.stickerMessage) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `📌 يرجى الرد على ملصق متحرك بكلمة \`.متحرك_لفيديو\` لتحويله.` }));
+            return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق متحرك بكلمة \`.متحرك_لفيديو\` لتحويله.`, ...getChannelAdOptions(sock) });
         }
         
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
@@ -1098,23 +1102,24 @@ if (cmd === 'متحرك_لفيديو') {
         const videoBuffer = fs.readFileSync(outputMp4);
         try { fs.unlinkSync(inputWebp); fs.unlinkSync(outputMp4); } catch (e) {}
 
-        return sock.sendMessage(from, createForwardedOptions({ 
+        return sock.sendMessage(from, { 
             video: videoBuffer, 
             caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو صالح ويعمل بكفاءة!*`, 
             mimetype: 'video/mp4',
-            ptt: false 
-        }), { quoted: msg });
+            ptt: false,
+            ...getChannelAdOptions(sock)
+        }, { quoted: msg });
 
     } catch (e) {
         console.error('خطأ تحويل المتحرك لفيديو:', e);
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ فشل تحويل الملصق المتحرك إلى فيديو صالح.` }));
+        return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق المتحرك إلى فيديو صالح.`, ...getChannelAdOptions(sock) });
     }
 }
 
 if (cmd.startsWith('حزمة')) {
     const characterName = trimmedBody.replace(/^\.حزمة/i, '').trim();
     if (!characterName) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` }));
+        return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\``, ...getChannelAdOptions(sock) });
     }
     try {
         const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
@@ -1122,7 +1127,7 @@ if (cmd.startsWith('حزمة')) {
         const results = res.data?.result;
 
         if (!results || !Array.isArray(results) || results.length === 0) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `❌ لم يتم العثور على حزمة ملصقات للشخصية (${characterName}).` }));
+            return sock.sendMessage(from, { text: `❌ لم يتم العثور على حزمة ملصقات للشخصية (${characterName}).`, ...getChannelAdOptions(sock) });
         }
 
         let countSent = 0;
@@ -1146,12 +1151,12 @@ if (cmd.startsWith('حزمة')) {
         }
 
         if (countSent > 0) {
-            return sock.sendMessage(from, createForwardedOptions({ text: `✅ *تم إرسال (${countSent}) ملصقات حقيقية بنجاح لشخصية (${characterName})!*` }));
+            return sock.sendMessage(from, { text: `✅ *تم إرسال (${countSent}) ملصقات حقيقية بنجاح لشخصية (${characterName})!*`, ...getChannelAdOptions(sock) });
         } else {
-            return sock.sendMessage(from, createForwardedOptions({ text: `❌ تعذر تحميل وتشكيل ملصقات هذه الحزمة.` }));
+            return sock.sendMessage(from, { text: `❌ تعذر تحميل وتشكيل ملصقات هذه الحزمة.`, ...getChannelAdOptions(sock) });
         }
     } catch (e) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ عذراً، خدمة جلب الحزم غير متوفرة حالياً.` }));
+        return sock.sendMessage(from, { text: `❌ عذراً، خدمة جلب الحزم غير متوفرة حالياً.`, ...getChannelAdOptions(sock) });
     }
 }
 
@@ -1167,20 +1172,20 @@ async function restartSameGame(sock, from, gameType) {
         const timer = setTimeout(async () => {
             if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
-                await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *الكلمة كانت:* \`${word}\`` }));
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الكلمة كانت:* \`${word}\``, ...getChannelAdOptions(sock) });
             }
         }, 30000);
-        const sent = await sock.sendMessage(from, createForwardedOptions({ text: `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية:\n\n👉 *${word}*` }));
+        const sent = await sock.sendMessage(from, { text: `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية:\n\n👉 *${word}*`, ...getChannelAdOptions(sock) });
         activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'disassemble') {
         const timer = setTimeout(async () => {
             if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
-                await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` }));
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\``, ...getChannelAdOptions(sock) });
             }
         }, 30000);
-        const sent = await sock.sendMessage(from, createForwardedOptions({ text: `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية:\n\n👉 *${word}*` }));
+        const sent = await sock.sendMessage(from, { text: `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية:\n\n👉 *${word}*`, ...getChannelAdOptions(sock) });
         activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'arrange') {
@@ -1188,10 +1193,10 @@ async function restartSameGame(sock, from, gameType) {
         const timer = setTimeout(async () => {
             if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
-                await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` }));
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الترتيب الصحيح هو:* \`${word}\``, ...getChannelAdOptions(sock) });
             }
         }, 30000);
-        const sent = await sock.sendMessage(from, createForwardedOptions({ text: `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة:\n\n👉 *[ ${shuffled} ]*` }));
+        const sent = await sock.sendMessage(from, { text: `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة:\n\n👉 *[ ${shuffled} ]*`, ...getChannelAdOptions(sock) });
         activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
 
     } else if (gameType === 'guess') {
@@ -1199,10 +1204,10 @@ async function restartSameGame(sock, from, gameType) {
         const timer = setTimeout(async () => {
             if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
                 delete activeGames[from];
-                await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` }));
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\``, ...getChannelAdOptions(sock) });
             }
         }, 30000);
-        const sent = await sock.sendMessage(from, createForwardedOptions({ text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!` }));
+        const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!`, ...getChannelAdOptions(sock) });
         activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
     }
 }
@@ -1238,8 +1243,8 @@ if (cmd === 'زواج') {
 │ ✨ نَـتَـمَـنَّـى لَـهُـمَـا حَـيَـاةً مَـلِـيئَـةً بِـالـمَـجْـدِ وَالـسَّـعَـادَةِ الدَّائِـمَـة! 🥂❤️
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
-        return sock.sendMessage(from, createForwardedOptions({ text: marriageText, mentions: [groom, bride] }));
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ تعذر إتمام عقد الزواج.' })); }
+        return sock.sendMessage(from, { text: marriageText, mentions: [groom, bride], ...getChannelAdOptions(sock) });
+    } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر إتمام عقد الزواج.', ...getChannelAdOptions(sock) }); }
 }    
 
 if (cmd === 'صراحة') {    
@@ -1248,13 +1253,13 @@ if (cmd === 'صراحة') {
         const participants = meta.participants.map(p => p.id);    
         const randomUser = participants[Math.floor(Math.random() * participants.length)];    
         const q = sarahaQuestions[Math.floor(Math.random() * sarahaQuestions.length)];
-        return sock.sendMessage(from, createForwardedOptions({ text: `💬 *سُـؤَالُ صَـرَاحَـةٍ مَـوَجَّـهٌ إِلَـى @${randomUser.split('@')[0]}:*\n\n> 🎯 ${q}`, mentions: [randomUser] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `💬 *سُـؤَالُ صَـرَاحَـة:* ${sarahaQuestions[0]}` })); }    
+        return sock.sendMessage(from, { text: `💬 *سُـؤَالُ صَـرَاحَـةٍ مَـوَجَّـهٌ إِلَـى @${randomUser.split('@')[0]}:*\n\n> 🎯 ${q}`, mentions: [randomUser], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: `💬 *سُـؤَالُ صَـرَاحَـة:* ${sarahaQuestions[0]}`, ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmd === 'خيروك' || cmd === 'لوخيروك') {    
     const q = khayrokQuestions[Math.floor(Math.random() * khayrokQuestions.length)];
-    return sock.sendMessage(from, createForwardedOptions({ text: `❓ *لَـعْـبَـةُ لَـوْ خَـيَّـرُوكَ:* \n\n> ${q}` }));    
+    return sock.sendMessage(from, { text: `❓ *لَـعْـبَـةُ لَـوْ خَـيَّـرُوكَ:* \n\n> ${q}`, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
@@ -1266,12 +1271,12 @@ if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الكلمة كانت:* \`${word}\`` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الكلمة كانت:* \`${word}\``, ...getChannelAdOptions(sock) });
         }
     }, 30000);
 
     const promptText = `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية بدقة سرعة:\n\n👉 *${word}*`;
-    return sock.sendMessage(from, createForwardedOptions({ text: promptText })).then(sent => {
+    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
@@ -1285,12 +1290,12 @@ if (cmdBase === 'تفكيك') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\`` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\``, ...getChannelAdOptions(sock) });
         }
     }, 30000);
 
     const promptText = `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية وإعادة كتابتها بحروف مفصولة بمسافات:\n\n👉 *${word}*`;
-    return sock.sendMessage(from, createForwardedOptions({ text: promptText })).then(sent => {
+    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
@@ -1306,12 +1311,12 @@ if (cmd === 'رتب') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الترتيب الصحيح هو:* \`${word}\`` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الترتيب الصحيح هو:* \`${word}\``, ...getChannelAdOptions(sock) });
         }
     }, 30000);
 
     const promptText = `🔤 *فَـعَـالِـيَّـةُ تَـرْتِـيـبِ الـحُـرُوفِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة لتكوين اسم أنمي أو شخصية صحيحة:\n\n👉 *[ ${shuffled} ]*`;
-    return sock.sendMessage(from, createForwardedOptions({ text: promptText })).then(sent => {
+    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }
@@ -1327,12 +1332,12 @@ if (cmd === 'حرف') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'letter_characters' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد للفعالية!*` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد للفعالية!*`, ...getChannelAdOptions(sock) });
         }
     }, 45000);
 
     const promptText = `🔠 *فَـعَـالِـيَّـةُ الـحَـرْفِ (الوقت: 45 ثانية):*\n\nالحرف المطلوب: [ *${randomLetter}* ]\n\n📌 *المطلوب:* اكتب 3 أسماء شخصيات أنمي تبدأ بهذا الحرف في رسالة واحدة!`;
-    return sock.sendMessage(from, createForwardedOptions({ text: promptText })).then(sent => {
+    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'letter_characters', requiredLetter: randomLetter, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
@@ -1340,7 +1345,7 @@ if (cmd === 'حرف') {
 if (cmd === 'حكمة') {    
     const item = animeQuotesList[Math.floor(Math.random() * animeQuotesList.length)];    
     const quoteFormatted = `📜 *مَوْسُوعَةُ حِكَمِ وَأَقْوَالِ الشَّخْصِيَّاتِ (الأنمي):*\n\n> "${item.quote}"\n\n👤 *الشَّخْصِيَّة:* \`${item.character}\``;
-    return sock.sendMessage(from, createForwardedOptions({ text: quoteFormatted }));    
+    return sock.sendMessage(from, { text: quoteFormatted, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'خمن') { 
@@ -1352,10 +1357,10 @@ if (cmd === 'خمن') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\`` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\``, ...getChannelAdOptions(sock) });
         }
     }, 30000);
-    return sock.sendMessage(from, createForwardedOptions({ text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!` })).then(sent => {
+    return sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!`, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
@@ -1373,10 +1378,10 @@ if (cmdBase === 'حزورة' || cmdBase === 'لغز') {
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === 'riddles' && !activeGames[from].isCompleted) {
             delete activeGames[from];
-            await sock.sendMessage(from, createForwardedOptions({ text: `⏰ *انتهى الوقت المحدد!*\n💡 *الجواب الصحيح:* \`${item.a}\`` }));
+            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الجواب الصحيح:* \`${item.a}\``, ...getChannelAdOptions(sock) });
         }
     }, 30000);
-    return sock.sendMessage(from, createForwardedOptions({ text: `🧩 *لغز وحزورة:*\n\n${item.q}` })).then(sent => {
+    return sock.sendMessage(from, { text: `🧩 *لغز وحزورة:*\n\n${item.q}`, ...getChannelAdOptions(sock) }).then(sent => {
         activeGames[from] = { type: 'riddles', answer: item.a, timer: timer, isCompleted: false, msgId: sent.key.id };
     });
 }    
@@ -1390,82 +1395,82 @@ if (cmd === 'قران' || cmd === 'قرآن') {
         selectedAyat.push(`🔹 ${tempDb[randIdx]}`);
         tempDb.splice(randIdx, 1);
     }
-    return sock.sendMessage(from, createForwardedOptions({ text: `📖 *آيَاتٌ قُرْآنِيَّةٌ مُبَارَكَةٌ (5 آيات):*\n\n` + selectedAyat.join('\n\n') }));    
+    return sock.sendMessage(from, { text: `📖 *آيَاتٌ قُرْآنِيَّةٌ مُبَارَكَةٌ (5 آيات):*\n\n` + selectedAyat.join('\n\n'), ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'دعاء') {    
     const randomDua = duaList[Math.floor(Math.random() * duaList.length)];
-    return sock.sendMessage(from, createForwardedOptions({ text: `🤲 *دعاء مبارك:*\n\n${randomDua}` }));    
+    return sock.sendMessage(from, { text: `🤲 *دعاء مبارك:*\n\n${randomDua}`, ...getChannelAdOptions(sock) });    
 }    
 if (cmd === 'ذكر') {    
-    return sock.sendMessage(from, createForwardedOptions({ text: `📿 *ذكر مبارك:* سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ العَظِيمِ.` }));    
+    return sock.sendMessage(from, { text: `📿 *ذكر مبارك:* سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ العَظِيمِ.`, ...getChannelAdOptions(sock) });    
 }    
 if (cmd === 'حديث') {    
     const randomHadith = hadithList[Math.floor(Math.random() * hadithList.length)];
-    return sock.sendMessage(from, createForwardedOptions({ text: `☪️ *حديث نبوي شريف:*\n\n${randomHadith}` }));    
+    return sock.sendMessage(from, { text: `☪️ *حديث نبوي شريف:*\n\n${randomHadith}`, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'اذكار_الصباح' || cmd === 'أذكار_الصباح') {    
-    return sock.sendMessage(from, createForwardedOptions({ text: `*╎أذكـار 🌙私*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...` }));    
+    return sock.sendMessage(from, { text: `*╎أذكـار 🌙私*\n\n*أذكار الـصـبـاح ⛅*\n\n- اللّهُ لاَ إِلَـهَ إِلاّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...`, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'اذكار_المساء' || cmd === 'أذكار_المساء') {    
-    return sock.sendMessage(from, createForwardedOptions({ text: `*أذكار الـمـسـاء 🌙*\n\n- اللهم انت ربي لا اله الا انت خلقتني وانا عبدك...` }));    
+    return sock.sendMessage(from, { text: `*أذكار الـمـسـاء 🌙*\n\n- اللهم انت ربي لا اله الا انت خلقتني وانا عبدك...`, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'أذكار' || cmd === 'اذكار') {    
-    return sock.sendMessage(from, createForwardedOptions({ text: `🌙 *الأوامر المتاحة للأذكار:\n\n.اذكار_الصباح\n.اذكار_المساء\n.اذكار_الاستيقاظ\n.اذكار_الصلاة\n.اذكار_المسجد` }));    
+    return sock.sendMessage(from, { text: `🌙 *الأوامر المتاحة للأذكار:\n\n.اذكار_الصباح\n.اذكار_المساء\n.اذكار_الاستيقاظ\n.اذكار_الصلاة\n.اذكار_المسجد`, ...getChannelAdOptions(sock) });    
 }    
 
-if (cmd === 'نكتة') { return sock.sendMessage(from, createForwardedOptions({ text: jokesList[Math.floor(Math.random() * jokesList.length)] })); }    
-if (cmd === 'ماذا_لو') { return sock.sendMessage(from, createForwardedOptions({ text: whatIfList[Math.floor(Math.random() * whatIfList.length)] })); }    
-if (cmd === 'قول') { return sock.sendMessage(from, createForwardedOptions({ text: `🗣️ *مقولة اليوم:* \n\n> "${quotesList[Math.floor(Math.random() * quotesList.length)]}"` })); }    
+if (cmd === 'نكتة') { return sock.sendMessage(from, { text: jokesList[Math.floor(Math.random() * jokesList.length)], ...getChannelAdOptions(sock) }); }    
+if (cmd === 'ماذا_لو') { return sock.sendMessage(from, { text: whatIfList[Math.floor(Math.random() * whatIfList.length)], ...getChannelAdOptions(sock) }); }    
+if (cmd === 'قول') { return sock.sendMessage(from, { text: `🗣️ *مقولة اليوم:* \n\n> "${quotesList[Math.floor(Math.random() * quotesList.length)]}"`, ...getChannelAdOptions(sock) }); }    
 
 if (cmd === 'غزل') {    
     const targetUser = getTargetUser(msg) || sender;
-    return sock.sendMessage(from, createForwardedOptions({ text: `🌹 *تَرْتِيلَةُ غَزَلٍ لِـ @${targetUser.split('@')[0]}:*\n\n> "${ghazalsList[Math.floor(Math.random() * ghazalsList.length)]}"`, mentions: [targetUser] }));
+    return sock.sendMessage(from, { text: `🌹 *تَرْتِيلَةُ غَزَلٍ لِـ @${targetUser.split('@')[0]}:*\n\n> "${ghazalsList[Math.floor(Math.random() * ghazalsList.length)]}"`, mentions: [targetUser], ...getChannelAdOptions(sock) });
 }
 
 if (cmd === 'ثنائي') {    
     try {    
         const meta = await sock.groupMetadata(from);    
         const mems = meta.participants;    
-        if (mems.length < 2) return sock.sendMessage(from, createForwardedOptions({ text: `❌ الأعضاء لا يكفون لتكوين ثنائي!` }));
+        if (mems.length < 2) return sock.sendMessage(from, { text: `❌ الأعضاء لا يكفون لتكوين ثنائي!`, ...getChannelAdOptions(sock) });
         const p1 = mems[Math.floor(Math.random() * mems.length)].id;
         let p2 = mems[Math.floor(Math.random() * mems.length)].id;
         while (p1 === p2) { p2 = mems[Math.floor(Math.random() * mems.length)].id; }
-        return sock.sendMessage(from, createForwardedOptions({ text: `💞 *استمارة نقابة فينلاند الرسمية لأفضل ثنائي متطابق:* \n\n✨ تم إعلان الثنائي الأسطوري بين:\n👤 @${p1.split('@')[0]}\n👤 @${p2.split('@')[0]}\n\nنتمنى لهما حياة سعيدة وموفقة! 🥂❤️`, mentions: [p1, p2] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `💞 تم اختيار الثنائي الأسطوري بنجاح.` })); }    
+        return sock.sendMessage(from, { text: `💞 *استمارة نقابة فينلاند الرسمية لأفضل ثنائي متطابق:* \n\n✨ تم إعلان الثنائي الأسطوري بين:\n👤 @${p1.split('@')[0]}\n👤 @${p2.split('@')[0]}\n\nنتمنى لهما حياة سعيدة وموفقة! 🥂❤️`, mentions: [p1, p2], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: `💞 تم اختيار الثنائي الأسطوري بنجاح.`, ...getChannelAdOptions(sock) }); }    
 }
 
 if (cmd === 'ملك_المجموعة') {    
     try {    
         const meta = await sock.groupMetadata(from);    
         const chosen = meta.participants[Math.floor(Math.random() * meta.participants.length)].id;    
-        return sock.sendMessage(from, createForwardedOptions({ text: `👑 *إعلان ملك المجموعة:* \n\nبناءً على التفاعل الأسطوري، تم اختيار:\n\n✨ @${chosen.split('@')[0]} ✨\n\nليكون *ملك المجموعة* لهذا اليوم! 🏆🔥`, mentions: [chosen] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `👑 تم اختيار ملك المجموعة.` })); }    
+        return sock.sendMessage(from, { text: `👑 *إعلان ملك المجموعة:* \n\nبناءً على التفاعل الأسطوري، تم اختيار:\n\n✨ @${chosen.split('@')[0]} ✨\n\nليكون *ملك المجموعة* لهذا اليوم! 🏆🔥`, mentions: [chosen], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: `👑 تم اختيار ملك المجموعة.`, ...getChannelAdOptions(sock) }); }    
 }
 
 if (cmd === 'كيوت_المجموعة') {    
     try {    
         const meta = await sock.groupMetadata(from);    
         const chosen = meta.participants[Math.floor(Math.random() * meta.participants.length)].id;    
-        return sock.sendMessage(from, createForwardedOptions({ text: `🌸 *إعلان لطافة المجموعة:* \n\nتم اختيار العضو:\n\n🧸 @${chosen.split('@')[0]} 🧸\n\nليكون رسمياً *كيوت المجموعة* لهذا اليوم! ✨🍼`, mentions: [chosen] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `🌸 تم اختيار كيوت المجموعة.` })); }    
+        return sock.sendMessage(from, { text: `🌸 *إعلان لطافة المجموعة:* \n\nتم اختيار العضو:\n\n🧸 @${chosen.split('@')[0]} 🧸\n\nليكون رسمياً *كيوت المجموعة* لهذا اليوم! ✨🍼`, mentions: [chosen], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: `🌸 تم اختيار كيوت المجموعة.`, ...getChannelAdOptions(sock) }); }    
 }
 
 if (['ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة'].includes(cmdBase)) {    
     try {    
         const meta = await sock.groupMetadata(from);    
         const chosen = meta.participants[Math.floor(Math.random() * meta.participants.length)].id;    
-        return sock.sendMessage(from, createForwardedOptions({ text: `👑 لقب (${cmdBase}) تم منحه بجدارة إلى العضو: @${chosen.split('@')[0]} ✨`, mentions: [chosen] }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `👑 تم اختيار الألقاب.` })); }    
+        return sock.sendMessage(from, { text: `👑 لقب (${cmdBase}) تم منحه بجدارة إلى العضو: @${chosen.split('@')[0]} ✨`, mentions: [chosen], ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: `👑 تم اختيار الألقاب.`, ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmd === 'رسائلي') {    
     const todayKey = getJordanDateKey();    
     const count = userMessagesCount[from]?.[todayKey]?.[sender] || 0;    
-    return sock.sendMessage(from, createForwardedOptions({ text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] }));    
+    return sock.sendMessage(from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender], ...getChannelAdOptions(sock) });    
 }
 
 if (cmd === 'توب_التفاعل') {    
@@ -1487,63 +1492,63 @@ if (cmd === 'توب_التفاعل') {
         });
         text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
         const userPp = await getUserProfilePic(sock, sender);
-        try { await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: text, mentions })); } catch (e) { await sock.sendMessage(from, createForwardedOptions({ text, mentions })); }
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text, mentions, ...getChannelAdOptions(sock, userPp) }); } catch (e) { await sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) }); }
         return;
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `❌ تعذر جلب توب التفاعل.` })); }
+    } catch (e) { return sock.sendMessage(from, { text: `❌ تعذر جلب توب التفاعل.`, ...getChannelAdOptions(sock) }); }
 }
 
 if (cmd.startsWith('اضافة_لقب')) {
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمشرفين والمطور فقط!' }));
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
     const title = trimmedBody.replace(/^\.اضافة_لقب/i, '').replace(/@\d+/g, '').trim();
-    if (!targetUser || !title) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام الصحيح: `.اضافة_لقب @العضو اللقب`' }));
+    if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.اضافة_لقب @العضو اللقب`', ...getChannelAdOptions(sock) });
     if (!groupTitles[from]) groupTitles[from] = {};
     if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
     if (Object.values(groupTitles[from]).includes(title) || Object.values(groupReservedTitles[from]).includes(title)) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً!` }));
+        return sock.sendMessage(from, { text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً!`, ...getChannelAdOptions(sock) });
     }
     groupTitles[from][targetUser] = title;
     const text = `╭━━━〔 👑 〕━━━╮\n『 تَـسْـجِـيـلُ لَـقَـبٍ جَـدِيـد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🏷️ ⌯ اللقب ↞ [ ${title} ]\n✨ ⌯ الحالة ↞ تم تسجيل اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmd.startsWith('ازالة_لقب')) {
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمشرفين والمطور فقط!' }));
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام الصحيح: `.ازالة_لقب @العضو`' }));
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.ازالة_لقب @العضو`', ...getChannelAdOptions(sock) });
     if (groupTitles[from]) delete groupTitles[from][targetUser];
     const text = `╭━━━〔 ❌ 〕━━━╮\n『 إِزَالَـةُ لَـقَـب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الحالة ↞ تمت إزالة اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmd.startsWith('حجز_لقب')) {
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمشرفين والمطور فقط!' }));
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
     const title = trimmedBody.replace(/^\.حجز_لقب/i, '').replace(/@\d+/g, '').trim();
-    if (!targetUser || !title) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام الصحيح: `.حجز_لقب @العضو اللقب`' }));
+    if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.حجز_لقب @العضو اللقب`', ...getChannelAdOptions(sock) });
     if (!groupTitles[from]) groupTitles[from] = {};
     if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
     if (Object.values(groupTitles[from]).includes(title) || Object.values(groupReservedTitles[from]).includes(title)) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً!` }));
+        return sock.sendMessage(from, { text: `❌ اللقب ( *${title}* ) مأخوذ أو محجوز مسبقاً!`, ...getChannelAdOptions(sock) });
     }
     groupReservedTitles[from][targetUser] = title;
     const text = `╭━━━〔 🔒 〕━━━╮\n『 حَـجْـزُ لَـقَـبٍ خَـاص 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔒 ⌯ اللقب ↞ [ ${title} ]\n✨ ⌯ الحالة ↞ تم حجز اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmd.startsWith('الغاء_حجز_لقب')) {
-    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمشرفين والمطور فقط!' }));
+    if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام الصحيح: `.الغاء_حجز_لقب @العضو`' }));
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.الغاء_حجز_لقب @العضو`', ...getChannelAdOptions(sock) });
     if (groupReservedTitles[from]) delete groupReservedTitles[from][targetUser];
     const text = `╭━━━〔 🔓 〕━━━╮\n『 إِلْـغَـاءُ حَـجْـزِ لَـقَـب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الحالة ↞ تم إلغاء حجز اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmd === 'قائمة_الالقاب') {
     const titles = groupTitles[from] || {};
     const keys = Object.keys(titles);
-    if (keys.length === 0) return sock.sendMessage(from, createForwardedOptions({ text: '📋 لا توجد ألقاب مسجلة في هذه المجموعة بعد!' }));
+    if (keys.length === 0) return sock.sendMessage(from, { text: '📋 لا توجد ألقاب مسجلة في هذه المجموعة بعد!', ...getChannelAdOptions(sock) });
     let text = `╭━━━〔 👑 〕━━━╮\n『 قَـائِـمَـةُ الأَلْـقَـابِ الـمُـسَـجَّـلَـةِ 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;
     let mentions = [];
     keys.forEach((userJid, idx) => {
@@ -1551,13 +1556,13 @@ if (cmd === 'قائمة_الالقاب') {
         mentions.push(userJid);
     });
     text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions }));
+    return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
 if (cmd === 'قائمة_الالقاب_المحجوزة') {
     const resTitles = groupReservedTitles[from] || {};
     const keys = Object.keys(resTitles);
-    if (keys.length === 0) return sock.sendMessage(from, createForwardedOptions({ text: '🔒 لا توجد ألقاب محجوزة في هذه المجموعة بعد!' }));
+    if (keys.length === 0) return sock.sendMessage(from, { text: '🔒 لا توجد ألقاب محجوزة في هذه المجموعة بعد!', ...getChannelAdOptions(sock) });
     let text = `╭━━━〔 🔒 〕━━━╮\n『 قَـائِـمَـةُ الأَلْـقَـابِ الـمَـحْـجُـوﺯَةِ 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;
     let mentions = [];
     keys.forEach((userJid, idx) => {
@@ -1565,131 +1570,131 @@ if (cmd === 'قائمة_الالقاب_المحجوزة') {
         mentions.push(userJid);
     });
     text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions }));
+    return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'تفاعل') {    
     const parts = trimmedBody.split(' ');    
     commandReactionEmoji = parts[1] || '⚡';    
     commandReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
-    return sock.sendMessage(from, createForwardedOptions({ text: `🟢 تم تحديث إعدادات التفاعل.` }));    
+    return sock.sendMessage(from, { text: `🟢 تم تحديث إعدادات التفاعل.`, ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'تفاعل_مطور') {    
     const parts = trimmedBody.split(' ');    
     devReactionEmoji = parts[1] || '👑';    
     devReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
-    return sock.sendMessage(from, createForwardedOptions({ text: `🟢 تم تحديث تفاعل المطور.` }));    
+    return sock.sendMessage(from, { text: `🟢 تم تحديث تفاعل المطور.`, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'اضافة_مطور') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 يرجى عمل منشن للشخص.' }));    
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });    
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!extraDevelopers.includes(cleanNum)) extraDevelopers.push(cleanNum);
     
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِضَـافَـةُ مُـطَـوِّرٍ جَـدِيـد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🛡️ ⌯ الصلاحية ↞ مطور\n✅ ⌯ الحالة ↞ تمت إضافة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser] }));    
+    return sock.sendMessage(from, { text, mentions: [targetUser], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'حذف_مطور') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     const targetUser = getTargetUser(msg);    
     if (targetUser) {
         const cleanNum = targetUser.replace(/[^0-9]/g, '');
         extraDevelopers = extraDevelopers.filter(d => d !== cleanNum);
     }
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِزَالَـةُ صَـلَاحِـيَـاتِ مُـطَـوِّر 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${targetUser ? targetUser.split('@')[0] : 'المستخدم'}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🔓 ⌯ الإجراء ↞ إزالة صلاحيات المطور\n✅ ⌯ الحالة ↞ تمت إزالة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: targetUser ? [targetUser] : [] }));    
+    return sock.sendMessage(from, { text, mentions: targetUser ? [targetUser] : [], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'اضف_نخبة') {
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 يرجى عمل منشن للشخص.' }));
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!vipUsers.includes(cleanNum)) vipUsers.push(cleanNum);
 
     const text = `╭━━━〔 👑 〕━━━╮\n『 إِضَـافَـةُ عُـضْـوٍ إِلَـى الـنُّـخْـبَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الرتبة ↞ نُخبة\n🛡️ ⌯ الصلاحية ↞ عضو نخبة\n✅ ⌯ الحالة ↞ تمت الإضافة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'ازل_نخبة') {
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 يرجى عمل منشن للشخص.' }));
+    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     vipUsers = vipUsers.filter(v => v !== cleanNum);
 
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِزَالَـةُ عُـضْـوٍ مِنَ الـنُّـخْـبَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📉 ⌯ الرتبة السابقة ↞ نُخبة\n🔓 ⌯ الإجراء ↞ سحب رتبة النخبة\n✅ ⌯ الحالة ↞ تمت الإزالة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [targetUser, sender] }));
+    return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'عرض_نخبة') {
-    if (vipUsers.length === 0) return sock.sendMessage(from, createForwardedOptions({ text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!' }));
+    if (vipUsers.length === 0) return sock.sendMessage(from, { text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!', ...getChannelAdOptions(sock) });
     let text = `👑 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
     let mentions = [];
     vipUsers.forEach((v, idx) => {
         text += `${idx + 1}. @${v}\n`;
         mentions.push(v + '@s.whatsapp.net');
     });
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions }));
+    return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'اختبار') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     let isBotActive = !globalBotStopped;
     let statusEmoji = isBotActive ? '🟢' : '🔴';
     let testReport = `🧪 *فَـحْـصُ وَاسْـتِـعْـرَاضُ حَـالَـةِ أَوْامِـرِ الـبُـوتِ:*\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
     validCommands.forEach((c, idx) => { testReport += `> ${idx + 1}. \`.${c}\` ↞ ${statusEmoji}\n`; });
     testReport += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐\n📊 *إجمالي الأوامر الفعالة:* \`${validCommands.length}\` أمر\n🟢 حالة النظام: [ممتازة]`;
     const devPp = await getDeveloperProfilePic(sock);
-    try { await sock.sendMessage(from, createForwardedOptions({ image: { url: devPp }, caption: testReport })); } catch (e) { await sock.sendMessage(from, createForwardedOptions({ text: testReport })); }
+    try { await sock.sendMessage(from, { image: { url: devPp }, caption: testReport, ...getChannelAdOptions(sock, devPp) }); } catch (e) { await sock.sendMessage(from, { text: testReport, ...getChannelAdOptions(sock) }); }
     return;
 }    
 
 if (cmdBase === 'سجل_البوت') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
-    return sock.sendMessage(from, createForwardedOptions({ text: `📡 سجل العمليات:\n` + (botLogs.join('\n') || 'لا توجد سجلات بعد.') }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
+    return sock.sendMessage(from, { text: `📡 سجل العمليات:\n` + (botLogs.join('\n') || 'لا توجد سجلات بعد.'), ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'ايقاف_البوت' || cmdBase === 'إيقاف_البوت' || cmdBase === 'إيقاف البوت') {
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     globalBotStopped = true;
-    return sock.sendMessage(from, createForwardedOptions({ text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` }));
+    return sock.sendMessage(from, { text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.`, ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') {
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     globalBotStopped = false;
-    return sock.sendMessage(from, createForwardedOptions({ text: `🟢 تم تفعيل البوت بنجاح! البوت يعود للاستجابة للجميع.` }));
+    return sock.sendMessage(from, { text: `🟢 تم تفعيل البوت بنجاح! البوت يعود للاستجابة للجميع.`, ...getChannelAdOptions(sock) });
 }
 
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     const parts = trimmedBody.split(' ');    
     const action = (parts[1] || '').toLowerCase();    
     if (action === 'تفعيل' || action === 'تشغيل') {    
         getGroupSetting(from).antiOtherBots = true;    
-        return sock.sendMessage(from, createForwardedOptions({ text: `🛡️ *تم تفعيل تعطيل البوتات الأخرى في هذه المجموعة.*` }));    
+        return sock.sendMessage(from, { text: `🛡️ *تم تفعيل تعطيل البوتات الأخرى في هذه المجموعة.*`, ...getChannelAdOptions(sock) });    
     } else if (action === 'ايقاف' || action === 'إيقاف' || action === 'تعطيل') {    
         getGroupSetting(from).antiOtherBots = false;    
-        return sock.sendMessage(from, createForwardedOptions({ text: `🔓 *تم إيقاف ميزة تعطيل البوتات.*` }));    
+        return sock.sendMessage(from, { text: `🔓 *تم إيقاف ميزة تعطيل البوتات.*`, ...getChannelAdOptions(sock) });    
     } else {    
-        return sock.sendMessage(from, createForwardedOptions({ text: `📌 الاستخدام: \`.تعطيل_البوتات تفعيل\` أو \`.تعطيل_البوتات ايقاف\`` }));    
+        return sock.sendMessage(from, { text: `📌 الاستخدام: \`.تعطيل_البوتات تفعيل\` أو \`.تعطيل_البوتات ايقاف\``, ...getChannelAdOptions(sock) });    
     }    
 }    
 
 if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين الأساسيين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين الأساسيين فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).botMode = 'private';    
-    return sock.sendMessage(from, createForwardedOptions({ text: '🔒 تم تفعيل الوضع الخاص (المطورين والنخبة فقط).' }));    
+    return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (المطورين والنخبة فقط).', ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين الأساسيين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين الأساسيين فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).botMode = 'public';    
-    return sock.sendMessage(from, createForwardedOptions({ text: '🔓 تم تفعيل الوضع العام للجميع.' }));    
+    return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.', ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'كشف') {    
@@ -1704,14 +1709,14 @@ if (cmdBase === 'كشف') {
             if (['imageMessage', 'videoMessage', 'audioMessage'].includes(mtype)) {    
                 let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });    
                 let mime = viewOnceObj[mtype].mimetype || (mtype === 'imageMessage' ? 'image/jpeg' : 'video/mp4');    
-                let sendOptions = createForwardedOptions({ [mtype.replace('Message', '')]: stream, mimetype: mime, caption: `🔓 *تم كشف رسالة العرض الواحد بنجاح!*` });    
+                let sendOptions = { [mtype.replace('Message', '')]: stream, mimetype: mime, caption: `🔓 *تم كشف رسالة العرض الواحد بنجاح!*`, ...getChannelAdOptions(sock) };    
                 if (mtype === 'audioMessage') { sendOptions.ptt = true; delete sendOptions.caption; }    
                 await sock.sendMessage(from, sendOptions, { quoted: msg });    
                 return;    
             }    
-        } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: `❌ حدث خطأ أثناء كشف الوسائط.` })); }    
+        } catch (e) { return sock.sendMessage(from, { text: `❌ حدث خطأ أثناء كشف الوسائط.`, ...getChannelAdOptions(sock) }); }    
     }    
-    return sock.sendMessage(from, createForwardedOptions({ text: `📌 يرجى الرد على رسالة العرض مرة واحدة بكلمة \`كشف\`` }));    
+    return sock.sendMessage(from, { text: `📌 يرجى الرد على رسالة العرض مرة واحدة بكلمة \`كشف\``, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase === 'الأغنياء') {    
@@ -1727,21 +1732,21 @@ if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase =
         });    
         topText += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
         const userPp = await getUserProfilePic(sock, sender);    
-        try { await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: topText, mentions })); } catch (e) { await sock.sendMessage(from, createForwardedOptions({ text: topText, mentions })); }    
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: topText, mentions, ...getChannelAdOptions(sock, userPp) }); } catch (e) { await sock.sendMessage(from, { text: topText, mentions, ...getChannelAdOptions(sock) }); }    
         return;    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ تعذر جلب توب النقاط.' })); }
+    } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر جلب توب النقاط.', ...getChannelAdOptions(sock) }); }
 }    
 
 if (cmdBase === 'تحويل') {    
     const parts = trimmedBody.split(' ');    
     const amount = parseInt(parts[1]);    
     const targetUser = getTargetUser(msg);    
-    if (isNaN(amount) || amount <= 0 || !targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: `.تحويل <المبلغ> @منشن`' }));    
+    if (isNaN(amount) || amount <= 0 || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.تحويل <المبلغ> @منشن`', ...getChannelAdOptions(sock) });    
     getBankAccount(sender); getBankAccount(targetUser);    
-    if ((userPoints[sender] || 0) < amount) return sock.sendMessage(from, createForwardedOptions({ text: `❌ رصيدك لا يكفي!` }));    
+    if ((userPoints[sender] || 0) < amount) return sock.sendMessage(from, { text: `❌ رصيدك لا يكفي!`, ...getChannelAdOptions(sock) });    
     userPoints[sender] -= amount; userPoints[targetUser] += amount;    
     const text = `╭━━━〔 💸 〕━━━╮\n『 تَـحْـوِيـلُ الـنِّـقَـاط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ المُرسِل ↞ @${sender.split('@')[0]}\n🎯 ⌯ المُستلم ↞ @${targetUser.split('@')[0]}\n💰 ⌯ المبلغ ↞ ${amount} نقطة\n✅ ⌯ الحالة ↞ تمت عملية التحويل بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions: [sender, targetUser] }));    
+    return sock.sendMessage(from, { text, mentions: [sender, targetUser], ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'قائمة_المطورين') {    
@@ -1754,24 +1759,24 @@ if (cmdBase === 'قائمة_المطورين') {
             mentions.push(dev + '@s.whatsapp.net');
         });
     }
-    return sock.sendMessage(from, createForwardedOptions({ text, mentions }));    
+    return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'اعطاء' || cmdBase === 'إعطاء') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!', ...getChannelAdOptions(sock) });    
     const parts = trimmedBody.split(' ');    
     const amount = parseInt(parts[1]);    
     const targetUser = getTargetUser(msg);    
-    if (isNaN(amount) || !targetUser) return sock.sendMessage(from, createForwardedOptions({ text: '📌 الاستخدام: `.اعطاء 1000 @منشن`' }));    
+    if (isNaN(amount) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.اعطاء 1000 @منشن`', ...getChannelAdOptions(sock) });    
     getBankAccount(targetUser);    
     userPoints[targetUser] = (userPoints[targetUser] || 0) + amount;    
-    return sock.sendMessage(from, createForwardedOptions({ text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser] }), { quoted: msg });    
+    return sock.sendMessage(from, { text: `✅ تم إضافة ${amount} نقطة بنجاح.`, mentions: [targetUser], ...getChannelAdOptions(sock) }, { quoted: msg });    
 }    
 
 if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين فقط!' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     const bcText = trimmedBody.replace(/^\.(اذاعة|إذاعة)/i, '').trim();    
-    if (!bcText) return sock.sendMessage(from, createForwardedOptions({ text: '📌 اكتب نص الإذاعة بعد الأمر.' }));    
+    if (!bcText) return sock.sendMessage(from, { text: '📌 اكتب نص الإذاعة بعد الأمر.', ...getChannelAdOptions(sock) });    
     
     try {    
         const allGroups = await sock.groupFetchAllParticipating();    
@@ -1792,10 +1797,10 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 ├────────────⬣
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
-│ ✅ الحالة: تم استلاستلام البث بنجاح
+│ ✅ الحالة: تم استلام البث بنجاح
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
-            await sock.sendMessage(gId, createForwardedOptions({ text: broadcastFormatted, mentions: allGroupMentions }));
+            await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions, ...getChannelAdOptions(sock) });
         }    
 
         const finalReport = `╭━━〔 📡 𝑹𝑬𝑷𝑶𝑹𝑻 〕━━⬣
@@ -1807,13 +1812,13 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 🕒 وقت الإرسال: ${getJordanTime()}
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
-        return sock.sendMessage(from, createForwardedOptions({ text: finalReport }));    
-    } catch (e) { return sock.sendMessage(from, createForwardedOptions({ text: '❌ فشل إرسال الإذاعة.' })); }    
+        return sock.sendMessage(from, { text: finalReport, ...getChannelAdOptions(sock) });    
+    } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.', ...getChannelAdOptions(sock) }); }    
 }    
 
 if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {    
-    if (!isSenderDev) return sock.sendMessage(from, createForwardedOptions({ text: '❌ مخصص للمطورين!' }));    
-    await sock.sendMessage(from, createForwardedOptions({ text: '🔄 جاري إعادة تشغيل النظام...' }));    
+    if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين!', ...getChannelAdOptions(sock) });    
+    await sock.sendMessage(from, { text: '🔄 جاري إعادة تشغيل النظام...', ...getChannelAdOptions(sock) });    
     process.exit(0);    
 }    
 
@@ -1837,13 +1842,14 @@ if (cmdBase === 'بوت') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     try { 
-        await sock.sendMessage(from, createForwardedOptions({ 
-            image: { url: BOT_PROFILE_IMAGE_URL }, 
+        await sock.sendMessage(from, { 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
-            mentions: [sender]
-        })); 
+            mentions: [sender],
+            ...getChannelAdOptions(sock, await getBotProfilePic(sock))
+        }); 
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: botWelcomeText })); 
+        await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -1867,13 +1873,14 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
     try { 
-        await sock.sendMessage(from, createForwardedOptions({ 
+        await sock.sendMessage(from, { 
             image: { url: BOT_PROFILE_IMAGE_URL }, 
             caption: botCommandsText,
-            mentions: [sender]
-        })); 
+            mentions: [sender],
+            ...getChannelAdOptions(sock, BOT_PROFILE_IMAGE_URL)
+        }); 
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: botCommandsText })); 
+        await sock.sendMessage(from, { text: botCommandsText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -1895,12 +1902,12 @@ if (cmdBase === '1') {
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: text1, mentions: [sender] })); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
     } catch (err) {
-        await sock.sendMessage(from, createForwardedOptions({ text: text1, mentions: [sender] }));
+        await sock.sendMessage(from, { text: text1, mentions: [sender], ...getChannelAdOptions(sock) });
     }
 } catch (e) { 
-    await sock.sendMessage(from, createForwardedOptions({ text: text1 })); 
+    await sock.sendMessage(from, { text: text1, ...getChannelAdOptions(sock) }); 
 }
 return;
 }
@@ -1921,12 +1928,12 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 const userPp = await getUserProfilePic(sock, sender);
 try { 
     try {
-        await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: entAndGamesText, mentions: [sender] })); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
     } catch (err) {
-        await sock.sendMessage(from, createForwardedOptions({ text: entAndGamesText, mentions: [sender] }));
+        await sock.sendMessage(from, { text: entAndGamesText, mentions: [sender], ...getChannelAdOptions(sock) });
     }
 } catch (e) { 
-    await sock.sendMessage(from, createForwardedOptions({ text: entAndGamesText })); 
+    await sock.sendMessage(from, { text: entAndGamesText, ...getChannelAdOptions(sock) }); 
 }
 return;
 }
@@ -1941,12 +1948,12 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 const userPp = await getUserProfilePic(sock, sender);
 try { 
     try {
-        await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: bankMenuText, mentions: [sender] })); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
     } catch (err) {
-        await sock.sendMessage(from, createForwardedOptions({ text: bankMenuText, mentions: [sender] }));
+        await sock.sendMessage(from, { text: bankMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
     }
 } catch (e) { 
-    await sock.sendMessage(from, createForwardedOptions({ text: bankMenuText })); 
+    await sock.sendMessage(from, { text: bankMenuText, ...getChannelAdOptions(sock) }); 
 }
 return;
 }
@@ -1966,12 +1973,12 @@ if (cmdBase === '4') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: islamText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: islamText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: islamText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: islamText })); 
+        await sock.sendMessage(from, { text: islamText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -1985,12 +1992,12 @@ if (cmdBase === '5') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: funText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: funText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: funText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: funText })); 
+        await sock.sendMessage(from, { text: funText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2008,12 +2015,12 @@ if (cmdBase === '6') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: groupExtText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: groupExtText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: groupExtText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: groupExtText })); 
+        await sock.sendMessage(from, { text: groupExtText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2040,12 +2047,12 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
     const devPp = await getDeveloperProfilePic(sock);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: devPp }, caption: devMenuText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender], ...getChannelAdOptions(sock, devPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: devMenuText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: devMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: devMenuText })); 
+        await sock.sendMessage(from, { text: devMenuText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2072,12 +2079,12 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: adminMenuText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: adminMenuText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: adminMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: adminMenuText })); 
+        await sock.sendMessage(from, { text: adminMenuText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2087,12 +2094,12 @@ if (cmdBase === '9' || cmd === 'الكاشف') {
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: detectorMenuText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: detectorMenuText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: detectorMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: detectorMenuText })); 
+        await sock.sendMessage(from, { text: detectorMenuText, ...getChannelAdOptions(sock) }); 
     }    
     return;    
 }    
@@ -2109,12 +2116,12 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: titleMenuText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: titleMenuText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: titleMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: titleMenuText })); 
+        await sock.sendMessage(from, { text: titleMenuText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2133,12 +2140,12 @@ if (cmdBase === '11') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: stickerMenuText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: stickerMenuText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: stickerMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: stickerMenuText })); 
+        await sock.sendMessage(from, { text: stickerMenuText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
@@ -2148,12 +2155,12 @@ if (cmdBase === 'بنك' || cmd === 'حسابي') {
     const accText = `💳 *كَـشْـفُ الحِـسَـابِ:* \n> رصيدك: *${userPoints[sender]} نقطة*`;    
     try { 
         try {
-            await sock.sendMessage(from, createForwardedOptions({ image: { url: userPp }, caption: accText, mentions: [sender] })); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
         } catch (err) {
-            await sock.sendMessage(from, createForwardedOptions({ text: accText, mentions: [sender] }));
+            await sock.sendMessage(from, { text: accText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
     } catch (e) { 
-        await sock.sendMessage(from, createForwardedOptions({ text: accText, mentions: [sender] })); 
+        await sock.sendMessage(from, { text: accText, ...getChannelAdOptions(sock) }); 
     }    
     return;    
 }    
@@ -2163,14 +2170,14 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     const cooldown = 24 * 60 * 60 * 1000;
     if (!dailyRewards[sender]) dailyRewards[sender] = 0;
     if ((now - dailyRewards[sender]) < cooldown) {
-        return sock.sendMessage(from, createForwardedOptions({ text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً!`, mentions: [sender] }));
+        return sock.sendMessage(from, { text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً!`, mentions: [sender], ...getChannelAdOptions(sock) });
     }
     dailyRewards[sender] = now;
     getBankAccount(sender);
     userPoints[sender] += 20;
 
     const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    return sock.sendMessage(from, createForwardedOptions({ text: rewardText, mentions: [sender] }));
+    return sock.sendMessage(from, { text: rewardText, mentions: [sender], ...getChannelAdOptions(sock) });
 }
 
 });
