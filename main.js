@@ -1,4 +1,4 @@
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1';
+Process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '1';
 import './config.js';
 import {createRequire} from 'module';
 import path, {join} from 'path';
@@ -117,7 +117,7 @@ const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFil
 const msgRetryCounterMap = (MessageRetryMap) => { };
 const msgRetryCounterCache = new NodeCache()
 const {version} = await fetchLatestBaileysVersion();
-let phoneNumber = global.botnumber || "962795106901";
+let phoneNumber = global.botnumber || process.env.PAIRING_NUMBER || "962795106901";
 
 const pairingCode = true
 const useMobile = process.argv.includes("--mobile")
@@ -345,6 +345,7 @@ global.reloadHandler = async function(restatConn) {
   conn.credsUpdate = saveCreds.bind(global.conn, true);
 
   conn.ev.on('messages.upsert', conn.handler);
+  conn.ev.on('group-participants.update', conn.participantsUpdate);
   conn.ev.on('group-participants.update', conn.participantsUpdate);
   conn.ev.on('groups.update', conn.groupsUpdate);
   conn.ev.on('message.delete', conn.onDelete);
