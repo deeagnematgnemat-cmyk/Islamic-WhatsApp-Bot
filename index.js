@@ -1824,7 +1824,11 @@ if (cmdBase === 'بوت') {
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `📌 *عرض القناة والأوامر الرسمية*
+انقر هنا لمتابعة القناة الرسمية
+🔗 whatsapp.com
+
+🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
@@ -1845,11 +1849,11 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
     try { 
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
-            caption: `${BOT_CHANNEL_URL}\n\n${botCommandsText}`,
+            caption: botCommandsText,
             mentions: [sender]
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botCommandsText}` }); 
+        await sock.sendMessage(from, { text: botCommandsText }); 
     }
     return;
 }
