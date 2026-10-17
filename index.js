@@ -158,16 +158,23 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// تمت إزالة علامة إعادة التوجيه والمربع العلوي، والإبقاء فقط على زر وعرض القناة في الأسفل
+// إضافة علامة إعادة التوجيه وزر عرض القناة في الأسفل فقط
 function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
+            newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
+            serverMessageId: 100
+        },
         externalAdReply: {
             title: "قناة المطور الرسمية 📌",
             body: "انقر هنا لمتابعة القناة والانضمام إلينا",
             mediaType: 1,
             thumbnailUrl: customThumbnailUrl,
             sourceUrl: BOT_CHANNEL_URL,
-            renderLargerThumbnail: true
+            renderLargerThumbnail: false
         }
     };
 }
