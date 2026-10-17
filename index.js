@@ -8,12 +8,16 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 
-// تشغيل خادم الـ HTTP فوراً لضمان استقرار الحاوية على Railway
+// تشغيل خادم الـ HTTP مع استجابة صريحة لفحص السلامة (Health Check) لمنع إيقاف Railway للحاوية
 const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Eren Bot is running successfully!\n');
-}).listen(PORT, '0.0.0.0', () => {
+});
+
+server.keepAliveTimeout = 60000;
+server.on('error', (err) => console.log('HTTP Server Error:', err));
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 HTTP Server is running on port ${PORT}`);
 });
 
@@ -1004,7 +1008,7 @@ if (cmd.startsWith('ملصق_نصي')) {
         }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
-            pack: '『✦』 𝐸𝓇构𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
             author: DEVELOPER_NAME,
             type: StickerTypes.FULL,
             quality: 50
