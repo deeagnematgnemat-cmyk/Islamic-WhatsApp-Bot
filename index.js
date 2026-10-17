@@ -1784,7 +1784,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1801,22 +1801,21 @@ if (cmdBase === 'بوت') {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
-    const botPp = await getBotProfilePic(sock);
     try { 
         await sock.sendMessage(from, { 
-            image: { url: botPp }, 
-            caption: botWelcomeText, 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
+            caption: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}`,
             mentions: [sender]
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText }); 
+        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}` }); 
     }
     return;
 }
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `${BOT_CHANNEL_URL}\n\n🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
@@ -1833,15 +1832,15 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
+    const botPp = await getBotProfilePic(sock);
     try { 
         await sock.sendMessage(from, { 
-            video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botCommandsText, 
-            gifPlayback: true,
+            image: { url: botPp }, 
+            caption: `${BOT_CHANNEL_URL}\n\n${botCommandsText}`,
             mentions: [sender]
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: botCommandsText }); 
+        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botCommandsText}` }); 
     }
     return;
 }
