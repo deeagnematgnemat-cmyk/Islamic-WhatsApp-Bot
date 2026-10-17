@@ -158,23 +158,25 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// دالة التنسيق الموحدة لإظهار الرسائل كمعاد توجيهها مع زر عرض القناة فقط في الأسفل
+// دالة التنسيق الموحدة لضمان إعادة التوجيه وزر عرض القناة معاً وبشكل دقيق
 function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-            newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
-            newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
-            serverMessageId: 100
-        },
-        externalAdReply: {
-            title: "عرض القناة",
-            body: "",
-            mediaType: 1,
-            thumbnailUrl: customThumbnailUrl,
-            sourceUrl: BOT_CHANNEL_URL,
-            renderLargerThumbnail: false
+        contextInfo: {
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
+                newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
+                serverMessageId: 100
+            },
+            externalAdReply: {
+                title: "عرض القناة",
+                body: "انقر هنا لمتابعة القناة والانضمام إلينا",
+                mediaType: 1,
+                thumbnailUrl: customThumbnailUrl,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: false
+            }
         }
     };
 }
@@ -455,8 +457,9 @@ if (action === 'add' && settings.welcome) {
 
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
+        const adOpts = getChannelAdOptions(sock, userPp);
         try {
-            await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user], ...getChannelAdOptions(sock, userPp) });
+            await sock.sendMessage(id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user], ...adOpts });
         } catch (err) {
             await sock.sendMessage(id, { text: welcomeMsg, mentions: [user], ...getChannelAdOptions(sock) });
         }
@@ -488,8 +491,9 @@ if (action === 'add' && settings.welcome) {
 
 『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
 
+        const adOpts = getChannelAdOptions(sock, userPp);
         try {
-            await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user], ...getChannelAdOptions(sock, userPp) });
+            await sock.sendMessage(id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user], ...adOpts });
         } catch (err) {
             await sock.sendMessage(id, { text: goodbyeMsg, mentions: [user], ...getChannelAdOptions(sock) });
         }
@@ -997,7 +1001,8 @@ if (cmd === 'لصورة' || cmd === 'toimage') {
             return sock.sendMessage(from, { text: `📌 يرجى الرد على ملصق بكلمة \`.لصورة\` لتحويله.`, ...getChannelAdOptions(sock) });
         }
         const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        return sock.sendMessage(from, { image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*`, ...getChannelAdOptions(sock) }, { quoted: msg });
+        const adOpts = getChannelAdOptions(sock);
+        return sock.sendMessage(from, { image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*`, ...adOpts }, { quoted: msg });
     } catch (e) {
         return sock.sendMessage(from, { text: `❌ فشل تحويل الملصق إلى صورة.`, ...getChannelAdOptions(sock) });
     }
@@ -1110,12 +1115,13 @@ if (cmd === 'متحرك_لفيديو') {
         const videoBuffer = fs.readFileSync(outputMp4);
         try { fs.unlinkSync(inputWebp); fs.unlinkSync(outputMp4); } catch (e) {}
 
+        const adOpts = getChannelAdOptions(sock);
         return sock.sendMessage(from, { 
             video: videoBuffer, 
             caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو صالح ويعمل بكفاءة!*`, 
             mimetype: 'video/mp4',
             ptt: false,
-            ...getChannelAdOptions(sock)
+            ...adOpts
         }, { quoted: msg });
 
     } catch (e) {
@@ -1500,7 +1506,8 @@ if (cmd === 'توب_التفاعل') {
         });
         text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
         const userPp = await getUserProfilePic(sock, sender);
-        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text, mentions, ...getChannelAdOptions(sock, userPp) }); } catch (e) { await sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) }); }
+        const adOpts = getChannelAdOptions(sock, userPp);
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: text, mentions, ...adOpts }); } catch (e) { await sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) }); }
         return;
     } catch (e) { return sock.sendMessage(from, { text: `❌ تعذر جلب توب التفاعل.`, ...getChannelAdOptions(sock) }); }
 }
@@ -1657,7 +1664,8 @@ if (cmdBase === 'اختبار') {
     validCommands.forEach((c, idx) => { testReport += `> ${idx + 1}. \`.${c}\` ↞ ${statusEmoji}\n`; });
     testReport += `\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐\n📊 *إجمالي الأوامر الفعالة:* \`${validCommands.length}\` أمر\n🟢 حالة النظام: [ممتازة]`;
     const devPp = await getDeveloperProfilePic(sock);
-    try { await sock.sendMessage(from, { image: { url: devPp }, caption: testReport, ...getChannelAdOptions(sock, devPp) }); } catch (e) { await sock.sendMessage(from, { text: testReport, ...getChannelAdOptions(sock) }); }
+    const adOpts = getChannelAdOptions(sock, devPp);
+    try { await sock.sendMessage(from, { image: { url: devPp }, caption: testReport, ...adOpts }); } catch (e) { await sock.sendMessage(from, { text: testReport, ...getChannelAdOptions(sock) }); }
     return;
 }    
 
@@ -1717,7 +1725,8 @@ if (cmdBase === 'كشف') {
             if (['imageMessage', 'videoMessage', 'audioMessage'].includes(mtype)) {    
                 let stream = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });    
                 let mime = viewOnceObj[mtype].mimetype || (mtype === 'imageMessage' ? 'image/jpeg' : 'video/mp4');    
-                let sendOptions = { [mtype.replace('Message', '')]: stream, mimetype: mime, caption: `🔓 *تم كشف رسالة العرض الواحد بنجاح!*`, ...getChannelAdOptions(sock) };    
+                let adOpts = getChannelAdOptions(sock);
+                let sendOptions = { [mtype.replace('Message', '')]: stream, mimetype: mime, caption: `🔓 *تم كشف رسالة العرض الواحد بنجاح!*`, ...adOpts };    
                 if (mtype === 'audioMessage') { sendOptions.ptt = true; delete sendOptions.caption; }    
                 await sock.sendMessage(from, sendOptions, { quoted: msg });    
                 return;    
@@ -1740,7 +1749,8 @@ if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase =
         });    
         topText += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
         const userPp = await getUserProfilePic(sock, sender);    
-        try { await sock.sendMessage(from, { image: { url: userPp }, caption: topText, mentions, ...getChannelAdOptions(sock, userPp) }); } catch (e) { await sock.sendMessage(from, { text: topText, mentions, ...getChannelAdOptions(sock) }); }    
+        const adOpts = getChannelAdOptions(sock, userPp);
+        try { await sock.sendMessage(from, { image: { url: userPp }, caption: topText, mentions, ...adOpts }); } catch (e) { await sock.sendMessage(from, { text: topText, mentions, ...getChannelAdOptions(sock) }); }    
         return;    
     } catch (e) { return sock.sendMessage(from, { text: '❌ تعذر جلب توب النقاط.', ...getChannelAdOptions(sock) }); }
 }    
@@ -1806,7 +1816,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
 │ ✅ الحالة: تم استلام البث بنجاح
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions, ...getChannelAdOptions(sock) });
         }    
@@ -1849,12 +1859,14 @@ if (cmdBase === 'بوت') {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
+    const botPic = await getBotProfilePic(sock);
+    const adOpts = getChannelAdOptions(sock, botPic);
     try { 
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
             mentions: [sender],
-            ...getChannelAdOptions(sock, await getBotProfilePic(sock))
+            ...adOpts
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
@@ -1880,12 +1892,13 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
+    const adOpts = getChannelAdOptions(sock, BOT_PROFILE_IMAGE_URL);
     try { 
         await sock.sendMessage(from, { 
             image: { url: BOT_PROFILE_IMAGE_URL }, 
             caption: botCommandsText,
             mentions: [sender],
-            ...getChannelAdOptions(sock, BOT_PROFILE_IMAGE_URL)
+            ...adOpts
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botCommandsText, ...getChannelAdOptions(sock) }); 
@@ -1908,9 +1921,10 @@ if (cmdBase === '1') {
 > تفعيل: .حظر_جهات | سماح: .سماح_جهات
 
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
+const adOpts = getChannelAdOptions(sock, userPp);
 try { 
     try {
-        await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: text1, mentions: [sender], ...adOpts }); 
     } catch (err) {
         await sock.sendMessage(from, { text: text1, mentions: [sender], ...getChannelAdOptions(sock) });
     }
@@ -1934,9 +1948,10 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 > 🔠 .حرف ↞ كلمات بالحرف
 > 🚪 .انسحب ↞ إلغاء الفعالية`;
 const userPp = await getUserProfilePic(sock, sender);
+const adOpts = getChannelAdOptions(sock, userPp);
 try { 
     try {
-        await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender], ...adOpts }); 
     } catch (err) {
         await sock.sendMessage(from, { text: entAndGamesText, mentions: [sender], ...getChannelAdOptions(sock) });
     }
@@ -1954,9 +1969,10 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 > 🏆 .توب_نقاط ↞ ترتيب النقاط
 > 🎁 .مكافأة ↞ الهدية اليومية (+20 نقطة)`;
 const userPp = await getUserProfilePic(sock, sender);
+const adOpts = getChannelAdOptions(sock, userPp);
 try { 
     try {
-        await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+        await sock.sendMessage(from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender], ...adOpts }); 
     } catch (err) {
         await sock.sendMessage(from, { text: bankMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
     }
@@ -1979,9 +1995,10 @@ if (cmdBase === '4') {
 > 🕌 .اذكار_الصلاة ↞ أذكار بعد الصلاة المفروضة
 > 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد`;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: islamText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: islamText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -1998,9 +2015,10 @@ if (cmdBase === '5') {
 > 🤔 .ماذا_لو ↞ تساؤلات خيالية
 > 🗣️ .قول ↞ حكمة اليوم`;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: funText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: funText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2021,9 +2039,10 @@ if (cmdBase === '6') {
 > 📩 .رسائلي ↞ عدد رسائلك
 > 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: groupExtText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: groupExtText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2053,9 +2072,10 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 📢 .إذاعة <النص> ↞ إذاعة عامة
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     const devPp = await getDeveloperProfilePic(sock);
+    const adOpts = getChannelAdOptions(sock, devPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender], ...getChannelAdOptions(sock, devPp) }); 
+            await sock.sendMessage(from, { image: { url: devPp }, caption: devMenuText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: devMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2085,9 +2105,10 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: adminMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2100,9 +2121,10 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 if (cmdBase === '9' || cmd === 'الكاشف') {    
     const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
     const userPp = await getUserProfilePic(sock, sender);    
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: detectorMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2122,9 +2144,10 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
 > 📋 \`.قائمة_الالقاب\`
 > 🔒 \`.قائمة_الالقاب_المحجوزة\``;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: titleMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2146,9 +2169,10 @@ if (cmdBase === '11') {
 > 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
 > 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
     const userPp = await getUserProfilePic(sock, sender);
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: stickerMenuText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
@@ -2161,9 +2185,10 @@ if (cmdBase === '11') {
 if (cmdBase === 'بنك' || cmd === 'حسابي') {    
     const userPp = await getUserProfilePic(sock, sender);    
     const accText = `💳 *كَـشْـفُ الحِـسَـابِ:* \n> رصيدك: *${userPoints[sender]} نقطة*`;    
+    const adOpts = getChannelAdOptions(sock, userPp);
     try { 
         try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender], ...getChannelAdOptions(sock, userPp) }); 
+            await sock.sendMessage(from, { image: { url: userPp }, caption: accText, mentions: [sender], ...adOpts }); 
         } catch (err) {
             await sock.sendMessage(from, { text: accText, mentions: [sender], ...getChannelAdOptions(sock) });
         }
