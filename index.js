@@ -8,6 +8,15 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 
+// تشغيل خادم الـ HTTP فوراً وبشكل فوري لضمان استقرار Railway وعدم توقف الحاوية
+const PORT = process.env.PORT || 8080;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Eren Bot is running successfully!\n');
+}).listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP Server is running on port ${PORT}`);
+});
+
 ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
 
 const strictBadWords = ['كس', 'قحبة', 'قحبه', 'شرموط', 'شرموطة', 'شرموطه', 'منيوك', 'عرص', 'قواد', 'طيز', 'زب'];
@@ -2145,11 +2154,3 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 }
 
 startBot();
-
-const PORT = process.env.PORT || 8080;
-http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Eren Bot is running successfully!\n');
-}).listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server is running on port ${PORT}`);
-});
