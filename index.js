@@ -1105,7 +1105,7 @@ if (cmd.startsWith('حزمة')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` });
     }
     try {
-        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
+        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&text=${encodeURIComponent(characterName + ' sticker anime')}`;
         const res = await axios.get(searchApi, { timeout: 15000 });
         const results = res.data?.result;
 
@@ -1780,7 +1780,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 ├────────────⬣
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
-│ ✅ الحالة: تم استلاستلام البث بنجاح
+│ ✅ الحالة: تم استلام البث بنجاح
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
@@ -1830,13 +1830,12 @@ if (cmdBase === 'بوت') {
             caption: botWelcomeText,
             footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
             buttons: [
-                { buttonId: 'channel_link', buttonText: { displayText: '📢 قناة المطور الرسمية' }, type: 1, url: BOT_CHANNEL_URL }
+                { buttonId: 'dev_channel_btn', buttonText: { displayText: '📢 قناة المطور' }, type: 1, url: BOT_CHANNEL_URL }
             ],
-            headerType: 5,
             mentions: [sender]
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText }); 
+        await sock.sendMessage(from, { text: botWelcomeText + `\n\n📢 قناة المطور: ${BOT_CHANNEL_URL}`, mentions: [sender] }); 
     }
     return;
 }
