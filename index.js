@@ -362,12 +362,24 @@ markOnlineOnConnect: true
 
 sock.ev.on('creds.update', saveCreds);
 
+sock.ev.on('connection.update', async (u) => {
+const { connection, lastDisconnect, qr } = u;
+if (connection === 'close') {
+    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+    if (shouldReconnect) {
+        setTimeout(startBot, 3000);
+    }
+} else if (connection === 'open') {
+    console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
+}
+});
+
 if (!sock.authState.creds.registered) {
 setTimeout(async () => {
 try {
 let phoneNumber = "962795106901";
 if (!sock.authState.creds.me) {
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
 }
 let code = await sock.requestPairingCode(phoneNumber);
 code = code?.match(/.{1,4}/g)?.join("-") || code;
@@ -377,16 +389,8 @@ console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e?.message || e);
 }
-}, 12000);
+}, 10000);
 }
-
-sock.ev.on('connection.update', (u) => {
-if (u.connection === 'close') {
-if (u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-    setTimeout(startBot, 3000);
-}
-} else if (u.connection === 'open') console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
-});
 
 sock.ev.on('group-participants.update', async (anu) => {
 try {
