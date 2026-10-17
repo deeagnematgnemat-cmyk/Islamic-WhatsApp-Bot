@@ -1780,7 +1780,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 ├────────────⬣
 │ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
-│ ✅ الحالة: تم استلام البث بنجاح
+│ ✅ الحالة: تم استلاستلام البث بنجاح
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
             await sock.sendMessage(gId, { text: broadcastFormatted, mentions: allGroupMentions });
@@ -1793,7 +1793,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1828,16 +1828,12 @@ if (cmdBase === 'بوت') {
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
+            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            buttons: [
+                { buttonId: 'channel_link', buttonText: { displayText: '📢 قناة المطور الرسمية' }, type: 1, url: BOT_CHANNEL_URL }
+            ],
+            headerType: 5,
             mentions: [sender]
-        }, {
-            externalAdReply: {
-                title: "عرض القناة والأوامر الرسمية 📌",
-                body: "انقر هنا لمتابعة القناة الرسمية",
-                mediaType: 1,
-                thumbnailUrl: await getBotProfilePic(sock),
-                sourceUrl: BOT_CHANNEL_URL,
-                renderLargerThumbnail: true
-            }
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botWelcomeText }); 
