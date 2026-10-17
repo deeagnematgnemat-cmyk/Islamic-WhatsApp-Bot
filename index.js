@@ -224,7 +224,7 @@ const validCommands = [
 'زواج', 'غزل', 'ثنائي', 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
 'رسائلي', 'توب_التفاعل',
 'المطور', 'مطور', 'الادارة', 'الاداره',
-'اضافة_المطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
+'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'عدد_الانذارات', 'قائمة_الانذارات',
 'حظر رابط', 'سماح رابط', 'حظر شتم', 'سماح شتم', 'حظر جهات', 'سماح جهات',
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
@@ -1105,7 +1105,7 @@ if (cmd.startsWith('حزمة')) {
         return sock.sendMessage(from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` });
     }
     try {
-        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&text=${encodeURIComponent(characterName + ' sticker anime')}`;
+        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
         const res = await axios.get(searchApi, { timeout: 15000 });
         const results = res.data?.result;
 
@@ -1793,7 +1793,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1822,23 +1822,25 @@ if (cmdBase === 'بوت') {
 > ┃ 
 > ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-📢 *قناة المطور الرسمية:*
-${BOT_CHANNEL_URL}`;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     try { 
-        // إرسال الفيديو والاستمارة الأصلية مرة واحدة فقط ودون أي تكرار
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
             mentions: [sender]
-        });
-    } catch (e) { 
-        await sock.sendMessage(from, { 
-            text: botWelcomeText,
-            mentions: [sender]
+        }, {
+            externalAdReply: {
+                title: "عرض القناة والأوامر الرسمية 📌",
+                body: "انقر هنا لمتابعة القناة الرسمية",
+                mediaType: 1,
+                thumbnailUrl: await getBotProfilePic(sock),
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: true
+            }
         }); 
+    } catch (e) { 
+        await sock.sendMessage(from, { text: botWelcomeText }); 
     }
     return;
 }
@@ -1867,6 +1869,15 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botCommandsText,
             mentions: [sender]
+        }, {
+            externalAdReply: {
+                title: "عرض القناة والأوامر الرسمية 📌",
+                body: "انقر هنا لمتابعة القناة الرسمية",
+                mediaType: 1,
+                thumbnailUrl: botPp,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: true
+            }
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botCommandsText }); 
