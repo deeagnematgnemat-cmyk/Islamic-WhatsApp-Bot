@@ -202,8 +202,8 @@ const validCommands = [
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
+'صفر', 'بوت', 'اوامر', 'الأوامر',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -586,6 +586,9 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
     const game = activeGames[from];
     if (game.isCompleted) return;
     
+    const quotedMsgId = msg.message.extendedTextMessage?.contextInfo?.stanzaId;
+    const isReplyToGame = quotedMsgId && quotedMsgId === game.msgId;
+
     let isCorrect = false;
 
     if (game.type === 'typing') {
@@ -635,10 +638,12 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         }, 1500);
         return;
     } else {
-        await sock.sendMessage(from, { 
-            text: `❌ @${sender.split('@')[0]} إجابة خاطئة! حاول مجدداً.`, 
-            mentions: [sender] 
-        }, { quoted: msg });
+        if (isReplyToGame) {
+            await sock.sendMessage(from, { 
+                text: `❌ @${sender.split('@')[0]} إجابة خاطئة! حاول مجدداً.`, 
+                mentions: [sender] 
+            }, { quoted: msg });
+        }
         return;
     }
 }
@@ -1445,7 +1450,7 @@ if (cmd === 'توب_التفاعل') {
         Object.values(groupMsgs).forEach(val => totalGroupMessages += val);
 
         let sortedParticipants = meta.participants.sort((a, b) => (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0));
-        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْـيَـوْمِ (${todayKey}):*\n💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْـيَوْمِ (${todayKey}):*\n💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
         let mentions = [];
         sortedParticipants.forEach((p, idx) => {
             const msgCount = groupMsgs[p.id] || 0;
@@ -1802,51 +1807,69 @@ if (cmdBase === 'بوت') {
 > ┃ 
 > ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
-⚙️ *قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة (اكتب رقم القسم من 1 إلى 11):*
-
-1. 🛡️ الحماية
-2. 🎉 الترفيه
-3. 💳 البنك والنقاط
-4. 🕌 إسلامي
-5. 😂 الضحك
-6. 👥 المجموعات
-7. ♟️ المطور
-8. ⚡ الإدارة
-9. 🔎 الكشف
-10. 👑 الألقاب
-11. 🎨 الملصقات`;
-
-const botPp = await getBotProfilePic(sock);
-try { 
-    try {
+    const botPp = await getBotProfilePic(sock);
+    try { 
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
             caption: botWelcomeText, 
             mentions: [sender]
         }); 
-    } catch (err) {
-        await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender] });
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
+    } catch (e) { 
+        await sock.sendMessage(from, { text: botWelcomeText + `\n\n📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` }); 
     }
-    
-    await sock.sendMessage(from, {
-        text: `📂 *الأقسام الرئيسية و📢 قناة المطور الرسمية:*`,
-        contextInfo: {
-            externalAdReply: {
-                title: "『✦』 📂 𝐸𝓇𝑒𝓃 𝑩𝑶𝑻 - 🔓 اضغط هنا لفتح الأقسام",
-                body: "انقر هنا أو اكتب الأرقام من 1 إلى 11 للوصول المباشر للأقسام",
-                mediaType: 1,
-                renderLargerThumbnail: true,
-                thumbnailUrl: botPp,
-                sourceUrl: BOT_CHANNEL_URL
-            }
-        }
-    });
-} catch (e) { 
-    await sock.sendMessage(from, { text: botWelcomeText }); 
+    return;
 }
-return;
+
+if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
+    const time = getJordanTime();    
+    const botCommandsText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+> ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
+> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
+> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
+> ┃ 📊︙عدد الأوامر → ${validCommands.length} أمراً
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+
+> 🛡️ `.1` ↞ الحماية
+> 🎉 `.2` ↞ الترفيه
+> 💳 `.3` ↞ البنك والنقاط
+> 🕌 `.4` ↞ اسلامي
+> 😂 `.5` ↞ الضحك
+> 👥 `.6` ↞ المجموعات
+> ♟️ `.7` ↞ المطور
+> ⚡ `.8` ↞ الادارة
+> 🔍 `.9` ↞ الكشف
+> 👑 `.10` ↞ الألقاب
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+💡 *اكتب رقم القسم للوصول السريع!*`;
+
+    const botPp = await getBotProfilePic(sock);
+    try { 
+        await sock.sendMessage(from, { 
+            image: { url: botPp }, 
+            caption: botCommandsText, 
+            mentions: [sender]
+        }); 
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
+    } catch (e) { 
+        await sock.sendMessage(from, { text: botCommandsText + `\n\n📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` }); 
+    }
+    return;
 }
 
 if (cmdBase === '1') {    
@@ -2086,21 +2109,6 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
         }
     } catch (e) { 
         await sock.sendMessage(from, { text: titleMenuText }); 
-    }
-    return;
-}
-
-if (cmdBase === '11' || cmd === 'الملصقات' || cmd === 'مساعدة_الملصقات') {
-    const stickerMenuText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل إلى ملصق\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق لصورة\n> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط\n> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي\n> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك\n> 🎬 \`.فيديو_لملصق\` ↞ فيديو إلى ملصق متحرك\n> 🎥 \`.متحرك_لفيديو\` ↞ ملصق متحرك إلى فيديو\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sock.sendMessage(from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sock.sendMessage(from, { text: stickerMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sock.sendMessage(from, { text: stickerMenuText }); 
     }
     return;
 }
