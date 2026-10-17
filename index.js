@@ -1822,40 +1822,21 @@ if (cmdBase === 'بوت') {
 > ┃ 
 > ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+📢 *قناة المطور الرسمية:*
+${BOT_CHANNEL_URL}`;
 
     try { 
-        // 1. إرسال الفيديو والاستمارة الأصلية بالتمام والكمال
+        // إرسال الفيديو والاستمارة الأصلية مرة واحدة فقط ودون أي تكرار
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
             mentions: [sender]
         });
-
-        // 2. إرسال الزر التفاعلي الحقيقي الخاص بقناة المطور أسفل الاستمارة
-        await sock.sendMessage(from, {
-            interactiveMessage: {
-                body: { 
-                    text: "👇 *انقر على الزر أدناه للانضمام إلى قناة المطور الرسمية:*" 
-                },
-                nativeFlowMessage: {
-                    buttons: [
-                        {
-                            name: "cta_url",
-                            buttonParamsJson: JSON.stringify({
-                                display_text: "📢 قناة المطور",
-                                url: BOT_CHANNEL_URL,
-                                merchant_url: BOT_CHANNEL_URL
-                            })
-                        }
-                    ]
-                }
-            }
-        }, { quoted: msg });
     } catch (e) { 
-        // النسخ الاحتياطي الآمن في حال عدم استجابة العميل للزر التفاعلي
         await sock.sendMessage(from, { 
-            text: botWelcomeText + `\n\n📢 *قناة المطور الرسمية:*\n${BOT_CHANNEL_URL}`,
+            text: botWelcomeText,
             mentions: [sender]
         }); 
     }
@@ -2184,7 +2165,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     getBankAccount(sender);
     userPoints[sender] += 20;
 
-    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @@${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text: rewardText, mentions: [sender] });
 }
 
