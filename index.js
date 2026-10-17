@@ -158,7 +158,7 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// تعديل الدالة لتعرض اسم القناة وزر عرض القناة تماماً مثل بوت صديقك دون مربعات كبيرة
+// الحل الأوسط: إزالة المربع الأسود والرابط وكلمة "عرض القناة" وإظهار اسم القناة فقط في الأعلى بشكل صغير ومنسق
 function getChannelAdOptions(sock) {
     return {
         contextInfo: {
@@ -168,14 +168,6 @@ function getChannelAdOptions(sock) {
                 newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
                 newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
                 serverMessageId: 100
-            },
-            externalAdReply: {
-                title: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
-                body: 'عرض القناة',
-                mediaType: 1,
-                thumbnailUrl: BOT_PROFILE_IMAGE_URL,
-                sourceUrl: BOT_CHANNEL_URL,
-                renderLargerThumbnail: false
             }
         }
     };
