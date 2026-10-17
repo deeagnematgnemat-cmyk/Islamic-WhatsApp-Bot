@@ -586,9 +586,6 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
     const game = activeGames[from];
     if (game.isCompleted) return;
     
-    const quotedMsgId = msg.message.extendedTextMessage?.contextInfo?.stanzaId;
-    const isReplyToGame = quotedMsgId && quotedMsgId === game.msgId;
-
     let isCorrect = false;
 
     if (game.type === 'typing') {
@@ -638,12 +635,10 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         }, 1500);
         return;
     } else {
-        if (isReplyToGame) {
-            await sock.sendMessage(from, { 
-                text: `❌ @${sender.split('@')[0]} إجابة خاطئة! حاول مجدداً.`, 
-                mentions: [sender] 
-            }, { quoted: msg });
-        }
+        await sock.sendMessage(from, { 
+            text: `❌ @${sender.split('@')[0]} إجابة خاطئة! حاول مجدداً.`, 
+            mentions: [sender] 
+        }, { quoted: msg });
         return;
     }
 }
@@ -1811,14 +1806,14 @@ if (cmdBase === 'بوت') {
 
     const botPp = await getBotProfilePic(sock);
     try { 
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
             caption: botWelcomeText, 
             mentions: [sender]
         }); 
-        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
     } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText + `\n\n📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` }); 
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}\n\n` + botWelcomeText }); 
     }
     return;
 }
@@ -1860,14 +1855,14 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 
     const botPp = await getBotProfilePic(sock);
     try { 
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
             caption: botCommandsText, 
             mentions: [sender]
         }); 
-        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` });
     } catch (e) { 
-        await sock.sendMessage(from, { text: botCommandsText + `\n\n📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}` }); 
+        await sock.sendMessage(from, { text: `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}\n\n` + botCommandsText }); 
     }
     return;
 }
