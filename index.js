@@ -130,6 +130,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -635,10 +636,6 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         }, 1500);
         return;
     } else {
-        await sock.sendMessage(from, { 
-            text: `❌ @${sender.split('@')[0]} إجابة خاطئة! حاول مجدداً.`, 
-            mentions: [sender] 
-        }, { quoted: msg });
         return;
     }
 }
@@ -1787,7 +1784,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `📢 *قناة البوت الرسمية للمطور:*\n${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1819,7 +1816,7 @@ if (cmdBase === 'بوت') {
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `${BOT_CHANNEL_URL}\n\n🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
@@ -1836,11 +1833,11 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
 
-    const devPp = await getDeveloperProfilePic(sock);
     try { 
         await sock.sendMessage(from, { 
-            image: { url: devPp }, 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botCommandsText, 
+            gifPlayback: true,
             mentions: [sender]
         }); 
     } catch (e) { 
