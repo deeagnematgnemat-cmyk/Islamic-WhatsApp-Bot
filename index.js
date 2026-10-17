@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+Import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -1825,27 +1825,35 @@ if (cmdBase === 'بوت') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     try { 
-        // 1. إرسال الاستمارة الأصلية مع الفيديو تماماً كما طلبت
+        // 1. إرسال الفيديو والاستمارة الأصلية بالتمام والكمال
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
             mentions: [sender]
         });
 
-        // 2. إرسال زر تفاعلي إلكتروني مستقل بعد الفيديو للاستجابة المباشرة على واتساب العادي
+        // 2. إرسال الزر التفاعلي الحقيقي الخاص بقناة المطور أسفل الاستمارة
         await sock.sendMessage(from, {
-            text: "👇 *انقر على الزر أدناه للانضمام إلى قناة المطور الرسمية:*",
-            buttons: [
-                {
-                    buttonId: 'developer_channel_btn',
-                    buttonText: { displayText: '📢 قناة المطور' },
-                    type: 1
+            interactiveMessage: {
+                body: { 
+                    text: "👇 *انقر على الزر أدناه للانضمام إلى قناة المطور الرسمية:*" 
+                },
+                nativeFlowMessage: {
+                    buttons: [
+                        {
+                            name: "cta_url",
+                            buttonParamsJson: JSON.stringify({
+                                display_text: "📢 قناة المطور",
+                                url: BOT_CHANNEL_URL,
+                                merchant_url: BOT_CHANNEL_URL
+                            })
+                        }
+                    ]
                 }
-            ],
-            headerType: 1
-        });
+            }
+        }, { quoted: msg });
     } catch (e) { 
-        // النسخ الاحتياطي في حال حدثت أي مشكلة بالوسائط
+        // النسخ الاحتياطي الآمن في حال عدم استجابة العميل للزر التفاعلي
         await sock.sendMessage(from, { 
             text: botWelcomeText + `\n\n📢 *قناة المطور الرسمية:*\n${BOT_CHANNEL_URL}`,
             mentions: [sender]
@@ -2176,7 +2184,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     getBankAccount(sender);
     userPoints[sender] += 20;
 
-    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
+    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @@${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text: rewardText, mentions: [sender] });
 }
 
