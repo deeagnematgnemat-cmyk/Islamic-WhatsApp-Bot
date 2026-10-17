@@ -143,7 +143,9 @@ const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
-const BOT_PROFILE_IMAGE_URL = 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg';
+
+// تم تحديث روابط الصور برابط مباشر ومستقر تماماً
+const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/6P3L4KY/eren-commands-img.jpg'; // رابط مباشر للصورة التي أرسلتها
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -157,7 +159,6 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// دالة لإنشاء خيارات الرسائل مع إضافة بطاقة القناة في الأسفل (externalAdReply) كأنها معاد توجيهها من القناة
 function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
         externalAdReply: {
