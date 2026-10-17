@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, proto } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -224,7 +224,7 @@ const validCommands = [
 'زواج', 'غزل', 'ثنائي', 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
 'رسائلي', 'توب_التفاعل',
 'المطور', 'مطور', 'الادارة', 'الاداره',
-'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
+'اضافة_المطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'عدد_الانذارات', 'قائمة_الانذارات',
 'حظر رابط', 'سماح رابط', 'حظر شتم', 'سماح شتم', 'حظر جهات', 'سماح جهات',
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
@@ -1829,42 +1829,34 @@ if (cmdBase === 'بوت') {
 
 ⏱️ ⌯ الـتـوقـيـت ↞ ${time} PM
 
+📢 *قناة المطور الرسمية:*
+${BOT_CHANNEL_URL}
+
 ╔═══━━━〔 🍷 〕━━━═══╗
 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
 ╚═══━━━〔 🍷 〕━━━═══╝`;
 
     try { 
-        const buttons = [
-            {
-                name: 'cta_url',
-                buttonParamsJson: JSON.stringify({
-                    display_text: '📢 قناة المطور الرسمية',
-                    url: BOT_CHANNEL_URL,
-                    merchant_url: BOT_CHANNEL_URL
-                })
+        const botPp = await getBotProfilePic(sock);
+        // إرسال الفيديو الأصلي مع الاستمارة ورابط قناة المطور المتوافق مع واتساب العادي
+        await sock.sendMessage(from, { 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
+            caption: botWelcomeText,
+            mentions: [sender]
+        }, {
+            externalAdReply: {
+                title: "📢 قناة المطور الرسمية",
+                body: "انقر هنا للانضمام إلى القناة",
+                mediaType: 1,
+                thumbnailUrl: botPp,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: false
             }
-        ];
-
-        const interactiveMessage = {
-            body: { text: botWelcomeText },
-            footer: { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』' },
-            header: { title: '', subtitle: '', hasMediaAttachment: false },
-            nativeFlowMessage: { buttons: buttons }
-        };
-
-        const messageContent = generateWAMessageFromContent(from, {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage: interactiveMessage
-                }
-            }
-        }, { userJid: sender });
-
-        await sock.relayMessage(from, messageContent.message, { messageId: messageContent.key.id });
-
+        });
     } catch (e) { 
         await sock.sendMessage(from, { 
-            text: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
+            caption: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
             mentions: [sender]
         }); 
     }
