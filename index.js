@@ -139,7 +139,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
-const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinterest.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -1004,7 +1004,7 @@ if (cmd.startsWith('ملصق_نصي')) {
         }
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
-            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            pack: '『✦』 𝐸𝓇构𝓃 🍷 𝐵𝑜𝓉 『✦』',
             author: DEVELOPER_NAME,
             type: StickerTypes.FULL,
             quality: 50
@@ -1199,7 +1199,7 @@ if (cmd === 'زواج') {
 
         const marriageText = `╭━━〔 💍 𝑴𝑨𝑹𝑹𝑰𝑨𝑮𝑬 👑 〕━━⬣
 
-│ 🕊️ بِـفَـرْمَـانٍ رَسْـمِـيٍّ مِـنْ نِـقَـابَـةِ ڤِـيـنْـلاَنْـد 🗡️
+│ 🕊️ بِـفَـرْمَـانٍ رَسْـمِـيٍّ مِـنْ نِـقَـابَـةِ ڤِـيـنْـلاَنْـد 🗡️
 │ يُـعْـلَـنُ الـآنَ عَـقْـدُ الـقِـرَانِ الأُسْـطُـورِيّ بَـيْـنَ:
 
 │ 🤵🏻 ⇢ الـعَـرِيـسُ الـمُـحَـارِب:
@@ -1793,7 +1793,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1814,7 +1814,13 @@ if (cmdBase === 'بوت') {
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
-            mentions: [sender]
+            mentions: [sender],
+            linkPreview: {
+                "canonical-url": BOT_CHANNEL_URL,
+                "matched-text": BOT_CHANNEL_URL,
+                "title": "عرض القناة والأوامر الرسمية 📌",
+                "description": "انقر هنا لمتابعة القناة الرسمية"
+            }
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botWelcomeText }); 
@@ -1824,7 +1830,7 @@ if (cmdBase === 'بوت') {
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `${BOT_CHANNEL_URL}\n\n🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
@@ -1846,7 +1852,13 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
             caption: botCommandsText,
-            mentions: [sender]
+            mentions: [sender],
+            linkPreview: {
+                "canonical-url": BOT_CHANNEL_URL,
+                "matched-text": BOT_CHANNEL_URL,
+                "title": "عرض القناة والأوامر الرسمية 📌",
+                "description": "انقر هنا لمتابعة القناة الرسمية"
+            }
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botCommandsText }); 
