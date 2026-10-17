@@ -158,7 +158,7 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// إضافة علامة إعادة التوجيه وزر عرض القناة في الأسفل فقط
+// دالة التنسيق الموحدة لإظهار الرسائل كمعاد توجيهها مع زر عرض القناة فقط في الأسفل
 function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
     return {
         forwardingScore: 999,
@@ -169,8 +169,8 @@ function getChannelAdOptions(sock, customThumbnailUrl = BOT_PROFILE_IMAGE_URL) {
             serverMessageId: 100
         },
         externalAdReply: {
-            title: "قناة المطور الرسمية 📌",
-            body: "انقر هنا لمتابعة القناة والانضمام إلينا",
+            title: "عرض القناة",
+            body: "",
             mediaType: 1,
             thumbnailUrl: customThumbnailUrl,
             sourceUrl: BOT_CHANNEL_URL,
