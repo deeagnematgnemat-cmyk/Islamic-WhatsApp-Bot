@@ -142,7 +142,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
-const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinterest.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -345,6 +345,8 @@ function cleanTextForComparison(str) {
         .toLowerCase();
 }
 
+let isPairingRequested = false;
+
 async function startBot() {
 const { state, saveCreds } = await useMultiFileAuthState('arem_new_session');
 const { version } = await fetchLatestBaileysVersion();
@@ -364,33 +366,35 @@ sock.ev.on('creds.update', saveCreds);
 
 sock.ev.on('connection.update', async (u) => {
 const { connection, lastDisconnect, qr } = u;
+
 if (connection === 'close') {
-    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+    isPairingRequested = false;
+    const statusCode = lastDisconnect?.error?.output?.statusCode;
+    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
     if (shouldReconnect) {
         setTimeout(startBot, 3000);
+    }
+} else if (connection === 'connecting') {
+    if (!sock.authState.creds.registered && !isPairingRequested) {
+        isPairingRequested = true;
+        setTimeout(async () => {
+            try {
+                let phoneNumber = "962795106901";
+                let code = await sock.requestPairingCode(phoneNumber);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                console.log(`\n========================================`);
+                console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+                console.log(`========================================\n`);
+            } catch (e) {
+                console.error('خطأ في طلب كود الاقتران:', e?.message || e);
+                isPairingRequested = false;
+            }
+        }, 3000);
     }
 } else if (connection === 'open') {
     console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
 }
 });
-
-if (!sock.authState.creds.registered) {
-setTimeout(async () => {
-try {
-let phoneNumber = "962795106901";
-if (!sock.authState.creds.me) {
-    await new Promise(resolve => setTimeout(resolve, 5000));
-}
-let code = await sock.requestPairingCode(phoneNumber);
-code = code?.match(/.{1,4}/g)?.join("-") || code;
-console.log(`\n========================================`);
-console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
-console.log(`========================================\n`);
-} catch (e) {
-console.error('خطأ في طلب كود الاقتران:', e?.message || e);
-}
-}, 10000);
-}
 
 sock.ev.on('group-participants.update', async (anu) => {
 try {
@@ -1789,7 +1793,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
