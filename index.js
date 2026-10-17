@@ -1796,7 +1796,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1817,13 +1817,7 @@ if (cmdBase === 'بوت') {
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
-            mentions: [sender],
-            linkPreview: {
-                "canonical-url": BOT_CHANNEL_URL,
-                "matched-text": BOT_CHANNEL_URL,
-                "title": "عرض القناة والأوامر الرسمية 📌",
-                "description": "انقر هنا لمتابعة القناة الرسمية"
-            }
+            mentions: [sender]
         }, {
             externalAdReply: {
                 title: "عرض القناة والأوامر الرسمية 📌",
@@ -1835,14 +1829,14 @@ if (cmdBase === 'بوت') {
             }
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}` }); 
+        await sock.sendMessage(from, { text: botWelcomeText }); 
     }
     return;
 }
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `${BOT_CHANNEL_URL}\n\n🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
@@ -1864,13 +1858,7 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
         await sock.sendMessage(from, { 
             image: { url: botPp }, 
             caption: botCommandsText,
-            mentions: [sender],
-            linkPreview: {
-                "canonical-url": BOT_CHANNEL_URL,
-                "matched-text": BOT_CHANNEL_URL,
-                "title": "عرض القناة والأوامر الرسمية 📌",
-                "description": "انقر هنا لمتابعة القناة الرسمية"
-            }
+            mentions: [sender]
         }, {
             externalAdReply: {
                 title: "عرض القناة والأوامر الرسمية 📌",
@@ -1882,7 +1870,7 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
             }
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botCommandsText}` }); 
+        await sock.sendMessage(from, { text: botCommandsText }); 
     }
     return;
 }
