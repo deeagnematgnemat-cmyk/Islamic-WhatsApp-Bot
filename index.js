@@ -142,7 +142,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
-const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinterest.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
@@ -1793,7 +1793,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
@@ -1846,20 +1846,19 @@ if (cmdBase === 'بوت') {
 }
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
-    const time = getJordanTime();    
     const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
-> \`1.\` 🛡️ الحماية
-> \`2.\` 🎉 الترفيه
-> \`3.\` 💳 البنك والنقاط
-> \`4.\` 🕌 إسلامي
-> \`5.\` 😂 الضحك
-> \`6.\` 👥 المجموعات
-> \`7.\` ♟️ المطور
-> \`8.\` ⚡ الإدارة
-> \`9.\` 🔎 الكشف
-> \`10\` 👑 الألقاب
-> \`11\` 🎨 الملصقات
+> 🛡️ \`.1\` ↞ الحماية
+> 🎉 \`.2\` ↞ الترفيه
+> 💳 \`.3\` ↞ البنك والنقاط
+> 🕌 \`.4\` ↞ اسلامي
+> 😂 \`.5\` ↞ الضحك
+> 👥 \`.6\` ↞ المجموعات
+> ♟️ \`.7\` ↞ المطور
+> ⚡ \`.8\` ↞ الادارة
+> 🔍 \`.9\` ↞ الكشف
+> 👑 \`.10\` ↞ الألقاب
+> 🎨 \`.11\` ↞ الملصقات
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
@@ -1867,7 +1866,7 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
     const botPp = await getBotProfilePic(sock);
     try { 
         await sock.sendMessage(from, { 
-            image: { url: botPp }, 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botCommandsText,
             mentions: [sender]
         }, {
