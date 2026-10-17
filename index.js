@@ -158,7 +158,7 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// تعديل الدالة لإزالة المربع (externalAdReply) كلياً وإبقاء إعادة التوجيه وزر عرض القناة فقط
+// تعديل الدالة لتعرض اسم القناة وزر عرض القناة تماماً مثل بوت صديقك دون مربعات كبيرة
 function getChannelAdOptions(sock) {
     return {
         contextInfo: {
@@ -168,6 +168,14 @@ function getChannelAdOptions(sock) {
                 newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
                 newsletterName: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
                 serverMessageId: 100
+            },
+            externalAdReply: {
+                title: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』',
+                body: 'عرض القناة',
+                mediaType: 1,
+                thumbnailUrl: BOT_PROFILE_IMAGE_URL,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: false
             }
         }
     };
@@ -481,7 +489,7 @@ if (action === 'add' && settings.welcome) {
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵G𝑳𝑨ℕ𝐷』`;
 
         const adOpts = getChannelAdOptions(sock);
         try {
