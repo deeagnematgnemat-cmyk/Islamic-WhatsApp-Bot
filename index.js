@@ -366,15 +366,18 @@ if (!sock.authState.creds.registered) {
 setTimeout(async () => {
 try {
 let phoneNumber = "962795106901";
+if (!sock.authState.creds.me) {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+}
 let code = await sock.requestPairingCode(phoneNumber);
 code = code?.match(/.{1,4}/g)?.join("-") || code;
 console.log(`\n========================================`);
 console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
 console.log(`========================================\n`);
 } catch (e) {
-console.error('خطأ في طلب كود الاقتران:', e);
+console.error('خطأ في طلب كود الاقتران:', e?.message || e);
 }
-}, 5000);
+}, 7000);
 }
 
 sock.ev.on('connection.update', (u) => {
