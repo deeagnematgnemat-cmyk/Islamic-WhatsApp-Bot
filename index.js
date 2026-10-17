@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, generateWAMessageFromContent, proto } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -1825,17 +1825,46 @@ if (cmdBase === 'بوت') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     try { 
+        const buttons = [
+            {
+                name: 'cta_url',
+                buttonParamsJson: JSON.stringify({
+                    display_text: '📢 قناة المطور الرسمية',
+                    url: BOT_CHANNEL_URL,
+                    merchant_url: BOT_CHANNEL_URL
+                })
+            }
+        ];
+
+        const interactiveMessage = {
+            body: { text: botWelcomeText },
+            footer: { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』' },
+            header: {
+                title: "",
+                hasMediaAttachment: true,
+                videoMessage: (await sock.sendMessage(from, { video: { url: BOT_COMMANDS_VIDEO_URL } })).message.videoMessage
+            },
+            nativeFlowMessage: {
+                buttons: buttons
+            }
+        };
+
+        const messageContent = generateWAMessageFromContent(from, {
+            viewOnceMessage: {
+                message: {
+                    interactiveMessage: interactiveMessage
+                }
+            }
+        }, { userJid: sender });
+
+        await sock.relayMessage(from, messageContent.message, { messageId: messageContent.key.id });
+
+    } catch (e) { 
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botWelcomeText,
-            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            buttons: [
-                { buttonId: 'dev_channel_btn', buttonText: { displayText: '📢 قناة المطور' }, type: 1, url: BOT_CHANNEL_URL }
-            ],
+            caption: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
             mentions: [sender]
         }); 
-    } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText + `\n\n📢 قناة المطور: ${BOT_CHANNEL_URL}`, mentions: [sender] }); 
     }
     return;
 }
