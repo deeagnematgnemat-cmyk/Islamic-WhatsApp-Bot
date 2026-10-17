@@ -8,7 +8,6 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 
-// تشغيل خادم الـ HTTP مع استجابة صريحة لفحص السلامة (Health Check) لمنع إيقاف Railway للحاوية
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -1825,9 +1824,18 @@ if (cmdBase === 'بوت') {
                 "title": "عرض القناة والأوامر الرسمية 📌",
                 "description": "انقر هنا لمتابعة القناة الرسمية"
             }
+        }, {
+            externalAdReply: {
+                title: "عرض القناة والأوامر الرسمية 📌",
+                body: "انقر هنا لمتابعة القناة الرسمية",
+                mediaType: 1,
+                thumbnailUrl: await getBotProfilePic(sock),
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: true
+            }
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText }); 
+        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}` }); 
     }
     return;
 }
@@ -1863,9 +1871,18 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
                 "title": "عرض القناة والأوامر الرسمية 📌",
                 "description": "انقر هنا لمتابعة القناة الرسمية"
             }
+        }, {
+            externalAdReply: {
+                title: "عرض القناة والأوامر الرسمية 📌",
+                body: "انقر هنا لمتابعة القناة الرسمية",
+                mediaType: 1,
+                thumbnailUrl: botPp,
+                sourceUrl: BOT_CHANNEL_URL,
+                renderLargerThumbnail: true
+            }
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: botCommandsText }); 
+        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botCommandsText}` }); 
     }
     return;
 }
