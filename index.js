@@ -367,7 +367,7 @@ setTimeout(async () => {
 try {
 let phoneNumber = "962795106901";
 if (!sock.authState.creds.me) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 4000));
 }
 let code = await sock.requestPairingCode(phoneNumber);
 code = code?.match(/.{1,4}/g)?.join("-") || code;
@@ -377,7 +377,7 @@ console.log(`========================================\n`);
 } catch (e) {
 console.error('خطأ في طلب كود الاقتران:', e?.message || e);
 }
-}, 7000);
+}, 12000);
 }
 
 sock.ev.on('connection.update', (u) => {
@@ -1636,7 +1636,7 @@ if (cmdBase === 'سجل_البوت') {
 if (cmdBase === 'ايقاف_البوت' || cmdBase === 'إيقاف_البوت' || cmdBase === 'إيقاف البوت') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!' });
     globalBotStopped = true;
-    return sock.sendMessage(from, { text: `🔴 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` });
+    return sock.sendMessage(from, { text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` });
 }
 
 if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') {
