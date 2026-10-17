@@ -1807,22 +1807,31 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `╔═══━━━〔 🍷 〕━━━═══╗
+『 🍷 أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 🍷 』
+╚═══━━━〔 🍷 〕━━━═══╝
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+┌─〔 🏛️ 〕── *مُـعـلـومـات الـنـظـام* ──〔 🏛️ 〕─┐
 
-> ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
-> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
-> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
-> ┃ 📊︙عدد الأوامر → ${validCommands.length} أمراً
-> ┃ 
-> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
-> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
-> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
-> ┃ 
-> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
+│ 🔮 ⌯ الـمُـسـتـخـدم ↞ @${sender.split('@')[0]}
+│ 🎯 ⌯ حالة النظام ↞ يعمل بكفاءة عالية 🟢
+│ 👨🏻‍💻 ⌯ الــمـطـور ↞ 𝐸𝓇𝑒𝓃 (962796163926)
+│ 📊 ⌯ عدد الأوامر ↞ ${validCommands.length} أمراً
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
+└──────────────────────────────┘
+
+╭━━━〔 📜 〕━━━╮
+『 حِـكْـمَـةُ الـيَـوْمِ 』
+╰━━━〔 ⚜️ 〕━━━╯
+
+> ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور، بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+
+⏱️ ⌯ الـتـوقـيـت ↞ ${time} PM
+
+╔═══━━━〔 🍷 〕━━━═══╗
+『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
+╚═══━━━〔 🍷 〕━━━═══╝`;
 
     try { 
         const buttons = [
@@ -1839,14 +1848,8 @@ if (cmdBase === 'بوت') {
         const interactiveMessage = {
             body: { text: botWelcomeText },
             footer: { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』' },
-            header: {
-                title: "",
-                hasMediaAttachment: true,
-                videoMessage: (await sock.sendMessage(from, { video: { url: BOT_COMMANDS_VIDEO_URL } })).message.videoMessage
-            },
-            nativeFlowMessage: {
-                buttons: buttons
-            }
+            header: { title: '', subtitle: '', hasMediaAttachment: false },
+            nativeFlowMessage: { buttons: buttons }
         };
 
         const messageContent = generateWAMessageFromContent(from, {
@@ -1861,8 +1864,7 @@ if (cmdBase === 'بوت') {
 
     } catch (e) { 
         await sock.sendMessage(from, { 
-            video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
+            text: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
             mentions: [sender]
         }); 
     }
