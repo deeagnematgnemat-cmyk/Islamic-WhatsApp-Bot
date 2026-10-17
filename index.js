@@ -791,7 +791,7 @@ if (cmdBase === 'اضف_انذار') {
     if (activeWarnings >= 3) {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
         delete userWarnings[targetUser];    
-        return sock.sendMessage(from, { text: `🚨 تم طرد @${targetUser.split('@')[0]} لتجاوزه الحد الأقصى من الإنذارات!`, mentions: [targetUser] });    
+        return sock.sendMessage(from, { text: `🚨 @${targetUser.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات!`, mentions: [targetUser] });    
     }    
 
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِنْـذَارٌ إِدَارِيّ 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📌 ⌯ السبب ↞ مخالفة قوانين المجموعة\n🔢 ⌯ عدد التحذيرات ↞ [${activeWarnings}/3]\n⚠️ ⌯ الحالة ↞ تم تسجيل التحذير»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
@@ -1793,7 +1793,7 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
+    const botWelcomeText = `${BOT_CHANNEL_URL}\n\n🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1813,22 +1813,18 @@ if (cmdBase === 'بوت') {
     try { 
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}`,
+            caption: botWelcomeText,
             mentions: [sender]
         }); 
     } catch (e) { 
-        await sock.sendMessage(from, { text: `${BOT_CHANNEL_URL}\n\n${botWelcomeText}` }); 
+        await sock.sendMessage(from, { text: botWelcomeText }); 
     }
     return;
 }
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
     const time = getJordanTime();    
-    const botCommandsText = `📌 *عرض القناة والأوامر الرسمية*
-انقر هنا لمتابعة القناة الرسمية
-🔗 whatsapp.com
-
-🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `${BOT_CHANNEL_URL}\n\n🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > \`1.\` 🛡️ الحماية
 > \`2.\` 🎉 الترفيه
