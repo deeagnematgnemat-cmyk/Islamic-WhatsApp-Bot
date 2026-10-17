@@ -1807,56 +1807,47 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
 
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
-    const botWelcomeText = `╔═══━━━〔 🍷 〕━━━═══╗
-『 🍷 أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 🍷 』
-╚═══━━━〔 🍷 〕━━━═══╝
+    const botWelcomeText = `🍷 *أَهْـلاً بِـكَ فِي عَالَمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉* 🍷
 
-┌─〔 🏛️ 〕── *مُـعـلـومـات الـنـظـام* ──〔 🏛️ 〕─┐
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-│ 🔮 ⌯ الـمُـسـتـخـدم ↞ @${sender.split('@')[0]}
-│ 🎯 ⌯ حالة النظام ↞ يعمل بكفاءة عالية 🟢
-│ 👨🏻‍💻 ⌯ الــمـطـور ↞ 𝐸𝓇𝑒𝓃 (962796163926)
-│ 📊 ⌯ عدد الأوامر ↞ ${validCommands.length} أمراً
+> ┃ ⌯🔮︙الـمُـسـتـخـدم → @${sender.split('@')[0]}
+> ┃ ⌯🎯︙حالة النظام → يعمل بكفاءة عالية 🟢
+> ┃ ⌯👨🏻‍💻︙الــمـطـور → 𝐸𝓇𝑒𝓃 (962796163926)
+> ┃ 📊︙عدد الأوامر → ${validCommands.length} أمراً
+> ┃ 
+> ┃ ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور،*
+> ┃ *بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
+> ┃ ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
+> ┃ 
+> ┃ ⌯🚀︙الـتـوقـيـت → ${time}
 
-└──────────────────────────────┘
-
-╭━━━〔 📜 〕━━━╮
-『 حِـكْـمَـةُ الـيَـوْمِ 』
-╰━━━〔 ⚜️ 〕━━━╯
-
-> ♟️ *"الهيبةُ ليستْ بصَخبِ الـحُضور، بل بالتأثيرِ الصَّامِتِ الذي يترُكُ أثراً لا يُـنْسَى."*
-> ✦ لا نَسْعَى خَلْفَ الأَضْوَاءِ.. بَلْ نَدَعُ النَّتَائِجَ هِيَ مَنْ تَتَكَلَّمُ.
-
-⏱️ ⌯ الـتـوقـيـت ↞ ${time} PM
-
-📢 *قناة المطور الرسمية:*
-${BOT_CHANNEL_URL}
-
-╔═══━━━〔 🍷 〕━━━═══╗
-『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-╚═══━━━〔 🍷 〕━━━═══╝`;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     try { 
-        const botPp = await getBotProfilePic(sock);
-        // إرسال الفيديو الأصلي مع الاستمارة ورابط قناة المطور المتوافق مع واتساب العادي
+        // 1. إرسال الاستمارة الأصلية مع الفيديو تماماً كما طلبت
         await sock.sendMessage(from, { 
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
             mentions: [sender]
-        }, {
-            externalAdReply: {
-                title: "📢 قناة المطور الرسمية",
-                body: "انقر هنا للانضمام إلى القناة",
-                mediaType: 1,
-                thumbnailUrl: botPp,
-                sourceUrl: BOT_CHANNEL_URL,
-                renderLargerThumbnail: false
-            }
+        });
+
+        // 2. إرسال زر تفاعلي إلكتروني مستقل بعد الفيديو للاستجابة المباشرة على واتساب العادي
+        await sock.sendMessage(from, {
+            text: "👇 *انقر على الزر أدناه للانضمام إلى قناة المطور الرسمية:*",
+            buttons: [
+                {
+                    buttonId: 'developer_channel_btn',
+                    buttonText: { displayText: '📢 قناة المطور' },
+                    type: 1
+                }
+            ],
+            headerType: 1
         });
     } catch (e) { 
+        // النسخ الاحتياطي في حال حدثت أي مشكلة بالوسائط
         await sock.sendMessage(from, { 
-            video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botWelcomeText + `\n\n📢 *قناة المطور:* ${BOT_CHANNEL_URL}`,
+            text: botWelcomeText + `\n\n📢 *قناة المطور الرسمية:*\n${BOT_CHANNEL_URL}`,
             mentions: [sender]
         }); 
     }
@@ -1887,15 +1878,6 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
             video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botCommandsText,
             mentions: [sender]
-        }, {
-            externalAdReply: {
-                title: "عرض القناة والأوامر الرسمية 📌",
-                body: "انقر هنا لمتابعة القناة الرسمية",
-                mediaType: 1,
-                thumbnailUrl: botPp,
-                sourceUrl: BOT_CHANNEL_URL,
-                renderLargerThumbnail: true
-            }
         }); 
     } catch (e) { 
         await sock.sendMessage(from, { text: botCommandsText }); 
