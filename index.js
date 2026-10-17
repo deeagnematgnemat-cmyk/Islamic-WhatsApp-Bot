@@ -1793,7 +1793,7 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ 
 │ 🏛️ عدد المجموعات المستهدفة: [${targetGroupsCount}] مجموعة
 │ 🕒 وقت الإرسال: ${getJordanTime()}
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
 
         return sock.sendMessage(from, { text: finalReport });    
     } catch (e) { return sock.sendMessage(from, { text: '❌ فشل إرسال الإذاعة.' }); }    
