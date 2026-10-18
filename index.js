@@ -1400,7 +1400,7 @@ if (cmd === 'قران' || cmd === 'قرآن') {
         selectedAyat.push(`🔹 ${tempDb[randIdx]}`);
         tempDb.splice(randIdx, 1);
     }
-    return sock.sendMessage(from, { text: `📖 *آيَاتٌ قُرْآنِيَّةٌ مُبَارَكَةٌ (5 آيات):*\n\n` + selectedAyat.join('\n\n'), ...getChannelAdOptions(sock) });    
+    return sock.sendMessage(from, { text: `📖 *آيَاتٌ قُرْآنِيَّةٌ مُبَارَكَةٌ (5 آيات):*\n\n` + selectedAyat.join('\n\n'), ...getChannelAdOptions(sock) });    
 }    
 
 if (cmd === 'دعاء') {    
