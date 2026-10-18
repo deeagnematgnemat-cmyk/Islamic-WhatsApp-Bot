@@ -4,26 +4,9 @@
   "description": "www.techsoune.com",
   "main": "index.js",
   "type": "module",
-  "directories": {
-    "lib": "lib",
-    "src": "src",
-    "plugins": "plugins"
-  },
   "scripts": {
     "start": "node index.js"
   },
-  "homepage": "https://github.com/midsoune/Islamic-WhatsApp-Bot",
-  "author": {
-    "name": "MidSoune"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/midsoune/Islamic-WhatsApp-Bot.git"
-  },
-  "bugs": {
-    "url": "https://github.com/midsoune/Islamic-WhatsApp-Bot/issues"
-  },
-  "license": "GPL-3.0-or-later",
   "dependencies": {
     "@bochilteam/scraper": "^4.2.4",
     "@hapi/boom": "^10.0.1",
@@ -36,7 +19,6 @@
     "express": "^4.19.2",
     "file-type": "^19.0.0",
     "fluent-ffmpeg": "^2.1.2",
-    "formdata-node": "^6.0.3",
     "lodash": "^4.17.21",
     "lowdb": "^7.0.1",
     "moment-timezone": "^0.5.45",
@@ -49,8 +31,5 @@
     "wa-sticker-formatter": "^4.3.2",
     "ws": "^8.16.0",
     "yargs": "^17.7.2"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.0"
   }
 }
