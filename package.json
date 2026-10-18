@@ -11,7 +11,7 @@
     "@bochilteam/scraper": "^4.2.4",
     "@hapi/boom": "^10.0.1",
     "@vitalets/google-translate-api": "^8.0.0",
-    "@yemo-dev/yebail": "^1.0.0",
+    "@yemo-dev/yebail": "https://github.com/yemo-dev/yebail/archive/refs/heads/main.tar.gz",
     "axios": "^1.6.8",
     "body-parser": "^1.20.2",
     "chalk": "^5.0.0",
