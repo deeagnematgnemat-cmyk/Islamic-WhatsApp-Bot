@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@yemo-dev/yebail';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -1952,43 +1952,15 @@ if (cmdBase === 'بوت') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     const adOpts = getChannelAdOptions(sock);
-    
-    // الزر التفاعلي الإلكتروني المخصص لقائمة الأقساب فارغاً كما أردت تماماً
-    const interactiveListMessage = {
-        text: botWelcomeText,
-        footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-        title: '╭━━━〔 🍷 𝑬𝑹𝑬𝑵 𝑩𝑶𝑻 〕━━━╮',
-        buttonText: '⛨ ≡ الأقسام ≡ ⛨',
-        sections: [
-            {
-                title: 'الأقسام',
-                rows: []
-            }
-        ],
-        ...adOpts
-    };
-
-    try {
-        await sock.sendMessage(from, {
-            video: { url: BOT_COMMANDS_VIDEO_URL },
+    try { 
+        await sock.sendMessage(from, { 
+            video: { url: BOT_COMMANDS_VIDEO_URL }, 
             caption: botWelcomeText,
-            gifPlayback: true,
             mentions: [sender],
             ...adOpts
-        });
-        await sock.sendMessage(from, interactiveListMessage);
-    } catch (err) {
-        try {
-            await sock.sendMessage(from, {
-                video: { url: BOT_COMMANDS_VIDEO_URL },
-                caption: botWelcomeText,
-                mentions: [sender],
-                ...adOpts
-            });
-            await sock.sendMessage(from, interactiveListMessage);
-        } catch (e2) {
-            await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender], ...adOpts });
-        }
+        }); 
+    } catch (e) { 
+        await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
     }
     return;
 }
