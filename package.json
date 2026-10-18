@@ -33,7 +33,6 @@
     "@bochilteam/scraper": "^4.2.4",
     "@hapi/boom": "^10.0.1",
     "@vitalets/google-translate-api": "^8.0.0",
-    "@yemo-dev/yebail": "^1.0.0",
     "acrcloud": "^1.4.0",
     "awesome-phonenumber": "^2.68.0",
     "axios": "^1.1.3",
