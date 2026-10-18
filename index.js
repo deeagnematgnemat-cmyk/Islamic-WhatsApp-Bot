@@ -1955,25 +1955,20 @@ if (cmdBase === 'بوت') {
     
     try {
         await sock.sendMessage(from, {
-            text: botWelcomeText,
-            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            buttons: [
-                { buttonId: 'channel_btn', buttonText: { displayText: '📢 قناة المطور' }, type: 1 }
-            ],
-            headerType: 1,
+            video: { url: BOT_COMMANDS_VIDEO_URL },
+            caption: botWelcomeText,
+            gifPlayback: true,
             ...adOpts
-        }, { quoted: msg });
+        });
     } catch (err) {
         try {
             await sock.sendMessage(from, {
-                text: botWelcomeText,
-                templateButtons: [
-                    { index: 1, urlButton: { displayText: '📢 قناة المطور', url: BOT_CHANNEL_URL } }
-                ],
+                video: { url: BOT_COMMANDS_VIDEO_URL },
+                caption: botWelcomeText,
                 ...adOpts
-            }, { quoted: msg });
+            });
         } catch (e2) {
-            await sock.sendMessage(from, { text: botWelcomeText, ...adOpts }, { quoted: msg });
+            await sock.sendMessage(from, { text: botWelcomeText, ...adOpts });
         }
     }
     return;
@@ -2272,7 +2267,7 @@ if (cmdBase === '11') {
 > 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك
 > 🎬 \`.فيديو_لملصق\` ↞ فيديو لملصق
 > 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
-> 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
+> 📦 \`.حزمة <اسم الشخصية>\` hFile ↞ حزمة ملصقات`;
     const userPp = await getUserProfilePic(sock, sender);
     const adOpts = getChannelAdOptions(sock);
     try { 
