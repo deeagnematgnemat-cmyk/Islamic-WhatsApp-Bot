@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@yemo-dev/yebail';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -142,7 +142,7 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
-const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
+const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinterest.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
 let extraDevelopers = []; 
@@ -307,7 +307,7 @@ function shuffleString(str) {
     let arr = str.split('');
     for (let i = arr.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+        [arr[i], arr[j]] = [arr[i], arr[j]];
     }
     return arr.join(' ');
 }
@@ -1624,7 +1624,7 @@ if (cmd === 'قائمة_الالقاب_المحجوزة') {
         text += `${idx + 1}. @${userJid.split('@')[0]} ↞ *[${resTitles[userJid]} ]*\n`;
         mentions.push(userJid);
     });
-    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇划』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
@@ -1953,7 +1953,7 @@ if (cmdBase === 'بوت') {
 
     const adOpts = getChannelAdOptions(sock);
     
-    // الزر التفاعلي الإلكتروني السفلي المخصص للأقسام (فارغ كما طلبت تماماً)
+    // الزر التفاعلي الإلكتروني المخصص لقائمة الأقساب فارغاً كما أردت تماماً
     const interactiveListMessage = {
         text: botWelcomeText,
         footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
@@ -1961,20 +1961,8 @@ if (cmdBase === 'بوت') {
         buttonText: '⛨ ≡ الأقسام ≡ ⛨',
         sections: [
             {
-                title: 'قائمة أقسام البوت الرسمية',
-                rows: [
-                    { title: '.1 - قسم الحماية', rowId: '.1', description: 'إدارة وتفعيل/تعطيل حماية الروابط والشتم' },
-                    { title: '.2 - الترفيه والالعاب', rowId: '.2', description: 'ألعاب التفكيك، السرعة، والفعاليات الأسطورية' },
-                    { title: '.3 - البنك والنقاط', rowId: '.3', description: 'رصيد الحساب، التحويل، والمكافأة اليومية' },
-                    { title: '.4 - القسم الإسلامي', rowId: '.4', description: 'القرآن الكريم، الأذكار، والأحاديث النبوية' },
-                    { title: '.5 - الضحك والترفيه', rowId: '.5', description: 'النكت، ماذا لو، ومقولات اليوم' },
-                    { title: '.6 - المجموعات والتفاعل', rowId: '.6', description: 'الزواج، الغزل، وتوب التفاعلات اليومية' },
-                    { title: '.7 - قسم المطور', rowId: '.7', description: 'أوامر التحكم والمطورين الأساسيين' },
-                    { title: '.8 - قسم الإدارة', rowId: '.8', description: 'قفل الجروب، الطرد، والإنذارات الإدارية' },
-                    { title: '.9 - الكاشف', rowId: '.9', description: 'كشف الوسائط المعروضة مرة واحدة' },
-                    { title: '.10 - الألقاب', rowId: '.10', description: 'إضافة وحجز الألقاب الخاصة للأعضاء' },
-                    { title: '.11 - الملصقات', rowId: '.11', description: 'صانع الملصقات والمتحرّكات والحزم' }
-                ]
+                title: 'الأقسام',
+                rows: []
             }
         ],
         ...adOpts
@@ -1985,6 +1973,7 @@ if (cmdBase === 'بوت') {
             video: { url: BOT_COMMANDS_VIDEO_URL },
             caption: botWelcomeText,
             gifPlayback: true,
+            mentions: [sender],
             ...adOpts
         });
         await sock.sendMessage(from, interactiveListMessage);
@@ -1993,11 +1982,12 @@ if (cmdBase === 'بوت') {
             await sock.sendMessage(from, {
                 video: { url: BOT_COMMANDS_VIDEO_URL },
                 caption: botWelcomeText,
+                mentions: [sender],
                 ...adOpts
             });
             await sock.sendMessage(from, interactiveListMessage);
         } catch (e2) {
-            await sock.sendMessage(from, { text: botWelcomeText, ...adOpts });
+            await sock.sendMessage(from, { text: botWelcomeText, mentions: [sender], ...adOpts });
         }
     }
     return;
@@ -2296,7 +2286,7 @@ if (cmdBase === '11') {
 > 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك
 > 🎬 \`.فيديو_لملصق\` ↞ فيديو لملصق
 > 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
-> 📦 \`.حزمة <اسم الشخصية>\` hFile ↞ حزمة ملصقات`;
+> 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
     const userPp = await getUserProfilePic(sock, sender);
     const adOpts = getChannelAdOptions(sock);
     try { 
