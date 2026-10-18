@@ -307,7 +307,7 @@ function shuffleString(str) {
     let arr = str.split('');
     for (let i = arr.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[i], arr[j]];
+        [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr.join(' ');
 }
@@ -444,7 +444,7 @@ if (action === 'add' && settings.welcome) {
 
 🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺
 
-『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨ℕ𝐷』`;
+『𝑽. 𝑳. 1⊰🗡⊱ 𝑬𝑵G𝑳𝑨ℕ𝐷』`;
 
         const adOpts = getChannelAdOptions(sock);
         try {
@@ -1624,7 +1624,7 @@ if (cmd === 'قائمة_الالقاب_المحجوزة') {
         text += `${idx + 1}. @${userJid.split('@')[0]} ↞ *[${resTitles[userJid]} ]*\n`;
         mentions.push(userJid);
     });
-    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇划』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    text += `\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions, ...getChannelAdOptions(sock) });
 }
 
