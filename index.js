@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+Import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -422,7 +422,7 @@ if (action === 'add' && settings.welcome) {
 
 ❋・────━【🗡】━────・❋
 
-- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلانـد، أهـلاً وسـهـلاً ومـرحـبـاً بـك، نـتـمـنـى أن تـكـون رحـلـتـك مـلـيـئـة بـالـمـجـد وَالـمـغـامـرات.
+- مـحـارب جـديـد يـحـط الـرحـال فـي أرض ڤـيـنـلانـد، أهـلاً وسـهـلاً ومـرحـبـاً بـك، نـتـمـنـى أن تـكـون رحـلـتـك مـلـيـئـة بـالـمـج-د وَالـمـغـامـرات.
 
 ❋・────━【🗡】━────・❋
 
@@ -1951,16 +1951,56 @@ if (cmdBase === 'بوت') {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
+    const interactiveMessage = {
+        body: { text: botWelcomeText },
+        footer: { text: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』" },
+        header: {
+            title: "قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة",
+            hasMediaAttachment: true,
+            imageMessage: {
+                url: BOT_PROFILE_IMAGE_URL,
+                mimetype: 'image/jpeg'
+            }
+        },
+        nativeFlowMessage: {
+            buttons: [
+                {
+                    name: "cta_url",
+                    buttonParamsJson: JSON.stringify({
+                        display_text: "📢 قناة المطور",
+                        url: BOT_CHANNEL_URL,
+                        merchant_url: BOT_CHANNEL_URL
+                    })
+                }
+            ]
+        }
+    };
+
     const adOpts = getChannelAdOptions(sock);
     try { 
-        await sock.sendMessage(from, { 
-            video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botWelcomeText,
+        const prepMsg = await sock.sendMessage(from, {
+            viewOnceMessage: {
+                message: {
+                    interactiveMessage: interactiveMessage
+                }
+            },
             mentions: [sender],
             ...adOpts
-        }); 
+        });
+        if (!prepMsg) {
+            throw new Error('Interactive message fallback');
+        }
     } catch (e) { 
-        await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
+        try {
+            await sock.sendMessage(from, { 
+                video: { url: BOT_COMMANDS_VIDEO_URL }, 
+                caption: botWelcomeText,
+                mentions: [sender],
+                ...adOpts
+            });
+        } catch (err) {
+            await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
+        }
     }
     return;
 }
