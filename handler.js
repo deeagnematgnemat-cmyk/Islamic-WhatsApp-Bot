@@ -1,4 +1,4 @@
-import {generateWAMessageFromContent} from '@whiskeysockets/baileys';
+import {generateWAMessageFromContent} from '@yemo-dev/yebail';
 import {smsg} from './lib/simple.js';
 import {format} from 'util';
 import {fileURLToPath} from 'url';
@@ -10,9 +10,9 @@ import mddd5 from 'md5';
 import ws from 'ws';
 
 /**
- * @type {import('@whiskeysockets/baileys')}
+ * @type {import('@yemo-dev/yebail')}
  */
-const {proto} = (await import('@whiskeysockets/baileys')).default;
+const {proto} = (await import('@yemo-dev/yebail')).default;
 const isNumber = (x) => typeof x === 'number' && !isNaN(x);
 const delay = (ms) => isNumber(ms) && new Promise((resolve) => setTimeout(function() {
   clearTimeout(this);
@@ -21,7 +21,7 @@ const delay = (ms) => isNumber(ms) && new Promise((resolve) => setTimeout(functi
 
 /**
  * Handle messages upsert
- * @param {import('@whiskeysockets/baileys').BaileysEventMap<unknown>['messages.upsert']} groupsUpdate
+ * @param {import('@yemo-dev/yebail').BaileysEventMap<unknown>['messages.upsert']} groupsUpdate
  */
 export async function handler(chatUpdate) {
   this.msgqueque = this.msgqueque || [];
