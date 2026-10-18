@@ -12,6 +12,7 @@
     "@hapi/boom": "^10.0.1",
     "@vitalets/google-translate-api": "^8.0.0",
     "@whiskeysockets/baileys": "^6.6.0",
+    "@yemo-dev/yebail": "^1.0.0",
     "axios": "^1.6.8",
     "body-parser": "^1.20.2",
     "chalk": "^5.0.0",
