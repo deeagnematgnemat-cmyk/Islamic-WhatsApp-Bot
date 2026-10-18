@@ -664,38 +664,11 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         if (!game.scores) game.scores = {};
         game.scores[sender] = (game.scores[sender] || 0) + 1;
         const currentScore = game.scores[sender];
+        const gameTypeToRestart = game.type;
+        const existingScores = game.scores;
+        delete activeGames[from];
 
-        if (currentScore >= 10) {
-            delete activeGames[from];
-            
-            const eventWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-  👑 *𝐄𝐕𝐄𝐍𝐓 𝐖𝐈𝐍𝐍𝐄𝐑*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-*«🏆 مُـبَـارَكُ الـفَـوْز! »*
-
-> ╎ 👤 الفائز بالفعالية:
-> ╎ @${sender.split('@')[0]}
-
-*╎ 🎯 النقاط المكتسبة: +50*
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-\`🍷 أحسنت! تستحق الفوز.\`
-
-*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
-
-            return sock.sendMessage(from, { text: eventWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
-        } else {
-            const gameTypeToRestart = game.type;
-            const existingScores = game.scores;
-            delete activeGames[from];
-
-            const roundWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+        const roundWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -717,8 +690,35 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
 
 *『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
 
-            await sock.sendMessage(from, { text: roundWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+        await sock.sendMessage(from, { text: roundWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
 
+        if (currentScore >= 10) {
+            setTimeout(async () => {
+                const eventWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+  👑 *𝐄𝐕𝐄𝐍𝐓 𝐖𝐈𝐍𝐍𝐄𝐑*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*«🏆 مُـبَـارَكُ الـفَـوْز! »*
+
+> ╎ 👤 الفائز بالفعالية:
+> ╎ @${sender.split('@')[0]}
+
+*╎ 🎯 النقاط المكتسبة: +50*
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+\`🍷 أحسنت! تستحق الفوز.\`
+
+*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+
+                await sock.sendMessage(from, { text: eventWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+            }, 1000);
+            return;
+        } else {
             setTimeout(() => {
                 if (!activeGames[from]) {
                     startNextRound(sock, from, gameTypeToRestart, existingScores);
@@ -1295,13 +1295,7 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
         }
     }, 15000);
 
-    const challengeMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-   ✍️ *𝐓𝐘𝐏𝐈𝐍𝐆 𝐂𝐇𝐀𝐋𝐋𝐄𝐍𝐆𝐄*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+    const challengeMsg = `*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 \`«🌀 جَـوْلَـةٌ جَـدِيـدَة»\`
 
@@ -1844,7 +1838,7 @@ if (cmdBase === 'توب_نقاط' || cmdBase === 'الاغنياء' || cmdBase =
         let topText = `╭━━━〔 🏆 〕━━━╮\n『 قَـائِـمَـةُ أَعْلَى الـنِّـقَـاط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n`;    
         sorted.forEach((u, index) => { 
             let medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
-            topText += `${medal} *الـمَـرْتَـبَـة [${index + 1}]* ↞ @${u.split('@')[0]}\n> 💰 *الـرَّصِـيـد:* \`${userPoints[u] || 0}\` نقطة\n\n`; 
+            topText += `${medal} *الـمَـرْتَـب [${index + 1}]* ↞ @${u.split('@')[0]}\n> 💰 *الـرَّصِـيـد:* \`${userPoints[u] || 0}\` نقطة\n\n`; 
         });    
         topText += `❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
         const userPp = await getUserProfilePic(sock, sender);    
