@@ -1,4 +1,4 @@
-import { generateWAMessageFromContent, prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import { generateWAMessageFromContent, prepareWAMessageMedia } from '@yemo-dev/yebail';
 
 let handler = async (m, { conn, usedPrefix }) => {
     const imageUrl = 'https://i.postimg.cc/q7SjJpYy/eren-pfp.jpg'; 
