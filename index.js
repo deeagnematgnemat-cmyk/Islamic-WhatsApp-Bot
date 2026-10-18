@@ -143,7 +143,6 @@ const DEVELOPER_NUMBER = '962796163926';
 const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://v1.pinimg.com/videos/iht/expMp4/5f/62/d0/5f62d0e960f2a2f55f99a912b25311ba_720w.mp4';
-
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
 let extraDevelopers = []; 
@@ -661,22 +660,74 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         game.isCompleted = true;
         clearTimeout(game.timer);
         getBankAccount(sender);
-        userPoints[sender] += 10;
-        const gameTypeToRestart = game.type;
-        delete activeGames[from];
+        userPoints[sender] += 1;
+        
+        if (!game.scores) game.scores = {};
+        game.scores[sender] = (game.scores[sender] || 0) + 1;
+        const currentScore = game.scores[sender];
 
-        await sock.sendMessage(from, { 
-            text: `✅ إجابة صحيحة!\n🏆 اللاعب: @${sender.split('@')[0]}\n💰 النقاط المكتسبة: +10 نقاط`, 
-            mentions: [sender],
-            ...getChannelAdOptions(sock)
-        });
+        if (currentScore >= 10) {
+            const gameTypeToRestart = game.type;
+            delete activeGames[from];
+            
+            const eventWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
 
-        setTimeout(() => {
-            if (!activeGames[from]) {
-                restartSameGame(sock, from, gameTypeToRestart);
-            }
-        }, 1500);
-        return;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+  👑 *𝐄𝐕𝐄𝐍𝐓 𝐖𝐈𝐍𝐍𝐄𝐑*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*«🏆 مُـبَـارَكُ الـفَـوْز! »*
+
+> ╎ 👤 الفائز بالفعالية:
+> ╎ @${sender.split('@')[0]}
+
+*╎ 🎯 النقاط المكتسبة: +50*
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+\`🍷 أحسنت! تستحق الفوز.\`
+
+*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+
+            return sock.sendMessage(from, { text: eventWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+        } else {
+            const gameTypeToRestart = game.type;
+            const existingScores = game.scores;
+            delete activeGames[from];
+
+            const roundWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+      👑 *𝐑𝐎𝐔𝐍𝐃 𝐖𝐈𝐍𝐍𝐄𝐑*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*«⚡ إِجَـابَـةٌ صَـحِـيـحَـة!»*
+
+> ╎ 🏆 الفائز بالجولة:
+> ╎ 👤 @${sender.split('@')[0]}
+
+> ╎ 🎯 النقاط: ${currentScore} / 10
+> ╎ 🥇 الحالة: فوز بالجولة
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🍷 أحسنت! نقطة جديدة تقترب بك من الفوز.*
+
+*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+
+            await sock.sendMessage(from, { text: roundWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+
+            setTimeout(() => {
+                if (!activeGames[from]) {
+                    startSpecificGame(sock, from, gameTypeToRestart, existingScores);
+                }
+            }, 1500);
+            return;
+        }
     } else {
         return;
     }
@@ -763,7 +814,7 @@ if (cmdBase === 'الكل' || cmdBase === 'منشن') {
 
 if (cmdBase === 'رفع' || cmdBase === 'ترقية') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.رفع @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'promote');    
         const text = `╭━━━〔 👑 〕━━━╮\n『 تَـرْقِـيَـةٌ إِدَارِيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🏆 ⌯ الرتبة الجديدة ↞ مشرف\n✨ ⌯ الحالة ↞ تمت الترقية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
@@ -773,7 +824,7 @@ if (cmdBase === 'رفع' || cmdBase === 'ترقية') {
 
 if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'demote');    
         const text = `╭━━━〔 ♟️ 〕━━━╮\n『 سَـحْـبُ الـصَّـلَاحِـيَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📉 ⌯ الرتبة السابقة ↞ مشرف\n👤 ⌯ الرتبة الحالية ↞ عضو\n✅ ⌯ الحالة ↞ تمت إزالة الإشراف بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
@@ -783,7 +834,7 @@ if (cmdBase === 'ازل' || cmdBase === 'تنزيل') {
 
 if (cmdBase === 'طرد') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.طرد @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     try {    
         await sock.groupParticipantsUpdate(from, [targetUser], 'remove');    
         const text = `╭━━━〔 ⚔️ 〕━━━╮\n『 قَـرَارُ الإِبْـعَـاد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📌 ⌯ الإجراء ↞ الطرد من المجموعة\n⚖️ ⌯ السبب ↞ مخالفة قوانين المجموعة\n✅ ⌯ الحالة ↞ تمت عملية الطرد بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
@@ -818,7 +869,7 @@ if (cmdBase === 'بوم') {
 
 if (cmdBase === 'اضف_انذار') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.اضف_انذار @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     const activeWarnings = addWarningToUser(targetUser);
 
     if (activeWarnings >= 3) {    
@@ -833,7 +884,7 @@ if (cmdBase === 'اضف_انذار') {
 
 if (cmdBase === 'ازل_انذار' || cmdBase === 'حذف_انذار') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.ازل_انذار @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     removeOneWarningFromUser(targetUser);
     const text = `╭━━━〔 ✅ 〕━━━╮\n『 إِلْـغَـاءُ الإِنْـذَار 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🧾 ⌯ الإجراء ↞ حذف التحذير\n✨ ⌯ الحالة ↞ تمت إعادة ضبط التحذيرات»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
@@ -841,7 +892,7 @@ if (cmdBase === 'ازل_انذار' || cmdBase === 'حذف_انذار') {
 
 if (cmdBase === 'صفر') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.صفر @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     delete userWarnings[targetUser];    
     return sock.sendMessage(from, { text: `✅ تم تصفير إنذارات العضو @${targetUser.split('@')[0]}.`, mentions: [targetUser], ...getChannelAdOptions(sock) });    
 }    
@@ -872,7 +923,7 @@ if (cmdBase === 'كتم') {
     const parts = trimmedBody.split(' ');    
     const mins = parseInt(parts[1]);    
     const targetUser = getTargetUser(msg);    
-    if (isNaN(mins) || !targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: `.كتم <دقائق> @عضو`', ...getChannelAdOptions(sock) });    
+    if (isNaN(mins) || !targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     if (!mutedUsers[from]) mutedUsers[from] = {};    
     mutedUsers[from][targetUser] = Date.now() + (mins * 60 * 1000);    
     const text = `╭━━━〔 🔇 〕━━━╮\n『 إِسْـكَـاتُ عُـضْـو 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔇 ⌯ الإجراء ↞ تفعيل الكتم\n⏳ ⌯ المدة ↞ [${mins} دقيقة]\n✅ ⌯ الحالة ↞ تم تنفيذ الكتم»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
@@ -881,7 +932,7 @@ if (cmdBase === 'كتم') {
 
 if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام: بالرد على رسالة العضو أو عمل منشن له `.الغاء_كتم @عضو`', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     if (mutedUsers[from]) delete mutedUsers[from][targetUser];    
     const text = `╭━━━〔 🔊 〕━━━╮\n『 إِلْـغَـاءُ الـكَـتْـم 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔊 ⌯ الإجراء ↞ إلغاء الكتم\n✅ ⌯ الحالة ↞ أصبح العضو غير مكتوم»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });    
@@ -1165,56 +1216,98 @@ if (cmd.startsWith('حزمة')) {
     }
 }
 
-async function restartSameGame(sock, from, gameType) {
+async function startSpecificGame(sock, from, gameType, existingScores = {}) {
     if (activeGames[from]) {
         clearTimeout(activeGames[from].timer);
         delete activeGames[from];
     }
 
     const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
+    let gameTitle = '';
+    let actionInstruction = '';
 
     if (gameType === 'typing') {
-        const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الكلمة كانت:* \`${word}\``, ...getChannelAdOptions(sock) });
-            }
-        }, 30000);
-        const sent = await sock.sendMessage(from, { text: `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية:\n\n👉 *${word}*`, ...getChannelAdOptions(sock) });
-        activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-
+        gameTitle = 'TYPING GAME';
+        actionInstruction = 'اكتب كلمة/اسم الأنمي التالي بشكل صحيح قبل الجميع!';
     } else if (gameType === 'disassemble') {
-        const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\``, ...getChannelAdOptions(sock) });
-            }
-        }, 30000);
-        const sent = await sock.sendMessage(from, { text: `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية:\n\n👉 *${word}*`, ...getChannelAdOptions(sock) });
-        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-
+        gameTitle = 'DISASSEMBLE GAME';
+        actionInstruction = 'قم بتفكيك اسم/كلمة الأنمي التالي بشكل صحيح قبل الجميع!';
     } else if (gameType === 'arrange') {
-        const shuffled = shuffleString(word);
-        const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الترتيب الصحيح هو:* \`${word}\``, ...getChannelAdOptions(sock) });
-            }
-        }, 30000);
-        const sent = await sock.sendMessage(from, { text: `🔤 *فَـعَـالِـيَّـةُ الـتَّـرْتِـيـبِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة:\n\n👉 *[ ${shuffled} ]*`, ...getChannelAdOptions(sock) });
-        activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-
+        gameTitle = 'ARRANGE GAME';
+        actionInstruction = 'أعد ترتيب الحروف المبعثرة بشكل صحيح قبل الجميع!';
     } else if (gameType === 'guess') {
-        const randomNum = Math.floor(Math.random() * 50) + 1;
-        const timer = setTimeout(async () => {
-            if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
-                delete activeGames[from];
-                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\``, ...getChannelAdOptions(sock) });
-            }
-        }, 30000);
-        const sent = await sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!`, ...getChannelAdOptions(sock) });
-        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
+        gameTitle = 'GUESS GAME';
+        actionInstruction = 'خمن الرقم الصحيح من 1 إلى 50 قبل الجميع!';
     }
+
+    const startMsg = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+    ✍️ *${gameTitle}*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*«🏁 بَـدْءُ مُـسَـابَـقَـةِ ${gameType === 'typing' ? 'الكتابة' : gameType === 'disassemble' ? 'التفكيك' : gameType === 'arrange' ? 'الترتيب' : 'التخمين'}»*
+
+> ╎ 🎯 الهدف: الوصول إلى 10 نقاط
+> ╎ ⏳ مدة الجولة: 15 ثانية
+> ╎ 🏆 الفوز: أول لاعب يصل إلى الهدف
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+\`⚡ هل أنت الأسرع؟ أثبت مهارتك!\`
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+
+    await sock.sendMessage(from, { text: startMsg, ...getChannelAdOptions(sock) });
+
+    setTimeout(async () => {
+        let displayContent = word;
+        if (gameType === 'disassemble') displayContent = disassembleWord(word);
+        if (gameType === 'arrange') displayContent = shuffleString(word);
+        if (gameType === 'guess') displayContent = Math.floor(Math.random() * 50) + 1;
+
+        const timer = setTimeout(async () => {
+            if (activeGames[from] && activeGames[from].type === gameType && !activeGames[from].isCompleted) {
+                delete activeGames[from];
+                await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الإجابة الصحيحة كانت:* \`${word}\``, ...getChannelAdOptions(sock) });
+            }
+        }, 15000);
+
+        const challengeMsg = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+   ✍️ *TYPING CHALLENGE*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+\`«🌀 جَـوْلَـةٌ جَـدِيـدَة»\`
+
+*╎ 💬 الكلمة المطلوبة:*
+
+    『 *${displayContent}* 』
+
+> ╎ ⏳ الوقت المتاح: 15 ثانية
+> ╎ 🏆 الجائزة: نقطة واحدة
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+\`⚡ ${actionInstruction}\`
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+
+        const sent = await sock.sendMessage(from, { text: challengeMsg, ...getChannelAdOptions(sock) });
+        activeGames[from] = { 
+            type: gameType, 
+            answer: gameType === 'guess' ? displayContent.toString() : word, 
+            timer: timer, 
+            isCompleted: false, 
+            msgId: sent.key.id,
+            scores: existingScores
+        };
+    }, 1500);
 }
 
 if (cmd === 'زواج') {    
@@ -1268,62 +1361,18 @@ if (cmd === 'خيروك' || cmd === 'لوخيروك') {
 }    
 
 if (cmdBase === 'كتابه' || cmdBase === 'كتابة') {
-    if (activeGames[from]) {
-        clearTimeout(activeGames[from].timer);
-        delete activeGames[from];
-    }
-    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
-    const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'typing' && !activeGames[from].isCompleted) {
-            delete activeGames[from];
-            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الكلمة كانت:* \`${word}\``, ...getChannelAdOptions(sock) });
-        }
-    }, 30000);
-
-    const promptText = `✍️ *فَـعَـالِـيَّـةُ الـكِـتَـابَـةِ (الوقت: 30 ثانية):*\n\nاكتب كلمة/اسم الأنمي التالية بدقة سرعة:\n\n👉 *${word}*`;
-    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
-        activeGames[from] = { type: 'typing', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-    });
+    startSpecificGame(sock, from, 'typing', {});
+    return;
 }
 
 if (cmdBase === 'تفكيك') {
-    if (activeGames[from]) {
-        clearTimeout(activeGames[from].timer);
-        delete activeGames[from];
-    }
-    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
-    const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'disassemble' && !activeGames[from].isCompleted) {
-            delete activeGames[from];
-            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *التفكيك الصحيح هو:* \`${disassembleWord(word)}\``, ...getChannelAdOptions(sock) });
-        }
-    }, 30000);
-
-    const promptText = `🧩 *فَـعَـالِـيَّـةُ الـتَّـفْـكِـيـكِ (الوقت: 30 ثانية):*\n\nقم بتفكيك اسم/كلمة الأنمي التالية وإعادة كتابتها بحروف مفصولة بمسافات:\n\n👉 *${word}*`;
-    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
-        activeGames[from] = { type: 'disassemble', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-    });
+    startSpecificGame(sock, from, 'disassemble', {});
+    return;
 }
 
 if (cmd === 'رتب') {
-    if (activeGames[from]) {
-        clearTimeout(activeGames[from].timer);
-        delete activeGames[from];
-    }
-    const word = animeDatabase[Math.floor(Math.random() * animeDatabase.length)];
-    const shuffled = shuffleString(word);
-
-    const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'arrange' && !activeGames[from].isCompleted) {
-            delete activeGames[from];
-            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد (30 ثانية)!*\n💡 *الترتيب الصحيح هو:* \`${word}\``, ...getChannelAdOptions(sock) });
-        }
-    }, 30000);
-
-    const promptText = `🔤 *فَـعَـالِـيَّـةُ تَـرْتِـيـبِ الـحُـرُوفِ (الوقت: 30 ثانية):*\n\nأعد ترتيب الحروف المبعثرة لتكوين اسم أنمي أو شخصية صحيحة:\n\n👉 *[ ${shuffled} ]*`;
-    return sock.sendMessage(from, { text: promptText, ...getChannelAdOptions(sock) }).then(sent => {
-        activeGames[from] = { type: 'arrange', answer: word, timer: timer, isCompleted: false, msgId: sent.key.id };
-    });
+    startSpecificGame(sock, from, 'arrange', {});
+    return;
 }
 
 if (cmd === 'حرف') {    
@@ -1354,20 +1403,8 @@ if (cmd === 'حكمة') {
 }    
 
 if (cmd === 'خمن') { 
-    if (activeGames[from]) {
-        clearTimeout(activeGames[from].timer);
-        delete activeGames[from];
-    }
-    const randomNum = Math.floor(Math.random() * 50) + 1;
-    const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'guess' && !activeGames[from].isCompleted) {
-            delete activeGames[from];
-            await sock.sendMessage(from, { text: `⏰ *انتهى الوقت المحدد!*\n💡 *الرقم الصحيح هو:* \`${randomNum}\``, ...getChannelAdOptions(sock) });
-        }
-    }, 30000);
-    return sock.sendMessage(from, { text: `🎯 *فعالية التخمين:* خمن الرقم الصحيح من 1 إلى 50!`, ...getChannelAdOptions(sock) }).then(sent => {
-        activeGames[from] = { type: 'guess', answer: randomNum.toString(), timer: timer, isCompleted: false, msgId: sent.key.id };
-    });
+    startSpecificGame(sock, from, 'guess', {});
+    return;
 }    
 
 if (cmdBase === 'حزورة' || cmdBase === 'لغز') { 
@@ -1507,7 +1544,7 @@ if (cmd.startsWith('اضافة_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
     const title = trimmedBody.replace(/^\.اضافة_لقب/i, '').replace(/@\d+/g, '').trim();
-    if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.اضافة_لقب @العضو اللقب`', ...getChannelAdOptions(sock) });
+    if (!targetUser || !title) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     if (!groupTitles[from]) groupTitles[from] = {};
     if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
     if (Object.values(groupTitles[from]).includes(title) || Object.values(groupReservedTitles[from]).includes(title)) {
@@ -1521,7 +1558,7 @@ if (cmd.startsWith('اضافة_لقب')) {
 if (cmd.startsWith('ازالة_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.ازالة_لقب @العضو`', ...getChannelAdOptions(sock) });
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     if (groupTitles[from]) delete groupTitles[from][targetUser];
     const text = `╭━━━〔 ❌ 〕━━━╮\n『 إِزَالَـةُ لَـقَـب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الحالة ↞ تمت إزالة اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
@@ -1531,7 +1568,7 @@ if (cmd.startsWith('حجز_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
     const title = trimmedBody.replace(/^\.حجز_لقب/i, '').replace(/@\d+/g, '').trim();
-    if (!targetUser || !title) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.حجز_لقب @العضو اللقب`', ...getChannelAdOptions(sock) });
+    if (!targetUser || !title) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     if (!groupTitles[from]) groupTitles[from] = {};
     if (!groupReservedTitles[from]) groupReservedTitles[from] = {};
     if (Object.values(groupTitles[from]).includes(title) || Object.values(groupReservedTitles[from]).includes(title)) {
@@ -1545,7 +1582,7 @@ if (cmd.startsWith('حجز_لقب')) {
 if (cmd.startsWith('الغاء_حجز_لقب')) {
     if (!isSenderAdmin && !isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمشرفين والمطور فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 الاستخدام الصحيح: `.الغاء_حجز_لقب @العضو`', ...getChannelAdOptions(sock) });
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     if (groupReservedTitles[from]) delete groupReservedTitles[from][targetUser];
     const text = `╭━━━〔 🔓 〕━━━╮\n『 إِلْـغَـاءُ حَـجْـزِ لَـقَـب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${targetUser.split('@')[0]}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الحالة ↞ تم إلغاء حجز اللقب بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』`;
     return sock.sendMessage(from, { text, mentions: [targetUser, sender], ...getChannelAdOptions(sock) });
@@ -1583,19 +1620,43 @@ if (cmdBase === 'تفاعل') {
     const parts = trimmedBody.split(' ');    
     commandReactionEmoji = parts[1] || '⚡';    
     commandReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
-    return sock.sendMessage(from, { text: `🟢 تم تحديث إعدادات التفاعل.`, ...getChannelAdOptions(sock) });    
+    const reactText = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🟢 تَـحْـدِيـثُ الـتَـفـاعـلُ*
+
+> ╎ ⚙️ تم تحديث إعدادات التفاعل بنجاح.
+> ╎ ✅ الحالة: تم حفظ التغييرات.
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+    return sock.sendMessage(from, { text: reactText, ...getChannelAdOptions(sock) });    
 }    
 if (cmdBase === 'تفاعل_مطور') {    
     const parts = trimmedBody.split(' ');    
     devReactionEmoji = parts[1] || '👑';    
     devReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
-    return sock.sendMessage(from, { text: `🟢 تم تحديث تفاعل المطور.`, ...getChannelAdOptions(sock) });    
+    const devReactText = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*👑 تَـحْـدِيـثُ تَـفَـاعُـلِ الـمُـطَـوِّر*
+
+> ╎ 🟢 الحالة: تم التحديث بنجاح.
+> ╎ ⚡ التغيير: تم اعتماد التفاعل الجديد.
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+    return sock.sendMessage(from, { text: devReactText, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'اضافة_مطور') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });    
     const targetUser = getTargetUser(msg);    
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });    
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });    
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!extraDevelopers.includes(cleanNum)) extraDevelopers.push(cleanNum);
     
@@ -1617,7 +1678,7 @@ if (cmdBase === 'حذف_مطور') {
 if (cmdBase === 'اضف_نخبة') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!vipUsers.includes(cleanNum)) vipUsers.push(cleanNum);
 
@@ -1628,7 +1689,7 @@ if (cmdBase === 'اضف_نخبة') {
 if (cmdBase === 'ازل_نخبة') {
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين فقط!', ...getChannelAdOptions(sock) });
     const targetUser = getTargetUser(msg);
-    if (!targetUser) return sock.sendMessage(from, { text: '📌 يرجى عمل منشن للشخص.', ...getChannelAdOptions(sock) });
+    if (!targetUser) return sock.sendMessage(from, { text: '『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐', ...getChannelAdOptions(sock) });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     vipUsers = vipUsers.filter(v => v !== cleanNum);
 
@@ -1695,13 +1756,41 @@ if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') 
 if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين الأساسيين فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).botMode = 'private';    
-    return sock.sendMessage(from, { text: '🔒 تم تفعيل الوضع الخاص (المطورين والنخبة فقط).', ...getChannelAdOptions(sock) });    
+    const privateMsg = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🔒 تَـمَّ تَـفْـعِـيـلُ الـوَضْـعِ الـخَـاصّ*
+
+> ╎ 🛡️ مستوى الوصول: المطورون والنخبة فقط
+> ╎ 🔐 الحالة: الوضع الخاص مفعّل
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+\`«🍷 الخصوصية امتياز، والوصول للنخبة فقط.»\`
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+    return sock.sendMessage(from, { text: privateMsg, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'عام' || cmdBase === 'وضع_عام') {    
     if (!isSenderDev) return sock.sendMessage(from, { text: '❌ مخصص للمطورين الأساسيين فقط!', ...getChannelAdOptions(sock) });    
     getGroupSetting(from).botMode = 'public';    
-    return sock.sendMessage(from, { text: '🔓 تم تفعيل الوضع العام للجميع.', ...getChannelAdOptions(sock) });    
+    const publicMsg = `*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🔓 تَـمَّ تَـفْـعِـيـلُ الـوَضْـعِ الـعَـامّ*
+
+> ╎ 🌐 حالة الوصول: متاح للجميع
+> ╎ ✅ الحالة: الوضع العام مفعّل
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+\`🍷 الجميع مرحّب بهم.\`
+
+*『✦』 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 『✦』*`;
+    return sock.sendMessage(from, { text: publicMsg, ...getChannelAdOptions(sock) });    
 }    
 
 if (cmdBase === 'كشف') {    
