@@ -158,7 +158,6 @@ function getJordanDateKey() {
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
 }
 
-// الحل الأوسط: إزالة المربع الأسود والرابط وكلمة "عرض القناة" وإظهار اسم القناة فقط في الأعلى بشكل صغير ومنسق
 function getChannelAdOptions(sock) {
     return {
         contextInfo: {
@@ -1488,7 +1487,7 @@ if (cmd === 'توب_التفاعل') {
         Object.values(groupMsgs).forEach(val => totalGroupMessages += val);
 
         let sortedParticipants = meta.participants.sort((a, b) => (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0));
-        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْـيَوْمِ (${todayKey}):*\n💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْيَوْمِ (${todayKey}):*\n💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
         let mentions = [];
         sortedParticipants.forEach((p, idx) => {
             const msgCount = groupMsgs[p.id] || 0;
@@ -1866,7 +1865,7 @@ if (cmdBase === 'بوت') {
 }
 
 if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
-    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
+    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
 
 > 🛡️ \`.1\` ↞ الحماية
 > 🎉 \`.2\` ↞ الترفيه
