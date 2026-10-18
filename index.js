@@ -1953,6 +1953,33 @@ if (cmdBase === 'بوت') {
 
     const adOpts = getChannelAdOptions(sock);
     
+    // الزر التفاعلي الإلكتروني السفلي المخصص للأقسام (فارغ كما طلبت تماماً)
+    const interactiveListMessage = {
+        text: botWelcomeText,
+        footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+        title: '╭━━━〔 🍷 𝑬𝑹𝑬𝑵 𝑩𝑶𝑻 〕━━━╮',
+        buttonText: '⛨ ≡ الأقسام ≡ ⛨',
+        sections: [
+            {
+                title: 'قائمة أقسام البوت الرسمية',
+                rows: [
+                    { title: '.1 - قسم الحماية', rowId: '.1', description: 'إدارة وتفعيل/تعطيل حماية الروابط والشتم' },
+                    { title: '.2 - الترفيه والالعاب', rowId: '.2', description: 'ألعاب التفكيك، السرعة، والفعاليات الأسطورية' },
+                    { title: '.3 - البنك والنقاط', rowId: '.3', description: 'رصيد الحساب، التحويل، والمكافأة اليومية' },
+                    { title: '.4 - القسم الإسلامي', rowId: '.4', description: 'القرآن الكريم، الأذكار، والأحاديث النبوية' },
+                    { title: '.5 - الضحك والترفيه', rowId: '.5', description: 'النكت، ماذا لو، ومقولات اليوم' },
+                    { title: '.6 - المجموعات والتفاعل', rowId: '.6', description: 'الزواج، الغزل، وتوب التفاعلات اليومية' },
+                    { title: '.7 - قسم المطور', rowId: '.7', description: 'أوامر التحكم والمطورين الأساسيين' },
+                    { title: '.8 - قسم الإدارة', rowId: '.8', description: 'قفل الجروب، الطرد، والإنذارات الإدارية' },
+                    { title: '.9 - الكاشف', rowId: '.9', description: 'كشف الوسائط المعروضة مرة واحدة' },
+                    { title: '.10 - الألقاب', rowId: '.10', description: 'إضافة وحجز الألقاب الخاصة للأعضاء' },
+                    { title: '.11 - الملصقات', rowId: '.11', description: 'صانع الملصقات والمتحرّكات والحزم' }
+                ]
+            }
+        ],
+        ...adOpts
+    };
+
     try {
         await sock.sendMessage(from, {
             video: { url: BOT_COMMANDS_VIDEO_URL },
@@ -1960,6 +1987,7 @@ if (cmdBase === 'بوت') {
             gifPlayback: true,
             ...adOpts
         });
+        await sock.sendMessage(from, interactiveListMessage);
     } catch (err) {
         try {
             await sock.sendMessage(from, {
@@ -1967,6 +1995,7 @@ if (cmdBase === 'بوت') {
                 caption: botWelcomeText,
                 ...adOpts
             });
+            await sock.sendMessage(from, interactiveListMessage);
         } catch (e2) {
             await sock.sendMessage(from, { text: botWelcomeText, ...adOpts });
         }
