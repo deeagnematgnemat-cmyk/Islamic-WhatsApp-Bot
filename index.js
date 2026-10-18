@@ -1951,55 +1951,29 @@ if (cmdBase === 'بوت') {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
-    const interactiveMessage = {
-        body: { text: botWelcomeText },
-        footer: { text: "『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』" },
-        header: {
-            title: "قَـائِـمَـةُ الأَقْـسَـامِ الرَّسْمِيَّة",
-            hasMediaAttachment: true,
-            imageMessage: {
-                url: BOT_PROFILE_IMAGE_URL,
-                mimetype: 'image/jpeg'
-            }
-        },
-        nativeFlowMessage: {
-            buttons: [
-                {
-                    name: "cta_url",
-                    buttonParamsJson: JSON.stringify({
-                        display_text: "📢 قناة المطور",
-                        url: BOT_CHANNEL_URL,
-                        merchant_url: BOT_CHANNEL_URL
-                    })
-                }
-            ]
-        }
-    };
-
     const adOpts = getChannelAdOptions(sock);
-    try { 
-        const prepMsg = await sock.sendMessage(from, {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage: interactiveMessage
-                }
-            },
-            mentions: [sender],
+    
+    try {
+        await sock.sendMessage(from, {
+            text: botWelcomeText,
+            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            buttons: [
+                { buttonId: 'channel_btn', buttonText: { displayText: '📢 قناة المطور' }, type: 1 }
+            ],
+            headerType: 1,
             ...adOpts
-        });
-        if (!prepMsg) {
-            throw new Error('Interactive message fallback');
-        }
-    } catch (e) { 
+        }, { quoted: msg });
+    } catch (err) {
         try {
-            await sock.sendMessage(from, { 
-                video: { url: BOT_COMMANDS_VIDEO_URL }, 
-                caption: botWelcomeText,
-                mentions: [sender],
+            await sock.sendMessage(from, {
+                text: botWelcomeText,
+                templateButtons: [
+                    { index: 1, urlButton: { displayText: '📢 قناة المطور', url: BOT_CHANNEL_URL } }
+                ],
                 ...adOpts
-            });
-        } catch (err) {
-            await sock.sendMessage(from, { text: botWelcomeText, ...getChannelAdOptions(sock) }); 
+            }, { quoted: msg });
+        } catch (e2) {
+            await sock.sendMessage(from, { text: botWelcomeText, ...adOpts }, { quoted: msg });
         }
     }
     return;
