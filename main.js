@@ -22,10 +22,13 @@ import {makeWASocket, protoType, serialize} from './lib/simple.js';
 import {Low, JSONFile} from 'lowdb';
 import {mongoDB, mongoDBV2} from './lib/mongoDB.js';
 import store from './lib/store.js';
-const {proto} = (await import('@whiskeysockets/baileys')).default;
-const baileysImport = await import('@whiskeysockets/baileys');
+
+// التعديل الضروري الوحيد لاستخدام المكتبة الجديدة @yemo-dev/yebail
+const {proto} = (await import('@yemo-dev/yebail')).default;
+const baileysImport = await import('@yemo-dev/yebail');
 const {DisconnectReason, useMultiFileAuthState, MessageRetryMap, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, jidNormalizedUser} = baileysImport;
 const PHONENUMBER_MCC = baileysImport.PHONENUMBER_MCC || {};
+
 import readline from 'readline';
 import NodeCache from 'node-cache';
 const {CONNECTING} = ws;
@@ -85,8 +88,6 @@ global.loadDatabase = async function loadDatabase() {
 };
 loadDatabase();
 
-/* Creditos a Otosaka (https://wa.me/51993966345) */
-
 global.chatgpt = new Low(new JSONFile(path.join(__dirname, '/db/chatgpt.json')));
 global.loadChatgptDB = async function loadChatgptDB() {
   if (global.chatgpt.READ) {
@@ -109,8 +110,6 @@ global.loadChatgptDB = async function loadChatgptDB() {
   global.chatgpt.chain = lodash.chain(global.chatgpt.data);
 };
 loadChatgptDB();
-
-/* ------------------------------------------------*/
 
 global.authFile = `MidSession`;
 const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFile);
@@ -356,7 +355,6 @@ global.reloadHandler = async function(restatConn) {
   return true;
 };
 
-// **تحميل متكامل ومرن لكافة مجلدات الأوامر والملحقات**
 const pluginFolders = [join(__dirname, './plugins'), join(__dirname, './Awamir'), join(__dirname, './Awamir/index')];
 const pluginFilter = (filename) => /\.js$/.test(filename);
 global.plugins = {};
