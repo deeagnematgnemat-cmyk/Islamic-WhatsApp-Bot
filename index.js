@@ -659,7 +659,6 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         game.isCompleted = true;
         clearTimeout(game.timer);
         getBankAccount(sender);
-        userPoints[sender] += 1;
         
         if (!game.scores) game.scores = {};
         game.scores[sender] = (game.scores[sender] || 0) + 1;
@@ -668,7 +667,34 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         const existingScores = game.scores;
         delete activeGames[from];
 
-        const roundWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+        if (currentScore >= 10) {
+            userPoints[sender] += 50;
+            const eventWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+  👑 *𝐄𝐕𝐄𝐍𝐓 𝐖𝐈𝐍𝐍𝐄𝐑*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*«🏆 مُـبَـارَكُ الـفَـوْز! »*
+
+> ╎ 👤 الفائز بالفعالية:
+> ╎ @${sender.split('@')[0]}
+
+*╎ 🎯 النقاط المكتسبة: +50*
+
+❐═━━━═╊⊰🍷⊱╉═━━━═❐
+
+\`🍷 أحسنت! تستحق الفوز.\`
+
+*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+
+            await sock.sendMessage(from, { text: eventWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+            return;
+        } else {
+            userPoints[sender] += 1;
+            const roundWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -690,35 +716,8 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
 
 *『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
 
-        await sock.sendMessage(from, { text: roundWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
+            await sock.sendMessage(from, { text: roundWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
 
-        if (currentScore >= 10) {
-            setTimeout(async () => {
-                const eventWinnerMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-  👑 *𝐄𝐕𝐄𝐍𝐓 𝐖𝐈𝐍𝐍𝐄𝐑*
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-*«🏆 مُـبَـارَكُ الـفَـوْز! »*
-
-> ╎ 👤 الفائز بالفعالية:
-> ╎ @${sender.split('@')[0]}
-
-*╎ 🎯 النقاط المكتسبة: +50*
-
-❐═━━━═╊⊰🍷⊱╉═━━━═❐
-
-\`🍷 أحسنت! تستحق الفوز.\`
-
-*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
-
-                await sock.sendMessage(from, { text: eventWinnerMsg, mentions: [sender], ...getChannelAdOptions(sock) });
-            }, 1000);
-            return;
-        } else {
             setTimeout(() => {
                 if (!activeGames[from]) {
                     startNextRound(sock, from, gameTypeToRestart, existingScores);
@@ -1247,7 +1246,7 @@ async function startFirstRound(sock, from, gameType) {
 
 *«🏁 بَـدْءُ مُـسَـابَـقَـةِ ${arabicName}»*
 
-> ╎ 🎯 الهدف: الوصول إلى 10 نقاط
+> ╎ 🎯 الهدف: الوصول إلى 10 نقاط (الفائز يحصل على 50 نقطة)
 > ╎ ⏳ مدة الجولة: 15 ثانية
 > ╎ 🏆 الفوز: أول لاعب يصل إلى الهدف
 
