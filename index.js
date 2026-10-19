@@ -163,36 +163,26 @@ function logBotAction(action) {
 }
 
 async function sendBotMessage(sock, jid, content, options = {}) {
-    let forwardInfo = {
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-            newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
-            newsletterName: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            serverMessageId: 100
-        }
-    };
-
+    let finalContent = {};
     if (typeof content === 'string') {
-        return await sock.sendMessage(jid, {
-            text: content,
-            contextInfo: {
-                ...forwardInfo,
-                ...(options.contextInfo || {})
-            },
-            ...options
-        });
+        finalContent = { text: content };
     } else {
-        return await sock.sendMessage(jid, {
-            ...content,
-            contextInfo: {
-                ...forwardInfo,
-                ...(content.contextInfo || {}),
-                ...(options.contextInfo || {})
-            },
-            ...options
-        });
+        finalContent = { ...content };
     }
+
+    finalContent.buttons = [
+        {
+            buttonId: 'channel_btn',
+            buttonText: { displayText: 'عرض القناة' },
+            type: 1,
+            url: BOT_CHANNEL_URL
+        }
+    ];
+
+    return await sock.sendMessage(jid, {
+        ...finalContent,
+        ...options
+    });
 }
 
 let userPoints = {};
