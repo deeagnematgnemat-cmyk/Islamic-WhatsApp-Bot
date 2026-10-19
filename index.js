@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@yemo-dev/yebail';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -683,7 +683,7 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-      👑 *𝐑𝐎𝐔𝐍𝐃 𝐖𝐈𝐍𝐍𝐄𝐑*
+      👑 *𝐑𝐎𝐔𝐍ْد 𝐖𝐈𝐍𝐍𝐄𝐑*
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
@@ -1759,7 +1759,7 @@ if (cmdBase === 'خاص' || cmdBase === 'وضع_خاص') {
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-\`«🍷 الخخصوصية امتياز، والوصول للنخبة فقط.»\`
+\`«🍷 الخصوصية امتياز، والوصول للنخبة فقط.»\`
 
 *『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
     return sock.sendMessage(from, { text: privateMsg });    
