@@ -163,15 +163,6 @@ function logBotAction(action) {
 }
 
 async function sendBotMessage(sock, jid, content, options = {}) {
-    let externalAdInfo = {
-        title: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-        body: 'انضم إلى قناتنا الرسمية لمتابعة كل جديد 🍷',
-        mediaType: 1,
-        thumbnailUrl: BOT_PROFILE_IMAGE_URL,
-        sourceUrl: BOT_CHANNEL_URL,
-        renderLargerThumbnail: false
-    };
-
     let forwardInfo = {
         forwardingScore: 999,
         isForwarded: true,
@@ -186,7 +177,6 @@ async function sendBotMessage(sock, jid, content, options = {}) {
         return await sock.sendMessage(jid, {
             text: content,
             contextInfo: {
-                externalAdReply: externalAdInfo,
                 ...forwardInfo,
                 ...(options.contextInfo || {})
             },
@@ -196,7 +186,6 @@ async function sendBotMessage(sock, jid, content, options = {}) {
         return await sock.sendMessage(jid, {
             ...content,
             contextInfo: {
-                externalAdReply: externalAdInfo,
                 ...forwardInfo,
                 ...(content.contextInfo || {}),
                 ...(options.contextInfo || {})
