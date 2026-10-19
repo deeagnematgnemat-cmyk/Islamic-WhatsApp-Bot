@@ -140,7 +140,6 @@ process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
 
 const DEVELOPER_NUMBER = '962796163926';
-const DEVELOPER_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
@@ -173,11 +172,22 @@ async function sendBotMessage(sock, jid, content, options = {}) {
         renderLargerThumbnail: false
     };
 
+    let forwardInfo = {
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: '0029Vb8jc2PFHWq9IwKDk50d@newsletter',
+            newsletterName: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
+            serverMessageId: 100
+        }
+    };
+
     if (typeof content === 'string') {
         return await sock.sendMessage(jid, {
             text: content,
             contextInfo: {
                 externalAdReply: externalAdInfo,
+                ...forwardInfo,
                 ...(options.contextInfo || {})
             },
             ...options
@@ -187,6 +197,7 @@ async function sendBotMessage(sock, jid, content, options = {}) {
             ...content,
             contextInfo: {
                 externalAdReply: externalAdInfo,
+                ...forwardInfo,
                 ...(content.contextInfo || {}),
                 ...(options.contextInfo || {})
             },
@@ -445,7 +456,7 @@ if (action === 'add' && settings.welcome) {
 
 *🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
 
-*『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝐷』*`;
+*『𝑽. 𝑳. ِد ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝐷』*`;
 
         try {
             await sendBotMessage(sock, id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
@@ -478,7 +489,7 @@ if (action === 'add' && settings.welcome) {
 
 *🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
 
-*『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝐷』*`;
+*『𝑽. 𝑳. ِد ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝐷』*`;
 
         try {
             await sendBotMessage(sock, id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
@@ -648,7 +659,7 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         const correctClean = cleanTextForComparison(game.answer);
         if (userClean.includes(correctClean) || correctClean.includes(userClean)) isCorrect = true;
     } else if (game.type === 'letter_characters') {
-        const charNames = trimmedBody.split(/[\n,،-]+/).map(s => s.trim()).filter(s => s.length > 0);
+        const charNames = trimmedBody.split(/[\n,|, /-]+/).map(s => s.trim()).filter(s => s.length > 0);
         const reqLetter = game.requiredLetter.replace(/[أإآا]/g, 'ا');
         const validChars = charNames.filter(c => c.replace(/[أإآا]/g, 'ا').startsWith(reqLetter));
         if (validChars.length >= 3) isCorrect = true;
@@ -1020,7 +1031,7 @@ if (cmd === 'ملصق' || cmd === 's') {
         
         const sticker = new Sticker(mediaStream, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: DEVELOPER_NAME,
+            author: 'Eren Bot',
             type: StickerTypes.DEFAULT,
             categories: ['✨', '🍷'],
             quality: 50
@@ -1059,7 +1070,7 @@ if (cmd.startsWith('ملصق_رابط')) {
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: DEVELOPER_NAME,
+            author: 'Eren Bot',
             type: StickerTypes.DEFAULT,
             quality: 50
         });
@@ -1085,7 +1096,7 @@ if (cmd.startsWith('ملصق_نصي')) {
         const buffer = Buffer.from(response.data);
         const sticker = new Sticker(buffer, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: DEVELOPER_NAME,
+            author: 'Eren Bot',
             type: StickerTypes.FULL,
             quality: 50
         });
@@ -1107,7 +1118,7 @@ if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
         
         const sticker = new Sticker(mediaStream, {
             pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: DEVELOPER_NAME,
+            author: 'Eren Bot',
             type: StickerTypes.CROPPED,
             categories: ['✨', '🍷'],
             quality: 30
@@ -1188,7 +1199,7 @@ if (cmd.startsWith('حزمة')) {
                 
                 let stickerObj = new Sticker(imgBuffer, {
                     pack: `حزمة: ${characterName}`,
-                    author: DEVELOPER_NAME,
+                    author: 'Eren Bot',
                     type: StickerTypes.DEFAULT,
                     quality: 40
                 });
@@ -1896,7 +1907,6 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
 │ ${bcText}
 │${hiddenMentionSpace}
 ├────────────⬣
-│ 👑 المُـرسِـل: المطور الأساسي
 │ 🎯 النطاق: إذاعة عامة شاملة
 │ ✅ الحالة: تم استلام البث بنجاح
 ╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
@@ -1931,15 +1941,13 @@ if (cmdBase === 'بوت') {
 
 > «┃ ⌯🔮︙الـمُـسـتـخـدم ⇠ @${sender.split('@')[0]}
 > ┃ ⌯⚙️︙حـالـة الـنـظـام ⇠ 🟢 يـعـمـل بـكـفـاءة
-> ┃ ⌯👨🏻‍💻︙الـمُـطـوّر ⇠ 𝐸𝓇𝑒𝓃
-> ┃ ⌯📱︙رقـم الـمُـطـوّر ⇠ 962796163926
 > ┃ ⌯📊︙عـدد الأوامـر ⇠ ${validCommands.length} أمـراً
 > ┃ ⌯🕒︙الـتـوقـيـت ⇠ ${time}»
 
 *❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
 > «┃ ♟️︙لَـيْـسَ الـتَّـمَـيُّـزُ فِـي كَـثْـرَةِ الـكَلَام،
-> ┃ ✦︙بَـلْ فِـي أَثَـرٍ يَـبْـقَـى وَحُـضُـورٍ لا يُـنْـسَـى.
+> ┃ ✦︙بَـلْ فِـي أثَـرٍ يَـبْـقَـى وَحُـضُـورٍ لا يُـنْـسَـى.
 > ┃ 🍷︙نَـجْـعَـلُ الـتَّـفَـاصِـيـلَ تَـتَـحَـدَّثُ عَـنَّـا.»
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
@@ -2130,9 +2138,6 @@ if (cmdBase === '6') {
 
 if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
     const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
-
-> 👤 المطور: 𝐸𝓇𝑒𝓃
-> 📱 الرقم: 962796163926
 
 > 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً
 > 🟢 .تفعيل_البوت ↞ تفعيل البوت
