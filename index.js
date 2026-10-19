@@ -435,7 +435,7 @@ if (action === 'add' && settings.welcome) {
 
 *🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
 
-*『V. L. D ⊰🗡⊱ ENGLAND』*`;
+*『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝑫』*`;
 
         try {
             await sendBotMessage(sock, id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
@@ -468,7 +468,7 @@ if (action === 'add' && settings.welcome) {
 
 *🫎┊مـع تـحـيـات ˼‏🗡️˹ ⤺*
 
-*『V. L. D ⊰🗡⊱ ENGLAND』*`;
+*『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝑫』*`;
 
         try {
             await sendBotMessage(sock, id, { image: { url: userPp }, caption: goodbyeMsg, mentions: [user] });
