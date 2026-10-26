@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+Import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -517,6 +517,54 @@ const body = msg.message.conversation || msg.message.extendedTextMessage?.text |
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
+// ==================== [ قسم الحماية المعدل والدائم ] ====================
+// تعمل الحماية دائماً بشكل مستقل فورياً دون التأثر بحالة إيقاف البوت أو الأوضاع الأخرى
+if (isGroup && !isFromMe && !isSenderDev) {
+    const settings = getGroupSetting(from);
+    const mType = Object.keys(msg.message || {});
+    
+    let violationDetected = false;
+    let violationType = '';
+    let shouldLockChat = false;
+
+    const wordsInBody = lowerBody.split(/\s+/);
+    const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
+
+    if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {
+        violationDetected = true;
+        violationType = 'جهات الاتصال';
+        shouldLockChat = true;
+    } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {
+        violationDetected = true;
+        violationType = 'الروابط';
+        shouldLockChat = true;
+    } else if (settings.antiBadWords && hasBadWord) {
+        violationDetected = true;
+        violationType = 'الشتم والسب القوي';
+        shouldLockChat = true;
+    }
+
+    if (violationDetected) {
+        try {
+            await sock.sendMessage(from, { delete: msg.key });
+            if (shouldLockChat) { await sock.groupSettingUpdate(from, 'announcement'); }
+            const activeWarnings = addWarningToUser(sender);
+
+            if (activeWarnings >= 3) {
+                await sendBotMessage(sock, from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] });
+                await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                delete userWarnings[sender];
+            } else {
+                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
+                if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
+                await sendBotMessage(sock, from, { text: alertMsg, mentions: [sender] });
+            }
+            return;
+        } catch (e) {}
+    }
+}
+// ======================================================================
+
 if (globalBotStopped && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
@@ -554,51 +602,6 @@ if (isSenderExtraDev && devReactionEnabled) {
     try {    
         await sock.sendMessage(from, { react: { text: devReactionEmoji, key: msg.key } });    
     } catch (e) {}    
-}    
-
-if (isGroup && !isSenderAdmin && !isSenderDev) {    
-    const settings = getGroupSetting(from);    
-    const mType = Object.keys(msg.message || {});    
-        
-    let violationDetected = false;    
-    let violationType = '';    
-    let shouldLockChat = false;
-
-    const wordsInBody = lowerBody.split(/\s+/);
-    const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
-
-    if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {    
-        violationDetected = true;    
-        violationType = 'جهات الاتصال';    
-        shouldLockChat = true;
-    } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
-        violationDetected = true;    
-        violationType = 'الروابط';    
-        shouldLockChat = true;
-    } else if (settings.antiBadWords && hasBadWord) {    
-        violationDetected = true;    
-        violationType = 'الشتم والسب القوي';    
-        shouldLockChat = true;
-    }    
-
-    if (violationDetected) {    
-        try {    
-            await sock.sendMessage(from, { delete: msg.key });    
-            if (shouldLockChat) { await sock.groupSettingUpdate(from, 'announcement'); }
-            const activeWarnings = addWarningToUser(sender);
-
-            if (activeWarnings >= 3) {    
-                await sendBotMessage(sock, from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] });    
-                await sock.groupParticipantsUpdate(from, [sender], 'remove');    
-                delete userWarnings[sender];    
-            } else {    
-                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
-                if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
-                await sendBotMessage(sock, from, { text: alertMsg, mentions: [sender] });    
-            }    
-            return;    
-        } catch (e) {}    
-    }    
 }    
 
 if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {    
