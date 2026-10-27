@@ -2113,8 +2113,7 @@ if (cmdBase === '5') {
 }
 
 if (cmdBase === '6') {
-    const groupExtText =
-            const groupExtText = `👥 *المجموعات:*
+    const groupExtText = `👥 *المجموعات:*
 
 > 💍 .زواج ↞ زواج عشوائي للجروب
 > 🌹 .غزل @منشن ↞ بيت غزل
