@@ -2094,4 +2094,220 @@ if (cmdBase === '4') {
 > 🤲 .دعاء ↞ أدعية مباركة عشوائية
 > 📿 .ذكر ↞ أذكار عشوائية مباركة
 > ☪️ .حديث ↞ أحاديث نبوية شريفة
-> ☀️ .اذكار_الصباح ↞
+> ☀️ .اذكار_الصباح ↞ أذكار الصباح كاملة
+> 🌙 .اذكار_المساء ↞ أذكار المساء كاملة
+> 🥀 .اذكار_الاستيقاظ ↞ أذكار الاستيقاظ من النوم
+> 🕌 .اذكار_الصلاة ↞ أذكار بعد الصلاة المفروضة
+> 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: islamText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: islamText }); 
+    }
+    return;
+}
+
+if (cmdBase === '5') {
+    const funText = `😂 *الضحك:*
+
+> 🤣 .نكتة ↞ نكتة مضحكة
+> 🤔 .ماذا_لو ↞ تساؤلات خيالية
+> 🗣️ .قول ↞ حكمة اليوم`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: funText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: funText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: funText }); 
+    }
+    return;
+}
+
+if (cmdBase === '6') {
+    const groupExtText = `👥 *المجموعات:*
+
+> 💍 .زواج ↞ زواج عشوائي للجروب
+> 🌹 .غزل @منشن ↞ بيت غزل
+> 💞 .ثنائي ↞ ثنائي عشوائي
+> 👑 .ملك_المجموعة ↞ ملك الجروب
+> 🧸 .كيوت_المجموعة ↞ كيوت الجروب
+> 📩 .رسائلي ↞ عدد رسائلك
+> 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: groupExtText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: groupExtText }); 
+    }
+    return;
+}
+
+if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
+    const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
+
+> 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً
+> 🟢 .تفعيل_البوت ↞ تفعيل البوت
+> 💣 .بوم ↞ طرد الأعضاء العاديين
+> 👑 .اضافة_مطور @منشن ↞ إضافة مطور
+> ❌ .حذف_مطور @منشن ↞ إزالة مطور
+> 🌟 .اضف_نخبة @منشن ↞ إضافة نخبة
+> ❌ .ازل_نخبة @منشن ↞ إزالة نخبة
+> 📜 .عرض_نخبة ↞ عرض أرقام النخبة (منشن)
+> 📋 .قائمة_المطورين ↞ عرض أرقام المطورين (منشن)
+> 📡 .سجل_البوت ↞ سجل العمليات
+> 🧪 .اختبار ↞ فحص الأوامر
+> 📢 .إذاعة <النص> ↞ إذاعة عامة
+> 🔄 .ريستارت ↞ إعادة التشغيل.`;
+    try { 
+        try {
+            await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: devMenuText }); 
+    }
+    return;
+}
+
+if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {    
+    const adminMenuText = `⚡ *قِـسْـمُ الإِدَارَةِ:*
+
+> 🔒 .قفل أو .غلق ↞ قفل الجروب
+> 🔓 .فتح ↞ فتح الجروب
+> 🗑️ .حذف ↞ حذف رسالة
+> 📢 .الكل أو .منشن ↞ منشن جماعي
+> 👑 .رفع @عضو ↞ ترقية مشرف
+> 📉 .تنزيل @عضو ↞ سحب الإشراف
+> 🚨 .طرد @عضو ↞ طرد
+> ⚠️ .اضف_انذار @عضو ↞ إنذار
+> 📉 .ازل_انذار @عضو ↞ حذف الإنذار
+> 📊 .عدد_الانذارات @عضو ↞ عدد الإنذارات
+> 📋 .قائمة_الانذارات ↞ المخالفون
+> 🔇 .كتم <دقائق> @عضو ↞ كتم
+> 🔊 .الغاء_كتم @عضو ↞ فك الكتم
+> 🔗 .الرابط ↞ رابط المجموعة
+> 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
+> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: adminMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: adminMenuText }); 
+    }
+    return;
+}
+
+if (cmdBase === '9' || cmd === 'الكاشف') {    
+    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
+    const userPp = await getUserProfilePic(sock, sender);    
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: detectorMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: detectorMenuText }); 
+    }    
+    return;    
+}    
+
+if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
+    const titleMenuText = `👑 *قسم الألقاب:*
+
+> ✍️ \`.اضافة_لقب @العضو اللقب\`
+> ❌ \`.ازالة_لقب @العضو\`
+> 🔒 \`.حجز_لقب @العضو اللقب\`
+> 🔓 \`.الغاء_حجز_لقب @العضو\`
+> 📋 \`.قائمة_الالقاب\`
+> 🔒 \`.قائمة_الالقاب_المحجوزة\``;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: titleMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: titleMenuText }); 
+    }
+    return;
+}
+
+if (cmdBase === '11') {
+    const stickerMenuText = `🎨 *قسـم الملصقات:*
+
+> 🎨 \`.ملصق\` ↞ تحويل إلى ملصق
+> 🖼️ \`.لصورة\` ↞ تحويل لصورة
+> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط
+> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي
+> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك
+> 🎬 \`.فيديو_لملصق\` ↞ فيديو لملصق
+> 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
+> 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
+    const userPp = await getUserProfilePic(sock, sender);
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: stickerMenuText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: stickerMenuText }); 
+    }
+    return;
+}
+
+if (cmdBase === 'بنك' || cmd === 'حسابي') {    
+    const userPp = await getUserProfilePic(sock, sender);    
+    const accText = `💳 *كَـشْـفُ الحِـسَـابِ:* \n> رصيدك: *${userPoints[sender]} نقطة*`;    
+    try { 
+        try {
+            await sendBotMessage(sock, from, { image: { url: userPp }, caption: accText, mentions: [sender] }); 
+        } catch (err) {
+            await sendBotMessage(sock, from, { text: accText, mentions: [sender] });
+        }
+    } catch (e) { 
+        await sendBotMessage(sock, from, { text: accText }); 
+    }    
+    return;    
+}    
+
+if (cmdBase === 'مكافأة' || cmd === 'هدية') {    
+    const now = Date.now();
+    const cooldown = 24 * 60 * 60 * 1000;
+    if (!dailyRewards[sender]) dailyRewards[sender] = 0;
+    if ((now - dailyRewards[sender]) < cooldown) {
+        return sendBotMessage(sock, from, { text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً!`, mentions: [sender] });
+    }
+    dailyRewards[sender] = now;
+    getBankAccount(sender);
+    userPoints[sender] += 20;
+
+    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    return sendBotMessage(sock, from, { text: rewardText, mentions: [sender] });
+}
+
+});
+
+}
+
+startBot();
+initSubBots(startBot); 
