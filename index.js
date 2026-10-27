@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
+import { initSubBots, handleSubBotCommand } from './subbot.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -239,7 +240,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'اوامر', 'الأوامر',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -282,7 +283,7 @@ const cleanNum = senderJid.replace(/[^0-9]/g, '');
 const devNum = DEVELOPER_NUMBER.replace(/[^0-9]/g, '');
 const botJidNum = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g, '') : '';
 if (cleanNum === devNum || cleanNum.endsWith(devNum) || devNum.endsWith(cleanNum)) return true;
-if (botJidNum && (cleanNum === botJidNum || cleanNum.endsWith(botJidNum))) return true;
+if (!sock?.isSubBot && botJidNum && (cleanNum === botJidNum || cleanNum.endsWith(botJidNum))) return true;
 return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
 }
 
@@ -352,8 +353,8 @@ function cleanTextForComparison(str) {
 
 let isPairingRequested = false;
 
-async function startBot() {
-const { state, saveCreds } = await useMultiFileAuthState('arem_new_session');
+async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
+const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 const { version } = await fetchLatestBaileysVersion();
 
 const sock = makeWASocket({
@@ -368,6 +369,8 @@ markOnlineOnConnect: true
 });
 
 sock.ev.on('creds.update', saveCreds);
+sock.isSubBot = !!subInfo;
+if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
 const { connection, lastDisconnect, qr } = u;
@@ -377,10 +380,12 @@ if (connection === 'close') {
     const statusCode = lastDisconnect?.error?.output?.statusCode;
     const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
     if (shouldReconnect) {
-        setTimeout(startBot, 3000);
+        setTimeout(() => { if (!(subInfo && subInfo.stopped)) startBot(sessionDir, subInfo); }, 3000);
+    } else if (subInfo && subInfo.onLoggedOut) {
+        subInfo.onLoggedOut();
     }
 } else if (connection === 'connecting') {
-    if (!sock.authState.creds.registered && !isPairingRequested) {
+    if (!subInfo && !sock.authState.creds.registered && !isPairingRequested) {
         isPairingRequested = true;
         setTimeout(async () => {
             try {
@@ -513,57 +518,9 @@ if (isGroup && !isFromMe && !isSenderDev) {
     } catch (e) {}    
 }    
 
-const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';    
+const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId || '';    
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
-
-// ==================== [ قسم الحماية المعدل والدائم ] ====================
-// تعمل الحماية دائماً بشكل مستقل فورياً دون التأثر بحالة إيقاف البوت أو الأوضاع الأخرى
-if (isGroup && !isFromMe && !isSenderDev) {
-    const settings = getGroupSetting(from);
-    const mType = Object.keys(msg.message || {});
-    
-    let violationDetected = false;
-    let violationType = '';
-    let shouldLockChat = false;
-
-    const wordsInBody = lowerBody.split(/\s+/);
-    const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
-
-    if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {
-        violationDetected = true;
-        violationType = 'جهات الاتصال';
-        shouldLockChat = true;
-    } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {
-        violationDetected = true;
-        violationType = 'الروابط';
-        shouldLockChat = true;
-    } else if (settings.antiBadWords && hasBadWord) {
-        violationDetected = true;
-        violationType = 'الشتم والسب القوي';
-        shouldLockChat = true;
-    }
-
-    if (violationDetected) {
-        try {
-            await sock.sendMessage(from, { delete: msg.key });
-            if (shouldLockChat) { await sock.groupSettingUpdate(from, 'announcement'); }
-            const activeWarnings = addWarningToUser(sender);
-
-            if (activeWarnings >= 3) {
-                await sendBotMessage(sock, from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] });
-                await sock.groupParticipantsUpdate(from, [sender], 'remove');
-                delete userWarnings[sender];
-            } else {
-                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
-                if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
-                await sendBotMessage(sock, from, { text: alertMsg, mentions: [sender] });
-            }
-            return;
-        } catch (e) {}
-    }
-}
-// ======================================================================
 
 if (globalBotStopped && !isSenderDev) return;
 
@@ -602,6 +559,51 @@ if (isSenderExtraDev && devReactionEnabled) {
     try {    
         await sock.sendMessage(from, { react: { text: devReactionEmoji, key: msg.key } });    
     } catch (e) {}    
+}    
+
+if (isGroup && !isSenderAdmin && !isSenderDev) {    
+    const settings = getGroupSetting(from);    
+    const mType = Object.keys(msg.message || {});    
+        
+    let violationDetected = false;    
+    let violationType = '';    
+    let shouldLockChat = false;
+
+    const wordsInBody = lowerBody.split(/\s+/);
+    const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
+
+    if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {    
+        violationDetected = true;    
+        violationType = 'جهات الاتصال';    
+        shouldLockChat = true;
+    } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
+        violationDetected = true;    
+        violationType = 'الروابط';    
+        shouldLockChat = true;
+    } else if (settings.antiBadWords && hasBadWord) {    
+        violationDetected = true;    
+        violationType = 'الشتم والسب القوي';    
+        shouldLockChat = true;
+    }    
+
+    if (violationDetected) {    
+        try {    
+            await sock.sendMessage(from, { delete: msg.key });    
+            if (shouldLockChat) { await sock.groupSettingUpdate(from, 'announcement'); }
+            const activeWarnings = addWarningToUser(sender);
+
+            if (activeWarnings >= 3) {    
+                await sendBotMessage(sock, from, { text: `🚨 @${sender.split('@')[0]} تم طردك لتجاوزك الحد الأقصى من الإنذارات (${violationType})!`, mentions: [sender] });    
+                await sock.groupParticipantsUpdate(from, [sender], 'remove');    
+                delete userWarnings[sender];    
+            } else {    
+                let alertMsg = `⚠️ تنبيه ومخالفة (${violationType})!\n👤 العضو: @${sender.split('@')[0]}\n📌 الإنذار الحالي: [${activeWarnings}/3]\n⏳ ينتهي الإنذار تلقائياً بعد مرور 48 ساعة (يومين).`;
+                if (shouldLockChat) alertMsg += `\n🔒 تم قفل الشات تلقائياً بسبب المخالفة.`;
+                await sendBotMessage(sock, from, { text: alertMsg, mentions: [sender] });    
+            }    
+            return;    
+        } catch (e) {}    
+    }    
 }    
 
 if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {    
@@ -736,6 +738,8 @@ if (commandReactionEnabled) {
 }    
 
 logBotAction(`استخدام أمر (${cmd}) من قبل العضو ${cleanSenderNum}`);    
+
+if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: isSenderDev })) return;
 
 if (!isGroup) {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
@@ -1945,6 +1949,37 @@ if (cmdBase === 'بوت') {
     } catch (e) { 
         await sendBotMessage(sock, from, { text: botWelcomeText, mentions: [sender] }); 
     }
+
+    // القائمة التفاعلية المضافة أسفل استمارة .بوت دون تعديل الاستمارة أو الفيديو.
+    try {
+        await sock.sendMessage(from, {
+            title: '🍷 『✦』 أقسام Eren Bot 『✦』',
+            text: 'اختر القسم لعرض أوامره:',
+            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝑡 『✦』',
+            buttonText: '📜 عرض الأقسام',
+            sections: [
+                {
+                    title: 'الأقسام الرئيسية',
+                    rows: [
+                        { title: '🛡️ 1. الحماية', description: 'أوامر الحماية والإنذارات', rowId: '.1' },
+                        { title: '🎉 2. الترفيه والألعاب', description: 'أوامر الألعاب والفعاليات', rowId: '.2' },
+                        { title: '💳 3. البنك والنقاط', description: 'الحساب والتحويل والمكافآت', rowId: '.3' },
+                        { title: '🕌 4. القسم الإسلامي', description: 'القرآن والأدعية والأذكار', rowId: '.4' },
+                        { title: '😂 5. الضحك', description: 'النكت والتساؤلات والمقولات', rowId: '.5' },
+                        { title: '👥 6. المجموعات', description: 'أوامر وتفاعلات المجموعة', rowId: '.6' },
+                        { title: '♟️ 7. المطور', description: 'أوامر المطور والنظام', rowId: '.7' },
+                        { title: '⚡ 8. الإدارة', description: 'أوامر إدارة المجموعة', rowId: '.8' },
+                        { title: '🔍 9. الكشف', description: 'أوامر كشف الوسائط', rowId: '.9' },
+                        { title: '👑 10. الألقاب', description: 'أوامر الألقاب', rowId: '.10' },
+                        { title: '🎨 11. الملصقات', description: 'أوامر صنع الملصقات', rowId: '.11' },
+                        { title: '📲 12. التنصيب', description: 'ربط بوت خاص بك', rowId: '.12' }
+                    ]
+                }
+            ]
+        });
+    } catch (e) {
+        console.error('تعذر إرسال قائمة أقسام .بوت التفاعلية:', e);
+    }
     return;
 }
 
@@ -1962,6 +1997,7 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
 > 🔍 \`.9\` ↞ الكشف
 > 👑 \`.10\` ↞ الألقاب
 > 🎨 \`.11\` ↞ الملصقات
+> 📲 \`.12\` ↞ التنصيب
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 💡 *اكتب رقم القسم للوصول السريع!*`;
@@ -2058,219 +2094,4 @@ if (cmdBase === '4') {
 > 🤲 .دعاء ↞ أدعية مباركة عشوائية
 > 📿 .ذكر ↞ أذكار عشوائية مباركة
 > ☪️ .حديث ↞ أحاديث نبوية شريفة
-> ☀️ .اذكار_الصباح ↞ أذكار الصباح كاملة
-> 🌙 .اذكار_المساء ↞ أذكار المساء كاملة
-> 🥀 .اذكار_الاستيقاظ ↞ أذكار الاستيقاظ من النوم
-> 🕌 .اذكار_الصلاة ↞ أذكار بعد الصلاة المفروضة
-> 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: islamText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: islamText }); 
-    }
-    return;
-}
-
-if (cmdBase === '5') {
-    const funText = `😂 *الضحك:*
-
-> 🤣 .نكتة ↞ نكتة مضحكة
-> 🤔 .ماذا_لو ↞ تساؤلات خيالية
-> 🗣️ .قول ↞ حكمة اليوم`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: funText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: funText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: funText }); 
-    }
-    return;
-}
-
-if (cmdBase === '6') {
-    const groupExtText = `👥 *المجموعات:*
-
-> 💍 .زواج ↞ زواج عشوائي للجروب
-> 🌹 .غزل @منشن ↞ بيت غزل
-> 💞 .ثنائي ↞ ثنائي عشوائي
-> 👑 .ملك_المجموعة ↞ ملك الجروب
-> 🧸 .كيوت_المجموعة ↞ كيوت الجروب
-> 📩 .رسائلي ↞ عدد رسائلك
-> 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: groupExtText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: groupExtText }); 
-    }
-    return;
-}
-
-if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
-    const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
-
-> 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً
-> 🟢 .تفعيل_البوت ↞ تفعيل البوت
-> 💣 .بوم ↞ طرد الأعضاء العاديين
-> 👑 .اضافة_مطور @منشن ↞ إضافة مطور
-> ❌ .حذف_مطور @منشن ↞ إزالة مطور
-> 🌟 .اضف_نخبة @منشن ↞ إضافة نخبة
-> ❌ .ازل_نخبة @منشن ↞ إزالة نخبة
-> 📜 .عرض_نخبة ↞ عرض أرقام النخبة (منشن)
-> 📋 .قائمة_المطورين ↞ عرض أرقام المطورين (منشن)
-> 📡 .سجل_البوت ↞ سجل العمليات
-> 🧪 .اختبار ↞ فحص الأوامر
-> 📢 .إذاعة <النص> ↞ إذاعة عامة
-> 🔄 .ريستارت ↞ إعادة التشغيل.`;
-    try { 
-        try {
-            await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: devMenuText }); 
-    }
-    return;
-}
-
-if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {    
-    const adminMenuText = `⚡ *قِـسْـمُ الإِدَارَةِ:*
-
-> 🔒 .قفل أو .غلق ↞ قفل الجروب
-> 🔓 .فتح ↞ فتح الجروب
-> 🗑️ .حذف ↞ حذف رسالة
-> 📢 .الكل أو .منشن ↞ منشن جماعي
-> 👑 .رفع @عضو ↞ ترقية مشرف
-> 📉 .تنزيل @عضو ↞ سحب الإشراف
-> 🚨 .طرد @عضو ↞ طرد
-> ⚠️ .اضف_انذار @عضو ↞ إنذار
-> 📉 .ازل_انذار @عضو ↞ حذف الإنذار
-> 📊 .عدد_الانذارات @عضو ↞ عدد الإنذارات
-> 📋 .قائمة_الانذارات ↞ المخالفون
-> 🔇 .كتم <دقائق> @عضو ↞ كتم
-> 🔊 .الغاء_كتم @عضو ↞ فك الكتم
-> 🔗 .الرابط ↞ رابط المجموعة
-> 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
-> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: adminMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: adminMenuText }); 
-    }
-    return;
-}
-
-if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
-    const userPp = await getUserProfilePic(sock, sender);    
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: detectorMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: detectorMenuText }); 
-    }    
-    return;    
-}    
-
-if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
-    const titleMenuText = `👑 *قسم الألقاب:*
-
-> ✍️ \`.اضافة_لقب @العضو اللقب\`
-> ❌ \`.ازالة_لقب @العضو\`
-> 🔒 \`.حجز_لقب @العضو اللقب\`
-> 🔓 \`.الغاء_حجز_لقب @العضو\`
-> 📋 \`.قائمة_الالقاب\`
-> 🔒 \`.قائمة_الالقاب_المحجوزة\``;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: titleMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: titleMenuText }); 
-    }
-    return;
-}
-
-if (cmdBase === '11') {
-    const stickerMenuText = `🎨 *قسـم الملصقات:*
-
-> 🎨 \`.ملصق\` ↞ تحويل إلى ملصق
-> 🖼️ \`.لصورة\` ↞ تحويل لصورة
-> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط
-> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي
-> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك
-> 🎬 \`.فيديو_لملصق\` ↞ فيديو لملصق
-> 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
-> 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
-    const userPp = await getUserProfilePic(sock, sender);
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: stickerMenuText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: stickerMenuText }); 
-    }
-    return;
-}
-
-if (cmdBase === 'بنك' || cmd === 'حسابي') {    
-    const userPp = await getUserProfilePic(sock, sender);    
-    const accText = `💳 *كَـشْـفُ الحِـسَـابِ:* \n> رصيدك: *${userPoints[sender]} نقطة*`;    
-    try { 
-        try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: accText, mentions: [sender] }); 
-        } catch (err) {
-            await sendBotMessage(sock, from, { text: accText, mentions: [sender] });
-        }
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: accText }); 
-    }    
-    return;    
-}    
-
-if (cmdBase === 'مكافأة' || cmd === 'هدية') {    
-    const now = Date.now();
-    const cooldown = 24 * 60 * 60 * 1000;
-    if (!dailyRewards[sender]) dailyRewards[sender] = 0;
-    if ((now - dailyRewards[sender]) < cooldown) {
-        return sendBotMessage(sock, from, { text: `⚠️ لقد استلمت مكافأتك اليومية مسبقاً!`, mentions: [sender] });
-    }
-    dailyRewards[sender] = now;
-    getBankAccount(sender);
-    userPoints[sender] += 20;
-
-    const rewardText = `╭━━━〔 🎁 〕━━━╮\n『 الـمُـكَـافَـأَةُ الـيَـوْمِـيَّـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو @${sender.split('@')[0]}\n💰 ⌯ المكافأة 20 نقطة\n✨ ⌯ الحالة تم استلام المكافأة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
-    return sendBotMessage(sock, from, { text: rewardText, mentions: [sender] });
-}
-
-});
-
-}
-
-startBot();
+> ☀️ .اذكار_الصباح ↞
