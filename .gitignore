@@ -13,3 +13,5 @@ datasecret
 
 package-lock.json
 database.json
+subbots_sessions
+subbots.json
