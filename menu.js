@@ -1,8 +1,8 @@
-// ============ الأزرار التفاعلية تحت استمارة .بوت و .اوامر ============
+// ============ الأزرار التفاعلية مع استمارة .بوت (رسالة واحدة) ============
 import * as baileysNs from '@whiskeysockets/baileys';
 
 const B = (baileysNs.default && baileysNs.default.generateWAMessageFromContent) ? baileysNs.default : baileysNs;
-const { generateWAMessageFromContent } = B;
+const { generateWAMessageFromContent, prepareWAMessageMedia } = B;
 
 const CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const INSTALL_GROUP_URL = 'https://chat.whatsapp.com/DjgGvEAiIEiCXwztk4F82L?s=cl&p=a&mlu=4&ilr=4';
@@ -28,44 +28,30 @@ const SECTIONS = [
             row('⚡ 8. الإدارة', 'أوامر إدارة المجموعة', 8),
             row('🔍 9. الكشف', 'أوامر كشف الوسائط', 9),
             row('👑 10. الألقاب', 'أوامر الألقاب', 10),
-            row('🎨 11. الملصقات', 'أوامر صنع الملصقات', 11),
-            row('📲 12. التنصيب', 'ربط بوت خاص بك', 12)
+            row('🎨 11. الملصقات', 'ملصقات وتعديل الصور', 11),
+            row('📲 12. التنصيب', 'ربط بوت خاص بك', 12),
+            row('📥 13. التنزيل', 'تنزيل من الروابط', 13),
+            row('🤖 14. الذكاء الاصطناعي', 'أسئلة وصور وترجمة', 14)
         ]
     }
 ];
 
-// يرسل رسالة الأزرار: [الأقسام] [قناة المطور] [جروب التنصيب]
-export async function sendMenuButtons(sock, jid) {
+const BUTTONS = () => [
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
+    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '📢 قناة المطور', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
+    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '🌐 جروب التنصيب', url: INSTALL_GROUP_URL, merchant_url: INSTALL_GROUP_URL }) }
+];
+
+async function relayInteractive(sock, jid, interactiveMessage) {
     const content = {
         viewOnceMessage: {
             message: {
                 messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-                interactiveMessage: {
-                    body: { text: '📌 اختر القسم المطلوب من الزر بالأسفل لاستعراض الأوامر.' },
-                    footer: { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』' },
-                    nativeFlowMessage: {
-                        buttons: [
-                            {
-                                name: 'single_select',
-                                buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS })
-                            },
-                            {
-                                name: 'cta_url',
-                                buttonParamsJson: JSON.stringify({ display_text: '📢 قناة المطور', url: CHANNEL_URL, merchant_url: CHANNEL_URL })
-                            },
-                            {
-                                name: 'cta_url',
-                                buttonParamsJson: JSON.stringify({ display_text: '🌐 جروب التنصيب', url: INSTALL_GROUP_URL, merchant_url: INSTALL_GROUP_URL })
-                            }
-                        ]
-                    }
-                }
+                interactiveMessage
             }
         }
     };
-
     const msg = generateWAMessageFromContent(jid, content, { userJid: sock.user.id });
-
     const nodes = [{
         tag: 'biz', attrs: {},
         content: [{
@@ -74,8 +60,26 @@ export async function sendMenuButtons(sock, jid) {
         }]
     }];
     if (!jid.endsWith('@g.us')) nodes.push({ tag: 'bot', attrs: { biz_bot: '1' } });
-
     await sock.relayMessage(jid, msg.message, { messageId: msg.key.id, additionalNodes: nodes });
+}
+
+// يرسل الاستمارة نفسها (فيديو + نص) ومعها الأزرار في رسالة واحدة
+export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid) {
+    let header = { hasMediaAttachment: false };
+    if (videoUrl) {
+        try {
+            const media = await prepareWAMessageMedia({ video: { url: videoUrl } }, { upload: sock.waUploadToServer });
+            if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+        } catch (e) {
+            console.error('تعذر رفع فيديو الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
+        }
+    }
+    await relayInteractive(sock, jid, {
+        header,
+        body: { text },
+        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+        nativeFlowMessage: { buttons: BUTTONS() }
+    });
 }
 
 // يقرأ رقم الصف الذي اختاره العضو من القائمة (مثل ".4") ليعالجه البوت كأنه كتب الأمر
