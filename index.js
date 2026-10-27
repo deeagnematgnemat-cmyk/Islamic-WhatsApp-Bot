@@ -8,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand } from './subbot.js';
+import { sendMenuButtons, getButtonId } from './menu.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -518,7 +519,7 @@ if (isGroup && !isFromMe && !isSenderDev) {
     } catch (e) {}    
 }    
 
-const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId || '';    
+const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId || getButtonId(msg.message) || '';    
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
@@ -1950,35 +1951,11 @@ if (cmdBase === 'بوت') {
         await sendBotMessage(sock, from, { text: botWelcomeText, mentions: [sender] }); 
     }
 
-    // القائمة التفاعلية المضافة أسفل استمارة .بوت دون تعديل الاستمارة أو الفيديو.
+    // أزرار تفاعلية أسفل استمارة .بوت: [الأقسام] [قناة المطور] [جروب التنصيب]
     try {
-        await sock.sendMessage(from, {
-            title: '🍷 『✦』 أقسام Eren Bot 『✦』',
-            text: 'اختر القسم لعرض أوامره:',
-            footer: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝑡 『✦』',
-            buttonText: '📜 عرض الأقسام',
-            sections: [
-                {
-                    title: 'الأقسام الرئيسية',
-                    rows: [
-                        { title: '🛡️ 1. الحماية', description: 'أوامر الحماية والإنذارات', rowId: '.1' },
-                        { title: '🎉 2. الترفيه والألعاب', description: 'أوامر الألعاب والفعاليات', rowId: '.2' },
-                        { title: '💳 3. البنك والنقاط', description: 'الحساب والتحويل والمكافآت', rowId: '.3' },
-                        { title: '🕌 4. القسم الإسلامي', description: 'القرآن والأدعية والأذكار', rowId: '.4' },
-                        { title: '😂 5. الضحك', description: 'النكت والتساؤلات والمقولات', rowId: '.5' },
-                        { title: '👥 6. المجموعات', description: 'أوامر وتفاعلات المجموعة', rowId: '.6' },
-                        { title: '♟️ 7. المطور', description: 'أوامر المطور والنظام', rowId: '.7' },
-                        { title: '⚡ 8. الإدارة', description: 'أوامر إدارة المجموعة', rowId: '.8' },
-                        { title: '🔍 9. الكشف', description: 'أوامر كشف الوسائط', rowId: '.9' },
-                        { title: '👑 10. الألقاب', description: 'أوامر الألقاب', rowId: '.10' },
-                        { title: '🎨 11. الملصقات', description: 'أوامر صنع الملصقات', rowId: '.11' },
-                        { title: '📲 12. التنصيب', description: 'ربط بوت خاص بك', rowId: '.12' }
-                    ]
-                }
-            ]
-        });
+        await sendMenuButtons(sock, from);
     } catch (e) {
-        console.error('تعذر إرسال قائمة أقسام .بوت التفاعلية:', e);
+        console.error('تعذر إرسال أزرار .بوت التفاعلية:', e);
     }
     return;
 }
@@ -2011,6 +1988,7 @@ if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {
     } catch (e) { 
         await sendBotMessage(sock, from, { text: botCommandsText, mentions: [sender] }); 
     }
+    try { await sendMenuButtons(sock, from); } catch (e) { console.error('تعذر إرسال أزرار .اوامر التفاعلية:', e); }
     return;
 }
 
