@@ -353,6 +353,7 @@ function cleanTextForComparison(str) {
 }
 
 let isPairingRequested = false;
+let lastPairingAt = 0;
 
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -379,6 +380,7 @@ const { connection, lastDisconnect, qr } = u;
 if (connection === 'close') {
     isPairingRequested = false;
     const statusCode = lastDisconnect?.error?.output?.statusCode;
+    console.log('🔄 انقطع الاتصال | الرمز:', statusCode, '|', lastDisconnect?.error?.message || '');
     const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
     if (shouldReconnect) {
         setTimeout(() => { if (!(subInfo && subInfo.stopped)) startBot(sessionDir, subInfo); }, 3000);
@@ -386,8 +388,9 @@ if (connection === 'close') {
         subInfo.onLoggedOut();
     }
 } else if (connection === 'connecting') {
-    if (!subInfo && !sock.authState.creds.registered && !isPairingRequested) {
+    if (!subInfo && !sock.authState.creds.registered && !isPairingRequested && Date.now() - lastPairingAt > 120000) {
         isPairingRequested = true;
+        lastPairingAt = Date.now();
         setTimeout(async () => {
             try {
                 let phoneNumber = "962795106901";
@@ -2110,7 +2113,8 @@ if (cmdBase === '5') {
 }
 
 if (cmdBase === '6') {
-    const groupExtText = `👥 *المجموعات:*
+    const groupExtText =
+            const groupExtText = `👥 *المجموعات:*
 
 > 💍 .زواج ↞ زواج عشوائي للجروب
 > 🌹 .غزل @منشن ↞ بيت غزل
@@ -2288,4 +2292,4 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 }
 
 startBot();
-initSubBots(startBot); 
+initSubBots(startBot);
