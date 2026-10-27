@@ -8,7 +8,8 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand } from './subbot.js';
-import { sendMenuButtons, getButtonId } from './menu.js';
+import { sendFormWithButtons, getButtonId } from './menu.js';
+import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand } from './features.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -240,7 +241,7 @@ const validCommands = [
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت', 'اوامر', 'الأوامر',
+'صفر', 'بوت',
 '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
@@ -260,6 +261,7 @@ const validCommands = [
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 'ملصق', 's', 'لصورة', 'toimage', 'ملصق_متحرك', 'فيديو_لملصق', 'متحرك_لفيديو', 'ملصق_رابط', 'ملصق_نصي', 'حزمة', 'مساعدة_الملصقات'
 ];
+validCommands.push(...featureCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -580,7 +582,7 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
         violationDetected = true;    
         violationType = 'جهات الاتصال';    
         shouldLockChat = true;
-    } else if (settings.antiLink && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
+    } else if (settings.antiLink && !isFeatureLinkCommand(trimmedBody) && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
         violationDetected = true;    
         violationType = 'الروابط';    
         shouldLockChat = true;
@@ -748,6 +750,8 @@ if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: is
 if (!isGroup) {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
+
+if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
@@ -1944,54 +1948,21 @@ if (cmdBase === 'بوت') {
 
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
 
-    try { 
-        await sendBotMessage(sock, from, { 
-            video: { url: BOT_COMMANDS_VIDEO_URL }, 
-            caption: botWelcomeText,
-            mentions: [sender]
-        }); 
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: botWelcomeText, mentions: [sender] }); 
-    }
-
-    // أزرار تفاعلية أسفل استمارة .بوت: [الأقسام] [قناة المطور] [جروب التنصيب]
+    // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
     try {
-        await sendMenuButtons(sock, from);
+        await sendFormWithButtons(sock, from, botWelcomeText, BOT_COMMANDS_VIDEO_URL, sender);
     } catch (e) {
-        console.error('تعذر إرسال أزرار .بوت التفاعلية:', e);
+        console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
+        try { 
+            await sendBotMessage(sock, from, { 
+                video: { url: BOT_COMMANDS_VIDEO_URL }, 
+                caption: botWelcomeText,
+                mentions: [sender]
+            }); 
+        } catch (e2) { 
+            await sendBotMessage(sock, from, { text: botWelcomeText, mentions: [sender] }); 
+        }
     }
-    return;
-}
-
-if (cmdBase === 'اوامر' || cmdBase === 'الأوامر') {    
-    const botCommandsText = `🗂️ *قَـائِـمَـةُ الأَقْـسَـامِ الـرَّسْـمِـيَّة:*
-
-> 🛡️ \`.1\` ↞ الحماية
-> 🎉 \`.2\` ↞ الترفيه
-> 💳 \`.3\` ↞ البنك والنقاط
-> 🕌 \`.4\` ↞ اسلامي
-> 😂 \`.5\` ↞ الضحك
-> 👥 \`.6\` ↞ المجموعات
-> ♟️ \`.7\` ↞ المطور
-> ⚡ \`.8\` ↞ الادارة
-> 🔍 \`.9\` ↞ الكشف
-> 👑 \`.10\` ↞ الألقاب
-> 🎨 \`.11\` ↞ الملصقات
-> 📲 \`.12\` ↞ التنصيب
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-💡 *اكتب رقم القسم للوصول السريع!*`;
-
-    try { 
-        await sendBotMessage(sock, from, { 
-            image: { url: BOT_PROFILE_IMAGE_URL }, 
-            caption: botCommandsText,
-            mentions: [sender]
-        }); 
-    } catch (e) { 
-        await sendBotMessage(sock, from, { text: botCommandsText, mentions: [sender] }); 
-    }
-    try { await sendMenuButtons(sock, from); } catch (e) { console.error('تعذر إرسال أزرار .اوامر التفاعلية:', e); }
     return;
 }
 
