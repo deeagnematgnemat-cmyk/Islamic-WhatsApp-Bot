@@ -6,14 +6,6 @@ const MAX_SUBBOTS = 10;
 const SESSIONS_DIR = './subbots_sessions';
 const LIST_FILE = './subbots.json';
 const PAIR_TIMEOUT_MS = 3 * 60 * 1000; // مهلة إدخال الكود: 3 دقائق
-// ============ نظام التنصيب (بوتات فرعية) - الحد الأقصى 10 ============
-import fs from 'fs';
-import path from 'path';
-
-const MAX_SUBBOTS = 10;
-const SESSIONS_DIR = './subbots_sessions';
-const LIST_FILE = './subbots.json';
-const PAIR_TIMEOUT_MS = 3 * 60 * 1000; // مهلة إدخال الكود: 3 دقائق
 
 let startBotFn = null;
 const subs = new Map(); // الرقم -> بيانات البوت الفرعي
@@ -200,28 +192,3 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
     });
     return true;
 }
-
-let startBotFn = null;
-const subs = new Map(); // الرقم -> بيانات البوت الفرعي
-
-function saveList() {
-    try { fs.writeFileSync(LIST_FILE, JSON.stringify([...subs.values()].filter(e => e.connected).map(e => e.number))); } catch (e) {}
-}
-
-function readList() {
-    try { return JSON.parse(fs.readFileSync(LIST_FILE, 'utf8')); } catch (e) { return []; }
-}
-
-// تشغيل بوت فرعي. opts: { onCode, onConnected, onFail, onTimeout }
-function launch(number, opts = {}) {
-    const dir = path.join(SESSIONS_DIR, number);
-    const isNew = !fs.existsSync(path.join(dir, 'creds.json'));
-    fs.mkdirSync(dir, { recursive: true });
-
-    const entry = {
-        number, dir, stopped: false, connected: false, sock: null, codeRequested: false, timer: null,
-
-        // يستدعيها startBot كل مرة ينشئ فيها اتصالاً
-        onSock(sock) {
-            entry.sock = sock;
-            sock.ev.on('connection.update', ({ connection }) => {
