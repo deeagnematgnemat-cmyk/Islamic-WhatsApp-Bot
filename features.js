@@ -6,7 +6,7 @@ import pino from 'pino';
 import { execFile } from 'child_process';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { sendSectionWithButtons } from './menu.js';
+import { sendSectionWithButtons, sendPackCard } from './menu.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -35,6 +35,7 @@ const COMMANDS = {
     'تيك': ['tt', 'tiktok'], 'انستا': ['ig', 'insta'], 'فيس': ['fb'], 'يوتيوب': ['yt'], 'صوت': ['mp3'],
     'فيديو': ['vid'], 'صورة': ['pic'], 'بنترست': ['pin'], 'تويتر': ['tw', 'x'], 'سناب': ['snap'],
     'ثريدز': ['threads'], 'تلي': ['tg'], 'بحث': ['search'], 'ميديا': ['media', 'dl'], 'رابط': ['link'], 'تحميل': [],
+    'ايدت': ['edit'], 'فويس': ['voice'],
     // الذكاء الاصطناعي
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
@@ -48,7 +49,7 @@ CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكا�
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
-const LINK_COMMANDS = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'ميديا', 'رابط', 'تحميل', 'تلخيص']);
+const LINK_COMMANDS = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'ميديا', 'رابط', 'تحميل', 'تلخيص', 'فويس']);
 export function isFeatureLinkCommand(body) {
     const t = String(body || '').trim();
     if (!t.startsWith('.')) return false;
@@ -87,7 +88,7 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 📘 .فيس | .fb ↞ فيديو فيسبوك
 > ▶️ .يوتيوب | .yt ↞ فيديو يوتيوب (+ صوت)
 > 🎧 .صوت | .mp3 ↞ استخراج الصوت من رابط
-> 🎬 .فيديو ↞ فيديو من رابط
+> 🎬 .فيديو ↞ فيديو من رابط، أو رد على ملصق متحرك
 > 🖼️ .صورة ↞ صورة من رابط
 > 📌 .بنترست | .pin ↞ بنترست
 > 🐦 .تويتر | .x ↞ منشورات X
@@ -95,6 +96,8 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🧵 .ثريدز ↞ ثريدز
 > ✈️ .تلي ↞ منشورات تيليجرام العامة
 > 🔎 .بحث <كلمات> ↞ بحث عن مقاطع
+> 🎞️ .ايدت <اسم الشخصية> ↞ 3 ايديتات من تيك توك
+> 🎙️ .فويس <اسم الاغنية أو الصوت> ↞ فويس حسب الطلب
 > 🧲 .ميديا | .dl ↞ تنزيل تلقائي من أي رابط
 > 🔗 .رابط ↞ فحص الرابط ومعرفة منصته
 
@@ -249,21 +252,25 @@ async function cmdToImage(c) {
     await c.media({ image: png, caption: t.node.isAnimated ? '🖼️ تم أخذ أول إطار من الملصق المتحرك.' : '🖼️ تم التحويل إلى صورة.' });
 }
 
-async function cmdToVideo(c) {
-    const t = getTarget(c, ['stickerMessage']);
-    if (!t || !t.node.isAnimated) return c.reply('📌 رد على ملصق **متحرك** بالأمر `.لفيديو`');
+async function stickerToVideo(c, t) {
     const buf = await download(c, t);
     const sharp = await getSharp();
     if (!sharp) return c.reply('❌ هذه الميزة تحتاج مكتبة sharp. أضفها في package.json ثم أعد النشر.');
-    const gif = await sharp(buf, { animated: true }).gif().toBuffer();
+    const animated = !!t.node.isAnimated;
     const id = uid();
-    const inp = path.join(TMP, `g_${id}.gif`), out = path.join(TMP, `v_${id}.mp4`);
-    fs.writeFileSync(inp, gif);
+    const inp = path.join(TMP, `g_${id}.${animated ? 'gif' : 'png'}`), out = path.join(TMP, `v_${id}.mp4`);
+    fs.writeFileSync(inp, animated ? await sharp(buf, { animated: true }).gif().toBuffer() : await sharp(buf).png().toBuffer());
     try {
-        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-movflags', 'faststart', '-pix_fmt', 'yuv420p',
-            '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', out], 90000);
+        const pre = animated ? ['-y', '-v', 'error', '-i', inp] : ['-y', '-v', 'error', '-loop', '1', '-i', inp, '-t', '3'];
+        await run(FFMPEG, [...pre, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', out], 90000);
         await c.media({ video: fs.readFileSync(out), mimetype: 'video/mp4', caption: '🎥 تم التحويل إلى فيديو.' });
     } finally { rm(inp, out); }
+}
+
+async function cmdToVideo(c) {
+    const t = getTarget(c, ['stickerMessage']);
+    if (!t) return c.reply('📌 رد على ملصق بالأمر `.لفيديو`');
+    await stickerToVideo(c, t);
 }
 
 // ----- رفع إلى مواقع استضافة للحصول على رابط
@@ -287,6 +294,15 @@ async function uploadForLink(buf, filename, mime) {
         if (u) return u;
         errors.push('uguu');
     } catch (e) { errors.push('uguu'); }
+    try {   // tmpfiles.org
+        const fd = new FormData();
+        fd.append('file', new Blob([buf], { type: mime }), filename);
+        const r = await http('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd, timeout: 90000 });
+        const j = await r.json();
+        const u = j?.data?.url;
+        if (u) return u.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+        errors.push('tmpfiles');
+    } catch (e) { errors.push('tmpfiles'); }
     throw new Error('UPLOAD_FAILED:' + errors.join(','));
 }
 
@@ -433,14 +449,33 @@ async function cmdImageEdit(c, op) {
 
 // ----- حزمة ملصقات
 const decodeHtml = (s) => (s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-async function cmdPack(c) {
-    const q = c.args.trim();
-    if (!q) return c.reply('📌 مثال: `.حزمة ناروتو` أو `.حزمة ايرين`');
-    let html;
-    try {
-        const r = await http('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:sticker.ly ${q} sticker pack`), { timeout: 20000 });
-        html = await r.text();
-    } catch (e) { return c.reply('❌ تعذر البحث عن الحزم حالياً. حاول لاحقاً.'); }
+
+// البحث في Sticker.ly مباشرة (يعطي الاسم والعدد وصور الملصقات)
+async function stickerlyPacks(q) {
+    const j = await httpJson('https://api.sticker.ly/v4/stickerPack/smartSearch', {
+        method: 'POST', timeout: 20000,
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'androidapp.stickerly/1.17.0 (Pixel 7; U; Android 33; en-US; US)' },
+        body: JSON.stringify({ keyword: q, enabledKeywordSearch: true, filter: { extendSearchResult: false, onlyAnimatedPack: false } })
+    });
+    const packs = j?.result?.packs || [];
+    const out = packs.map((p) => {
+        const files = p.resourceFiles || (p.stickers || []).map((x) => x.fileName).filter(Boolean);
+        const prefix = p.resourceUrlPrefix || '';
+        return {
+            title: p.name, author: p.authorName || '', animated: !!p.isAnimated,
+            count: files.length || p.stickerCount || null,
+            link: p.packId ? `https://sticker.ly/s/${p.packId}` : null,
+            thumbs: files.slice(0, 4).map((f) => prefix + f)
+        };
+    }).filter((p) => p.title && p.link);
+    out.sort((a, b) => Number(a.animated) - Number(b.animated));   // الثابتة أولاً
+    return out;
+}
+
+// الطريقة القديمة كاحتياط (بحث عام ثم قراءة صفحة الحزمة)
+async function legacyPacks(q) {
+    const r = await http('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:sticker.ly ${q} sticker pack`), { timeout: 20000 });
+    const html = await r.text();
     const links = [];
     for (const m of html.matchAll(/class="result__a"[^>]*href="([^"]+)"/g)) {
         let href = decodeHtml(m[1]);
@@ -452,18 +487,53 @@ async function cmdPack(c) {
     const packs = [];
     for (const link of links) {
         try {
-            const r = await http(link, { timeout: 15000 });
-            const mt = metaTags(await r.text());
+            const rr = await http(link, { timeout: 15000 });
+            const mt = metaTags(await rr.text());
             const title = decodeHtml(mt['og:title'] || '').replace(/\s*[|\-–].*Sticker\.ly.*$/i, '').trim();
             const desc = decodeHtml(mt['og:description'] || mt['description'] || '');
             const cnt = /(\d+)\s*(?:stickers?|ملصق)/i.exec(desc) || /(\d+)\s*(?:stickers?|ملصق)/i.exec(mt['og:title'] || '');
-            if (title) packs.push({ title, count: cnt ? cnt[1] : null, link, icon: mt['og:image'] || null });
+            if (title) packs.push({ title, author: '', count: cnt ? cnt[1] : null, link, thumbs: [], icon: mt['og:image'] || null });
         } catch (e) { /* تجاهل */ }
     }
+    return packs;
+}
+
+// صورة مجمّعة 2×2 لأول 4 ملصقات (مثل بطاقة الحزمة في واتساب)
+async function packCollage(urls) {
+    const sharp = await getSharp();
+    if (!sharp || !urls?.length) return null;
+    const tiles = [];
+    for (const u of urls.slice(0, 4)) {
+        try {
+            const { buf } = await httpBuffer(u, 3 * 1024 * 1024);
+            tiles.push(await sharp(buf).resize(240, 240, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } }).flatten({ background: '#ffffff' }).png().toBuffer());
+        } catch (e) { /* تجاهل */ }
+    }
+    if (!tiles.length) return null;
+    const pos = [[12, 12], [260, 12], [12, 260], [260, 260]];
+    return await sharp({ create: { width: 512, height: 512, channels: 3, background: '#ffffff' } })
+        .composite(tiles.map((input, i) => ({ input, left: pos[i][0], top: pos[i][1] })))
+        .jpeg({ quality: 88 }).toBuffer();
+}
+
+async function cmdPack(c) {
+    const q = c.args.trim();
+    if (!q) return c.reply('📌 مثال: `.حزمة ناروتو` أو `.حزمة ايرين`');
+    let packs = [];
+    try { packs = await stickerlyPacks(q); } catch (e) { packs = []; }
+    if (!packs.length) { try { packs = await legacyPacks(q); } catch (e) { packs = []; } }
     if (!packs.length) return c.reply(`❌ لم أعثر على حزمة ملصقات مناسبة لـ (${q}).\nجرّب اسماً آخر أو بالإنجليزية.`);
     for (const p of packs.slice(0, 2)) {
-        const caption = `📦 *${p.title}*\n🔢 عدد الملصقات: ${p.count || 'غير معروف'}\n🔗 ${p.link}\n\n💡 افتح الرابط ثم اضغط «Add to WhatsApp» لاستيراد الحزمة كاملة.`;
-        try { await c.media(p.icon ? { image: { url: p.icon }, caption } : { text: caption }); } catch (e) { await c.reply(caption); }
+        const text = `📦 *${p.title}*\n🎴 ${p.count ? p.count + ' ملصقاً' : 'عدد الملصقات غير معروف'}${p.author ? `\n✍️ ${p.author}` : ''}\n\n💡 اضغط «عرض مجموعة الملصقات» ثم «Add to WhatsApp» لإضافة الحزمة كاملة.`;
+        let image = null;
+        try { image = await packCollage(p.thumbs); } catch (e) {}
+        if (!image) image = p.icon || p.thumbs?.[0] || null;
+        try {
+            await sendPackCard(c.sock, c.from, { image, text, url: p.link, mentionJid: c.sender });
+        } catch (e) {
+            const caption = `${text}\n🔗 ${p.link}`;
+            try { await c.media(image ? (Buffer.isBuffer(image) ? { image, caption } : { image: { url: image }, caption }) : { text: caption }); } catch (e2) { await c.reply(caption); }
+        }
     }
 }
 
@@ -491,11 +561,32 @@ function getYtDlp() {
 function friendlyDlError(e) {
     const s = (e.stderr || e.message || '') + '';
     if (/larger than max|max-filesize|TOO_BIG/i.test(s)) return '⚠️ الملف أكبر من الحد المسموح (100MB).';
-    if (/private|login|sign in|cookies|authenticat|age/i.test(s)) return '🔒 المحتوى خاص أو يتطلب تسجيل دخول، ولا أستطيع تنزيله.';
+    if (/private video|private account|login required|log in|sign in|cookies|authenticat|age[- ]restrict|confirm your age|members-only|rate-limit|not a bot/i.test(s)) return '🔒 المحتوى خاص أو يتطلب تسجيل دخول، ولا أستطيع تنزيله.';
     if (/unsupported url/i.test(s)) return '❌ هذا الرابط غير مدعوم.';
     if (/not available|removed|deleted|unavailable|404/i.test(s)) return '❌ المحتوى غير متاح أو حُذف.';
     if (/YTDLP_DOWNLOAD_FAILED|ENOENT/i.test(s)) return '❌ أداة التنزيل غير متوفرة على هذا الخادم.';
     return '❌ تعذر تنزيل المحتوى من هذا الرابط.';
+}
+
+let lastYtdlpUpdate = 0;
+async function updateYtDlp(bin) {
+    if (Date.now() - lastYtdlpUpdate < 6 * 3600 * 1000) return false;
+    lastYtdlpUpdate = Date.now();
+    try { await run(bin, ['-U'], 120000); return true; } catch (e) { return false; }
+}
+// كوكيز اختيارية لتجاوز حظر المنصات: YTDLP_COOKIES_FILE (مسار) أو YTDLP_COOKIES (نص Netscape)
+function cookiesArgs() {
+    try {
+        const f = process.env.YTDLP_COOKIES_FILE;
+        if (f && fs.existsSync(f)) return ['--cookies', f];
+        if (process.env.YTDLP_COOKIES) {
+            const cp = path.resolve('./bin/cookies.txt');
+            fs.mkdirSync(path.dirname(cp), { recursive: true });
+            fs.writeFileSync(cp, process.env.YTDLP_COOKIES.replace(/\\n/g, '\n'));
+            return ['--cookies', cp];
+        }
+    } catch (e) {}
+    return [];
 }
 
 async function ytdlpDownload(url, { audio = false, many = false } = {}) {
@@ -505,13 +596,18 @@ async function ytdlpDownload(url, { audio = false, many = false } = {}) {
     const args = ['--no-warnings', '--no-progress', '--restrict-filenames', '--max-filesize', '100M',
         '--socket-timeout', '20', '--user-agent', UA, '-o', path.join(TMP, `${prefix}_%(autonumber)s.%(ext)s`)];
     if (FFMPEG !== 'ffmpeg') args.push('--ffmpeg-location', FFMPEG);
+    args.push(...cookiesArgs());
     if (many) args.push('--playlist-end', '10'); else args.push('--no-playlist');
     if (audio) args.push('-x', '--audio-format', 'mp3', '--audio-quality', '5');
-    else args.push('-f', 'bv*[height<=720]+ba/b[height<=720]/b', '--merge-output-format', 'mp4');
+    else args.push('-f', 'bv*[vcodec^=avc1][height<=720]+ba[acodec^=mp4a]/bv*[vcodec^=avc1][height<=720]+ba/bv*[height<=720]+ba/b[height<=720]/b', '--merge-output-format', 'mp4');
     args.push(url);
     try { await run(bin, args, 300000); } catch (e) {
         for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix)) rm(path.join(TMP, f));
-        throw e;
+        // إن كان السبب قدم نسخة yt-dlp نحدّثها مرة ثم نعيد المحاولة
+        if (/unable to extract|nsig|signature|failed to parse|unable to download webpage|unsupported url/i.test((e.stderr || '') + '') && await updateYtDlp(bin)) {
+            try { await run(bin, args, 300000); }
+            catch (e2) { for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix)) rm(path.join(TMP, f)); throw e2; }
+        } else throw e;
     }
     const files = fs.readdirSync(TMP).filter((f) => f.startsWith(prefix) && !f.endsWith('.part')).sort().map((f) => path.join(TMP, f));
     if (!files.length) throw new Error('NO_FILE');
@@ -526,12 +622,42 @@ const EXT_KIND = {
 const MIME = { mp4: 'video/mp4', mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav',
     webm: 'video/webm', mkv: 'video/x-matroska', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mov: 'video/quicktime' };
 
+async function mediaCodecs(file) {
+    let txt = '';
+    try { txt = (await run(FFMPEG, ['-hide_banner', '-i', file], 30000)).stderr; } catch (e) { txt = e.stderr || ''; }
+    return {
+        video: (/Video:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
+        audio: (/Audio:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
+        yuv420: /yuv420p/.test(txt)
+    };
+}
+// يحوّل الفيديو إلى mp4 (H.264 + AAC) ليعمل صوته وصورته في واتساب دائماً
+async function makeWhatsAppMp4(buf) {
+    const id = uid();
+    const inp = path.join(TMP, `mi_${id}.bin`), out = path.join(TMP, `mo_${id}.mp4`);
+    try {
+        fs.writeFileSync(inp, buf);
+        const k = await mediaCodecs(inp);
+        if (!k.video) return buf;
+        const okV = k.video === 'h264' && k.yuv420, okA = !k.audio || k.audio === 'aac';
+        if (okV && okA) return buf;
+        const vArgs = okV ? ['-c:v', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'];
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...vArgs, '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', out], 240000);
+        const o = fs.readFileSync(out);
+        return o.length ? o : buf;
+    } catch (e) { return buf; }
+    finally { rm(inp, out); }
+}
+
 async function sendBuffer(c, buf, ext, caption = '') {
     ext = (ext || 'bin').toLowerCase();
     let kind = EXT_KIND[ext] || 'doc';
     if (buf.length > MAX_AS_MEDIA) kind = 'doc';
     const mimetype = MIME[ext] || 'application/octet-stream';
-    if (kind === 'video') return c.media({ video: buf, mimetype, caption });
+    if (kind === 'video') {
+        if (buf.length <= MAX_AS_MEDIA) buf = await makeWhatsAppMp4(buf);
+        return c.media({ video: buf, mimetype: 'video/mp4', caption });
+    }
     if (kind === 'image') return c.media({ image: buf, caption });
     if (kind === 'audio') return c.media({ audio: buf, mimetype, ptt: false });
     return c.media({ document: buf, mimetype, fileName: `Eren_Bot_${uid()}.${ext}`, caption });
@@ -674,6 +800,125 @@ async function cmdSearch(c) {
     await c.reply(`🔎 *نتائج البحث عن (${q}):*\n\n${lines.join('\n\n')}\n\n💡 للتنزيل: \`.يوتيوب <الرابط>\` أو \`.صوت <الرابط>\``);
 }
 
+// ---- ايدت: 3 مقاطع (ايديتات) من تيك توك للشخصية
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const tikAbs = (u) => (u && u.startsWith('/') ? 'https://www.tikwm.com' + u : u);
+
+async function tiktokSearchVideos(q) {
+    const body = new URLSearchParams({ keywords: q, count: '20', cursor: '0', web: '1', hd: '1' });
+    const j = await httpJson('https://www.tikwm.com/api/feed/search', {
+        method: 'POST', body, timeout: 30000,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+    });
+    return (j?.code === 0 && Array.isArray(j?.data?.videos)) ? j.data.videos : [];
+}
+
+// احتياط: بحث عام عن روابط تيك توك ثم جلب كل رابط
+async function tiktokLinksViaWeb(q) {
+    const r = await http('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:tiktok.com ${q}`), { timeout: 20000 });
+    const html = await r.text();
+    const links = [];
+    for (const m of html.matchAll(/class="result__a"[^>]*href="([^"]+)"/g)) {
+        let href = decodeHtml(m[1]);
+        const u = /uddg=([^&]+)/.exec(href);
+        if (u) href = decodeURIComponent(u[1]);
+        if (/tiktok\.com\/@[^/]+\/video\/\d+/.test(href) && !links.includes(href)) links.push(href);
+        if (links.length >= 6) break;
+    }
+    return links;
+}
+
+async function cmdEdit(c) {
+    const name = c.args.trim() || quotedText(c).trim();
+    if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر، مثال: `.ايدت ايرين` أو `.ايدت غوجو`');
+    const q = `${name} edit`;
+    const tokens = name.toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
+    let videos = [];
+    try { videos = await tiktokSearchVideos(q); } catch (e) { videos = []; }
+    videos = videos.filter((v) => (v.hdplay || v.play) && (!v.duration || v.duration <= 120));
+    // المقاطع التي يحوي عنوانها اسم الشخصية أولاً
+    videos.sort((a, b) => {
+        const sa = tokens.some((t) => (a.title || '').toLowerCase().includes(t)) ? 0 : 1;
+        const sb = tokens.some((t) => (b.title || '').toLowerCase().includes(t)) ? 0 : 1;
+        return sa - sb;
+    });
+    let sent = 0;
+    for (const v of videos) {
+        if (sent >= 3) break;
+        try {
+            const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author?.nickname || v.author?.unique_id || ''}`.trim();
+            await sendUrlMedia(c, tikAbs(v.hdplay || v.play), cap, 'mp4');
+            sent++;
+        } catch (e) { /* ننتقل للمقطع التالي */ }
+    }
+    if (sent < 3) {
+        let links = [];
+        try { links = await tiktokLinksViaWeb(q); } catch (e) {}
+        for (const link of links) {
+            if (sent >= 3) break;
+            try {
+                await sleep(1200);
+                const j = await httpJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(link), { timeout: 30000 });
+                const d = j?.data;
+                const vu = tikAbs(d?.hdplay || d?.play);
+                if (j?.code === 0 && vu && !(d.images && d.images.length)) {
+                    await sendUrlMedia(c, vu, `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${d.author?.nickname || ''}`.trim(), 'mp4');
+                    sent++;
+                }
+            } catch (e) { /* تجاهل */ }
+        }
+    }
+    if (!sent) return c.reply(`❌ لم أجد ايديتات لـ (${name}).\nجرّب كتابة الاسم بالإنجليزية أو بشكل آخر.`);
+}
+
+// ---- فويس: يجلب الصوت حسب الاسم (يوتيوب ثم ساوند كلاود) ويرسله كرسالة صوتية
+async function searchAudioEntries(bin, prefix, q) {
+    const out = await run(bin, ['--no-warnings', '--flat-playlist', '-J', ...cookiesArgs(), `${prefix}6:${q}`], 60000);
+    return (JSON.parse(out.stdout).entries || []).filter((e) => e && (e.url || e.id) && (!e.duration || e.duration <= 900));
+}
+const entryUrl = (e, prefix) => {
+    if (e.webpage_url) return e.webpage_url;
+    if (/^https?:\/\//.test(e.url || '')) return e.url;
+    return prefix === 'ytsearch' ? 'https://www.youtube.com/watch?v=' + (e.id || e.url) : (e.url || '');
+};
+async function toVoiceOgg(file) {
+    const out = path.join(TMP, `vo_${uid()}.ogg`);
+    try {
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', file, '-vn', '-c:a', 'libopus', '-b:a', '48k', '-ac', '1', '-ar', '48000', '-f', 'ogg', out], 120000);
+        return fs.readFileSync(out);
+    } finally { rm(out); }
+}
+
+async function cmdVoice(c) {
+    const q = c.args.trim() || quotedText(c).trim();
+    if (!q) return c.reply('📌 اكتب اسم الأغنية أو الصوت بعد الأمر، مثال: `.فويس اغنية حماسية` أو `.فويس <رابط>`');
+    let files = null, title = '';
+    const direct = URL_RE.exec(q);
+    if (direct) {
+        try { files = await ytdlpDownload(direct[0], { audio: true }); } catch (e) { return c.reply(friendlyDlError(e)); }
+    } else {
+        let bin;
+        try { bin = await getYtDlp(); } catch (e) { return c.reply(friendlyDlError(e)); }
+        for (const prefix of ['ytsearch', 'scsearch']) {
+            try {
+                const entries = await searchAudioEntries(bin, prefix, q);
+                for (const e of entries.slice(0, 3)) {
+                    const u = entryUrl(e, prefix);
+                    if (!u) continue;
+                    try { files = await ytdlpDownload(u, { audio: true }); title = e.title || ''; break; } catch (err) { /* التالي */ }
+                }
+            } catch (err) { /* المصدر التالي */ }
+            if (files) break;
+        }
+    }
+    if (!files || !files.length) return c.reply('❌ لم أستطع جلب فويس لهذا الطلب. جرّب اسماً أدق أو اسم الفنان مع الأغنية.');
+    try {
+        const ogg = await toVoiceOgg(files[0]);
+        if (title) await c.reply(`🎙️ ${title}`);
+        await c.media({ audio: ogg, mimetype: 'audio/ogg; codecs=opus', ptt: true });
+    } finally { rm(...files); }
+}
+
 // ---------------------------------------------------------------- الذكاء الاصطناعي
 const SYSTEM = 'أنت مساعد ذكي ودود داخل بوت واتساب اسمه Eren Bot. أجب بلغة المستخدم (العربية غالباً) بوضوح واختصار ودقة، ولا تخترع معلومات. استخدم تنسيق واتساب البسيط عند الحاجة.';
 const memory = new Map();   // المرسل -> { t, msgs }
@@ -784,7 +1029,7 @@ async function cmdSummarize(c) {
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
 const HEAVY = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'بحث', 'ميديا',
-    'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود', 'حزمة', 'لرابط']);
+    'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود', 'حزمة', 'لرابط', 'ايدت', 'فويس']);
 let running = 0;
 
 async function sendSection(c, text) {
@@ -802,7 +1047,7 @@ const HANDLERS = {
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'لرابط': cmdToLink, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'حزمة': cmdPack, 'لفيديو': cmdToVideo,
     'إطار': (c) => cmdImageEdit(c, 'إطار'), 'قص': (c) => cmdImageEdit(c, 'قص'), 'عكس': (c) => cmdImageEdit(c, 'عكس'),
     'تدوير': (c) => cmdImageEdit(c, 'تدوير'), 'رمادي': (c) => cmdImageEdit(c, 'رمادي'),
-    'رابط': cmdLinkInfo, 'بحث': cmdSearch,
+    'رابط': cmdLinkInfo, 'بحث': cmdSearch, 'ايدت': cmdEdit, 'فويس': cmdVoice,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
@@ -825,7 +1070,12 @@ for (const [n, o] of Object.entries(YTDLP_CMDS)) {
 }
 HANDLERS['صوت'] = async (c) => { const u = getUrl(c); if (!u) return c.reply(NEED_URL); await viaYtdlp(c, u, { audio: true }); };
 HANDLERS['فيديو'] = async (c) => {
-    const u = getUrl(c); if (!u) return c.reply(NEED_URL);
+    const u = getUrl(c);
+    if (!u) {
+        const t = getTarget(c, ['stickerMessage']);
+        if (t) return stickerToVideo(c, t);
+        return c.reply(NEED_URL + '\n🎞️ أو رد على ملصق بالأمر `.فيديو` لتحويله إلى فيديو.');
+    }
     const info = await probe(u);
     if (info && info.type.startsWith('video/')) return sendUrlMedia(c, u, '', 'mp4');
     await cmdMedia(c, u);
