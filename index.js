@@ -10,7 +10,7 @@ import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand } from './subbot.js';
 import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider } from './menu.js';
-import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand } from './features.js';
+import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -336,6 +336,8 @@ botMode: 'public',
 antiOtherBots: false
 };
 }
+// تفعيل الترحيب والتوديع والحماية في جميع المجموعات دائماً
+Object.assign(groupSettings[groupId], { welcome: true, goodbye: true, antiLink: true, antiBadWords: true, antiContact: true });
 return groupSettings[groupId];
 }
 
@@ -492,7 +494,8 @@ if (connection === 'close') {
 
 sock.ev.on('group-participants.update', async (anu) => {
 try {
-const { id, participants, action } = anu;
+const { id, action } = anu;
+const participants = (anu.participants || []).map((p) => (typeof p === 'string' ? p : (p?.id || p?.phoneNumber || ''))).filter(Boolean);
 const settings = getGroupSetting(id);
 
 if (action === 'add' && settings.welcome) {    
@@ -566,11 +569,12 @@ if (action === 'add' && settings.welcome) {
         }
     }
 }
-} catch (e) {}
+} catch (e) { console.error('خطأ الترحيب/التوديع:', e?.message || e); }
 });
 
 const onUpsert = async (m) => {
 if (!['notify', 'append'].includes(m.type)) return;
+try { collectPackImages(sock, m.messages); } catch (e) {}
 
 const msg = m.messages[0];     
 if (!msg || !msg.message) return;    
@@ -611,9 +615,8 @@ if (globalBotStopped && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
-if (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) {
-    return;
-}
+// الوضع الخاص: يتجاهل الأوامر لغير المطورين، لكن الحماية تبقى شغالة (تُنفَّذ قبل الخروج أدناه)
+const privateBlocked = groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender);
 
 if (isGroup && !isFromMe) {    
     const groupSt = getGroupSetting(from);    
@@ -687,9 +690,11 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
                 await sendBotMessage(sock, from, { text: alertMsg, mentions: [sender] });    
             }    
             return;    
-        } catch (e) {}    
+        } catch (e) { console.error('تعذر تنفيذ الحماية (تأكد أن البوت مشرف في المجموعة):', e?.message || e); }    
     }    
 }    
+
+if (privateBlocked) return;
 
 if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {    
     if (activeGames[from]) {    
