@@ -1,6 +1,7 @@
 // ============ نظام التنصيب (بوتات فرعية) - الحد الأقصى 10 ============
 import fs from 'fs';
 import path from 'path';
+import { sendSectionWithButtons } from './menu.js';
 
 const MAX_SUBBOTS = 10;
 const SESSIONS_DIR = './subbots_sessions';
@@ -129,7 +130,7 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
 
     const reply = (text, mentions) => sock.sendMessage(from, { text, ...(mentions ? { mentions } : {}) }, { quoted: msg });
 
-    if (isSection) { await reply(SECTION_TEXT); return true; }
+    if (isSection) { if (!(await sendSectionWithButtons(sock, from, SECTION_TEXT, null, sender))) await reply(SECTION_TEXT); return true; }
 
     // التنصيب يعمل من البوت الرئيسي فقط (يمنع التنصيب المتسلسل)
     if (sock.isSubBot) {
