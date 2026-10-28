@@ -1,4 +1,5 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage } from '@whiskeysockets/baileys';
+import * as BaileysNs from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
@@ -145,6 +146,12 @@ process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', er
 const DEVELOPER_NUMBER = '962796163926';
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
+const BOT_VIDEO_FILE = './bot_commands_video.mp4';
+// الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
+function getBotCommandsVideo() {
+    try { if (fs.existsSync(BOT_VIDEO_FILE) && fs.statSync(BOT_VIDEO_FILE).size > 0) return BOT_VIDEO_FILE; } catch (e) {}
+    return BOT_COMMANDS_VIDEO_URL;
+}
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
 let extraDevelopers = []; 
@@ -246,6 +253,7 @@ const validCommands = [
 'حظر رابط', 'سماح رابط', 'حظر شتم', 'سماح شتم', 'حظر جهات', 'سماح جهات',
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة',
+'اساسي',
 'قران', 'قرآن', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'اذكار', 'اذكار_الصباح', 'اذكار_المساء', 'اذكار_الاستيقاظ', 'اذكار_الصلاة', 'اذكار_المسجد',
 'نكتة', 'ماذا_لو', 'قول',
 'تعطيل_البوتات', 'تعطيل بوتات',
@@ -399,13 +407,40 @@ setForwardContextProvider(async (sock) => {
     return { isForwarded: true, forwardingScore: 1, forwardedNewsletterMessageInfo: { newsletterJid: ch.newsletterJid, newsletterName: ch.newsletterName, serverMessageId: 100 + Math.floor(Math.random() * 900) } };
 });
 
+// ===== إصدار واتساب ويب: يُجلب من واتساب مباشرة (الإصدار القديم يسبب فشل الربط بالكود) =====
+let cachedWaVersion = null;
+let cachedWaVersionAt = 0;
+async function getWaVersion() {
+    if (cachedWaVersion && (Date.now() - cachedWaVersionAt) < 10 * 60 * 1000) return cachedWaVersion;
+    let found = null;
+    try {
+        const fetchWeb = BaileysNs.fetchLatestWaWebVersion || BaileysNs.default?.fetchLatestWaWebVersion;
+        if (fetchWeb) {
+            const r = await fetchWeb({});
+            if (r && r.version && !r.error) found = r.version;
+        }
+    } catch (e) {}
+    if (!found) {
+        try {
+            const r = await fetchLatestBaileysVersion();
+            if (r && r.version) found = r.version;
+        } catch (e) {}
+    }
+    if (found) {
+        cachedWaVersion = found;
+        cachedWaVersionAt = Date.now();
+        console.log('🔢 إصدار واتساب المستخدم:', found.join('.'));
+    }
+    return found || cachedWaVersion;
+}
+
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-const { version } = await fetchLatestBaileysVersion();
+const version = await getWaVersion();
 
 const sock = makeWASocket({
 auth: state,
-version,
+...(version ? { version } : {}),
 printQRInTerminal: false,
 logger: pino({ level: 'silent' }),
 browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
@@ -1966,6 +2001,27 @@ if (cmdBase === 'اذاعة' || cmdBase === 'إذاعة') {
     } catch (e) { return sendBotMessage(sock, from, { text: '❌ فشل إرسال الإذاعة.' }); }    
 }    
 
+if (cmdBase === 'اساسي') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
+    try {
+        const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
+        const isVid = (m) => !!(m?.videoMessage || (m?.documentMessage && (m.documentMessage.mimetype || '').startsWith('video/')));
+        let vidMsg = unwrap(quotedMsg);
+        if (!isVid(vidMsg)) vidMsg = unwrap(msg.message);
+        if (!isVid(vidMsg)) {
+            return sendBotMessage(sock, from, { text: '📌 رد على فيديو بكلمة `.اساسي` أو أرسل الفيديو وفي وصفه `.اساسي` لتغيير فيديو استمارة .بوت.' });
+        }
+        const videoBuffer = await downloadMediaMessage({ key: msg.key, message: vidMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        if (!videoBuffer || !videoBuffer.length) throw new Error('empty video');
+        fs.writeFileSync(BOT_VIDEO_FILE, videoBuffer);
+        const okText = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*🎬 تَـمَّ تَـغْـيِـيـرُ الـفِـيـدْيُـو*\n\n> ╎ ✅ الحالة: تم حفظ الفيديو الجديد بنجاح.\n> ╎ 📌 سيظهر الآن فوق استمارة \`.بوت\`.\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+        return sendBotMessage(sock, from, { text: okText }, { quoted: msg });
+    } catch (e) {
+        console.error('خطأ تغيير فيديو الاستمارة:', e?.message || e);
+        return sendBotMessage(sock, from, { text: '❌ فشل تغيير الفيديو، تأكد أنه فيديو صالح وأعد المحاولة.' });
+    }
+}
+
 if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {    
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين!' });    
     await sendBotMessage(sock, from, { text: '🔄 جاري إعادة تشغيل النظام...' });    
@@ -2001,12 +2057,12 @@ if (cmdBase === 'بوت') {
 
     // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
     try {
-        await sendFormWithButtons(sock, from, botWelcomeText, BOT_COMMANDS_VIDEO_URL, sender);
+        await sendFormWithButtons(sock, from, botWelcomeText, getBotCommandsVideo(), sender);
     } catch (e) {
         console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
         try { 
             await sendBotMessage(sock, from, { 
-                video: { url: BOT_COMMANDS_VIDEO_URL }, 
+                video: { url: getBotCommandsVideo() }, 
                 caption: botWelcomeText,
                 mentions: [sender]
             }); 
@@ -2172,6 +2228,7 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 📡 .سجل_البوت ↞ سجل العمليات
 > 🧪 .اختبار ↞ فحص الأوامر
 > 📢 .إذاعة <النص> ↞ إذاعة عامة
+> 🎬 .اساسي ↞ تغيير فيديو استمارة .بوت (رد على فيديو أو أرسله مع الأمر)
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
