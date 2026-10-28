@@ -97,10 +97,9 @@ export function getButtonId(message) {
     try { return JSON.parse(r.paramsJson).id || ''; } catch (e) { return ''; }
 }
 
-// ===== أزرار تحت كل قسم: [قائمة الأقسام] [القائمة الرئيسية] =====
+// ===== زر تحت كل قسم: [قائمة الأقسام] =====
 const SECTION_NAV_BUTTONS = () => [
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '📋 قائمة الأقسام', sections: SECTIONS }) },
-    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '🏠 القائمة الرئيسية', id: '.بوت' }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '📋 قائمة الأقسام', sections: SECTIONS }) }
 ];
 
 // ترجع true إذا أُرسل القسم مع الزرّين، وfalse إذا فشل (ليُرسل القسم بالطريقة القديمة)
@@ -126,7 +125,7 @@ export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJ
     }
 }
 
-// يعرض قائمة الأقسام كاملة (زر الأقسام) ومعها زر القائمة الرئيسية
+// يعرض قائمة الأقسام كاملة (زر الأقسام)
 export async function sendSectionsList(sock, jid, mentionJid) {
     await relayInteractive(sock, jid, {
         header: { hasMediaAttachment: false },
@@ -134,8 +133,7 @@ export async function sendSectionsList(sock, jid, mentionJid) {
         ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
         nativeFlowMessage: {
             buttons: [
-                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
-                { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '🏠 القائمة الرئيسية', id: '.بوت' }) }
+                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) }
             ]
         }
     });
