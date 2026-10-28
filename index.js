@@ -422,6 +422,23 @@ if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 sock.ev.on('connection.update', async (u) => {
 const { connection, lastDisconnect, qr } = u;
 
+// كود الاقتران: يُطلب لكل اتصال جديد بعد أن يصبح جاهزاً (أول qr)، لأن كل كود يبطل عند انقطاع اتصاله
+if (qr && !subInfo && !sock.authState.creds.registered && !sock.pairingCodeRequested) {
+    sock.pairingCodeRequested = true;
+    setTimeout(async () => {
+        try {
+            let code = await sock.requestPairingCode('962795106901');
+            code = code?.match(/.{1,4}/g)?.join('-') || code;
+            console.log(`\n========================================`);
+            console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+            console.log(`========================================\n`);
+        } catch (e) {
+            console.error('خطأ في طلب كود الاقتران:', e?.message || e);
+            sock.pairingCodeRequested = false;
+        }
+    }, 1500);
+}
+
 if (connection === 'close') {
     isPairingRequested = false;
     const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -433,23 +450,6 @@ if (connection === 'close') {
         subInfo.onLoggedOut();
     }
 } else if (connection === 'connecting') {
-    if (!subInfo && !sock.authState.creds.registered && !isPairingRequested && Date.now() - lastPairingAt > 120000) {
-        isPairingRequested = true;
-        lastPairingAt = Date.now();
-        setTimeout(async () => {
-            try {
-                let phoneNumber = "962795106901";
-                let code = await sock.requestPairingCode(phoneNumber);
-                code = code?.match(/.{1,4}/g)?.join("-") || code;
-                console.log(`\n========================================`);
-                console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
-                console.log(`========================================\n`);
-            } catch (e) {
-                console.error('خطأ في طلب كود الاقتران:', e?.message || e);
-                isPairingRequested = false;
-            }
-        }, 3000);
-    }
 } else if (connection === 'open') {
     console.log('👑 تم الاتصال بالواتساب بنجاح 👑');
 }
