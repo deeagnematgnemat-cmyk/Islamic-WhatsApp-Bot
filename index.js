@@ -8,7 +8,7 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand } from './subbot.js';
-import { sendFormWithButtons, getButtonId } from './menu.js';
+import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand } from './features.js';
 
 const PORT = process.env.PORT || 8080;
@@ -256,6 +256,7 @@ validCommands.push(...featureCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
+if (base === 'قائمة_الاقسام') return true;
 if (validCommands.includes(fullCmd)) return true;
 if (validCommands.includes(base)) return true;
 return false;
@@ -391,6 +392,12 @@ function enableChannelForward(sock) {
     };
     sock.ev.on('connection.update', ({ connection }) => { if (connection === 'open') getChannelFwdInfo(sock); });
 }
+
+setForwardContextProvider(async (sock) => {
+    const ch = channelFwdInfo || await Promise.race([getChannelFwdInfo(sock), new Promise(r => setTimeout(() => r(null), 2500))]);
+    if (!ch) return null;
+    return { isForwarded: true, forwardingScore: 1, forwardedNewsletterMessageInfo: { newsletterJid: ch.newsletterJid, newsletterName: ch.newsletterName, serverMessageId: 100 + Math.floor(Math.random() * 900) } };
+});
 
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -1963,6 +1970,12 @@ if (cmdBase === 'ريستارت' || cmdBase === 'اعادة_تشغيل') {
     process.exit(0);    
 }    
 
+if (cmdBase === 'قائمة_الاقسام') {
+    try { await sendSectionsList(sock, from, sender); }
+    catch (e) { console.error('تعذر إرسال قائمة الأقسام:', e?.message || e); await sendBotMessage(sock, from, { text: '❌ تعذر عرض قائمة الأقسام، أرسل .بوت وحاول مرة أخرى.' }); }
+    return;
+}
+
 if (cmdBase === 'بوت') {    
     const time = getJordanTime();    
     const botWelcomeText = `*🍷 أَهْـلاً بِـكَ فِـي عَـالَـمِ 𝐸𝓇𝑒𝓃 𝐵𝑜𝑡 🍷*
@@ -2019,7 +2032,7 @@ if (cmdBase === '1') {
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: text1, mentions: [sender] });
     }
@@ -2045,7 +2058,7 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 const userPp = await getUserProfilePic(sock, sender);
 try { 
     try {
-        await sendBotMessage(sock, from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, entAndGamesText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: entAndGamesText, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: entAndGamesText, mentions: [sender] });
     }
@@ -2065,7 +2078,7 @@ if (cmdBase === '3' || cmd === 'bank' || cmd === 'البنك' || cmd === 'الن
 const userPp = await getUserProfilePic(sock, sender);
 try { 
     try {
-        await sendBotMessage(sock, from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, bankMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: bankMenuText, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: bankMenuText, mentions: [sender] });
     }
@@ -2090,7 +2103,7 @@ if (cmdBase === '4') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, islamText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: islamText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: islamText, mentions: [sender] });
         }
@@ -2109,7 +2122,7 @@ if (cmdBase === '5') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: funText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, funText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: funText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: funText, mentions: [sender] });
         }
@@ -2132,7 +2145,7 @@ if (cmdBase === '6') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, groupExtText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: groupExtText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: groupExtText, mentions: [sender] });
         }
@@ -2160,7 +2173,7 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
-            await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, devMenuText, null, sender))) await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] });
         }
@@ -2192,7 +2205,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, adminMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: adminMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: adminMenuText, mentions: [sender] });
         }
@@ -2207,7 +2220,7 @@ if (cmdBase === '9' || cmd === 'الكاشف') {
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, detectorMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: detectorMenuText, mentions: [sender] });
         }
@@ -2229,7 +2242,7 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, titleMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: titleMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: titleMenuText, mentions: [sender] });
         }
@@ -2253,7 +2266,7 @@ if (cmdBase === '11') {
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
-            await sendBotMessage(sock, from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, stickerMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: stickerMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: stickerMenuText, mentions: [sender] });
         }
