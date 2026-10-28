@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import pino from 'pino';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { sendSectionWithButtons, sendPackCard } from './menu.js';
@@ -465,7 +465,8 @@ async function stickerlyPacks(q) {
             title: p.name, author: p.authorName || '', animated: !!p.isAnimated,
             count: files.length || p.stickerCount || null,
             link: p.packId ? `https://sticker.ly/s/${p.packId}` : null,
-            thumbs: files.slice(0, 4).map((f) => prefix + f)
+            thumbs: files.slice(0, 4).map((f) => prefix + f),
+            urls: files.map((f) => prefix + f)
         };
     }).filter((p) => p.title && p.link);
     out.sort((a, b) => Number(a.animated) - Number(b.animated));   // الثابتة أولاً
@@ -516,6 +517,7 @@ async function packCollage(urls) {
         .jpeg({ quality: 88 }).toBuffer();
 }
 
+const PACK_BUSY = new Set();
 async function cmdPack(c) {
     const q = c.args.trim();
     if (!q) return c.reply('📌 مثال: `.حزمة ناروتو` أو `.حزمة ايرين`');
@@ -523,6 +525,28 @@ async function cmdPack(c) {
     try { packs = await stickerlyPacks(q); } catch (e) { packs = []; }
     if (!packs.length) { try { packs = await legacyPacks(q); } catch (e) { packs = []; } }
     if (!packs.length) return c.reply(`❌ لم أعثر على حزمة ملصقات مناسبة لـ (${q}).\nجرّب اسماً آخر أو بالإنجليزية.`);
+    // الأفضلية: إرسال ملصقات الحزمة الفعلية مباشرة في المحادثة
+    const direct = packs.find((p) => p.urls && p.urls.length);
+    if (direct) {
+        if (PACK_BUSY.has(c.from)) return c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
+        PACK_BUSY.add(c.from);
+        try {
+            const urls = direct.urls.slice(0, 30);
+            await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${direct.title} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 ✅ 〕 تم تجهيز ${urls.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
+            let sent = 0;
+            for (const u of urls) {
+                try {
+                    const { buf } = await httpBuffer(u, 2 * 1024 * 1024);
+                    await c.sock.sendMessage(c.from, { sticker: buf });
+                    sent++;
+                    c.prog?.set(8 + 90 * sent / urls.length);
+                } catch (e) { /* تجاهل الملصق الفاشل */ }
+                await new Promise((r) => setTimeout(r, 700));
+            }
+            if (!sent) return c.reply('❌ تعذر تحميل ملصقات هذه الحزمة، جرّب اسماً آخر.');
+            return c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${direct.title}).`);
+        } finally { PACK_BUSY.delete(c.from); }
+    }
     for (const p of packs.slice(0, 2)) {
         const text = `📦 *${p.title}*\n🎴 ${p.count ? p.count + ' ملصقاً' : 'عدد الملصقات غير معروف'}${p.author ? `\n✍️ ${p.author}` : ''}\n\n💡 اضغط «عرض مجموعة الملصقات» ثم «Add to WhatsApp» لإضافة الحزمة كاملة.`;
         let image = null;
@@ -558,9 +582,125 @@ function getYtDlp() {
     return ytdlpPromise;
 }
 
+// ---------------------------------------------------------------- أدوات مساعدة للتنزيل (تقدّم حي + بدائل)
+// تشغيل أمر مع قراءة نسبة التقدم الحقيقية (yt-dlp)
+const runProgress = (file, args, timeout, onPct) => new Promise((resolve, reject) => {
+    const cp = spawn(file, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '', buf = '';
+    const timer = setTimeout(() => { try { cp.kill('SIGKILL'); } catch (e) {} }, timeout);
+    cp.stdout.on('data', (d) => {
+        buf += d.toString();
+        let i;
+        while ((i = buf.search(/[\r\n]/)) >= 0) {
+            const line = buf.slice(0, i); buf = buf.slice(i + 1);
+            const m = /dlprog:\s*([\d.]+)%/.exec(line);
+            if (m) { if (onPct) { try { onPct(Number(m[1])); } catch (e) {} } }
+            else if (out.length < 200000) out += line + '\n';
+        }
+    });
+    cp.stderr.on('data', (d) => { err += d.toString(); if (err.length > 200000) err = err.slice(-100000); });
+    cp.on('error', (e) => { clearTimeout(timer); e.stderr = err; reject(e); });
+    cp.on('close', (code, sig) => {
+        clearTimeout(timer);
+        if (code === 0) return resolve({ stdout: out, stderr: err });
+        const e = new Error('exit ' + (code ?? sig)); e.stderr = err; reject(e);
+    });
+});
+
+// عدّاد تقدم حي: رسالة تُعدَّل كل بضع ثوانٍ من 0% إلى 100% حتى يجهز الطلب
+function makeProgress(c, label) {
+    const bar = (p) => '▰'.repeat(Math.round(p / 10)) + '▱'.repeat(10 - Math.round(p / 10));
+    const render = (p, state) => `${state === 'ok' ? '✅' : state === 'fail' ? '❌' : '⏳'} *${label}*\n\n${bar(p)}  *${p}%*\n${state === 'ok' ? '🎉 الطلب جاهز!' : state === 'fail' ? 'تعذر إكمال الطلب.' : '🔄 جاري التحضير...'}`;
+    let pct = 0, shown = -1, key = null, closed = false, timer = null, chain = Promise.resolve();
+    const edit = (p, state) => {
+        chain = chain.then(async () => {
+            if (!key) return;
+            try { await c.sock.sendMessage(c.from, { text: render(p, state), edit: key }); shown = p; } catch (e) {}
+        });
+        return chain;
+    };
+    const obj = {
+        set(p) { if (!closed && p > pct) pct = Math.min(99, Math.floor(p)); },
+        async start() {
+            try { const sent = await c.sock.sendMessage(c.from, { text: render(0) }, { quoted: c.msg }); key = sent?.key || null; shown = 0; } catch (e) { key = null; }
+            timer = setInterval(() => {
+                if (closed) return;
+                if (pct < 90) pct = Math.min(90, pct + 1 + Math.floor(Math.random() * 4));   // تقدم تقديري إلى أن تصل نسبة حقيقية
+                if (pct !== shown) edit(pct);
+            }, 2500);
+            return obj;
+        },
+        async finish(ok = true) {
+            if (closed) return;
+            closed = true; clearInterval(timer);
+            await edit(ok ? 100 : pct, ok ? 'ok' : 'fail');
+        }
+    };
+    return obj;
+}
+
+// بدائل عبر واجهات عامة عندما تفشل أداة yt-dlp (مثلاً حظر يوتيوب لخوادم الاستضافة)
+function collectUrls(o, out = [], key = '') {
+    if (!o) return out;
+    if (typeof o === 'string') { if (/^https?:\/\//.test(o) && !/thumb|cover|avatar|poster|preview|icon/i.test(key)) out.push({ url: o, key }); return out; }
+    if (Array.isArray(o)) { o.forEach((x) => collectUrls(x, out, key)); return out; }
+    if (typeof o === 'object') for (const [k, v] of Object.entries(o)) collectUrls(v, out, k);
+    return out;
+}
+const keyScore = (k) => (/^(dl|download|downloadurl|download_url|video|hd|nowm|audio|mp3|mp4|url|link)$/i.test(k) ? 0 : 1);
+function apiEndpoints(url, kind) {
+    const pf = platformOf(url);
+    const n = pf ? pf[2] : '';
+    if (n === 'يوتيوب') {
+        const t = kind === 'audio' ? 'ytmp3' : 'ytmp4';
+        return [`https://api.siputzx.my.id/api/d/${t}?url=`, `https://api.ryzendesu.vip/api/downloader/${t}?url=`];
+    }
+    if (n === 'انستا') return ['https://api.siputzx.my.id/api/d/igdl?url=', 'https://api.ryzendesu.vip/api/downloader/igdl?url='];
+    if (n === 'فيس') return ['https://api.siputzx.my.id/api/d/facebook?url=', 'https://api.ryzendesu.vip/api/downloader/fbdl?url='];
+    if (n === 'تيك') return ['https://api.siputzx.my.id/api/d/tiktok?url='];
+    return ['https://api.siputzx.my.id/api/d/savefrom?url='];
+}
+async function apiFetchMedia(url, kind) {
+    for (const ep of apiEndpoints(url, kind)) {
+        let j;
+        try { j = await httpJson(ep + encodeURIComponent(url), { timeout: 30000 }); } catch (e) { continue; }
+        const cands = collectUrls(j).sort((a, b) => keyScore(a.key) - keyScore(b.key));
+        for (const cnd of cands.slice(0, 4)) {
+            try {
+                const r = await httpBuffer(cnd.url, MAX_DL, { timeout: 120000 });
+                if (/^(text\/|application\/json)/.test(r.type) || r.buf.length < 2000) continue;
+                return { ...r, from: cnd.url };
+            } catch (e) { /* التالي */ }
+        }
+    }
+    return null;
+}
+
+// بحث يوتيوب بدون yt-dlp (قراءة صفحة النتائج)
+async function searchYoutube(q) {
+    const r = await http('https://www.youtube.com/results?hl=en&search_query=' + encodeURIComponent(q), { timeout: 20000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+    const html = await r.text();
+    const m = /var ytInitialData\s*=\s*(\{[\s\S]*?\});\s*<\/script>/.exec(html);
+    if (!m) return [];
+    let data; try { data = JSON.parse(m[1]); } catch (e) { return []; }
+    const out = [];
+    (function walk(o) {
+        if (!o || typeof o !== 'object' || out.length >= 10) return;
+        if (o.videoRenderer && o.videoRenderer.videoId) {
+            const v = o.videoRenderer;
+            const dur = (v.lengthText?.simpleText || '').split(':').map(Number).reduce((a, x) => a * 60 + (x || 0), 0);
+            out.push({ id: v.videoId, title: v.title?.runs?.[0]?.text || '', duration: dur || 0, channel: v.ownerText?.runs?.[0]?.text || '' });
+            return;
+        }
+        for (const k of Object.keys(o)) walk(o[k]);
+    })(data);
+    return out;
+}
+
 function friendlyDlError(e) {
     const s = (e.stderr || e.message || '') + '';
     if (/larger than max|max-filesize|TOO_BIG/i.test(s)) return '⚠️ الملف أكبر من الحد المسموح (100MB).';
+    if (/not a bot/i.test(s)) return '🔒 يوتيوب يمنع هذا الخادم مؤقتاً (تحقق الروبوت). جرّب منصة أخرى أو أضف كوكيز YTDLP_COOKIES.';
     if (/private video|private account|login required|log in|sign in|cookies|authenticat|age[- ]restrict|confirm your age|members-only|rate-limit|not a bot/i.test(s)) return '🔒 المحتوى خاص أو يتطلب تسجيل دخول، ولا أستطيع تنزيله.';
     if (/unsupported url/i.test(s)) return '❌ هذا الرابط غير مدعوم.';
     if (/not available|removed|deleted|unavailable|404/i.test(s)) return '❌ المحتوى غير متاح أو حُذف.';
@@ -589,26 +729,43 @@ function cookiesArgs() {
     return [];
 }
 
-async function ytdlpDownload(url, { audio = false, many = false } = {}) {
+async function ytdlpDownload(url, { audio = false, many = false, onProgress } = {}) {
     const bin = await getYtDlp();
     const id = uid();
     const prefix = `dl_${id}`;
-    const args = ['--no-warnings', '--no-progress', '--restrict-filenames', '--max-filesize', '100M',
+    const isYt = /(^|\.)(youtube\.com|youtu\.be)$/.test(hostOf(url));
+    const args = ['--no-warnings', '--newline', '--progress', '--progress-template', 'download:dlprog:%(progress._percent_str)s', '--restrict-filenames', '--max-filesize', '100M',
         '--socket-timeout', '20', '--user-agent', UA, '-o', path.join(TMP, `${prefix}_%(autonumber)s.%(ext)s`)];
     if (FFMPEG !== 'ffmpeg') args.push('--ffmpeg-location', FFMPEG);
     args.push(...cookiesArgs());
     if (many) args.push('--playlist-end', '10'); else args.push('--no-playlist');
     if (audio) args.push('-x', '--audio-format', 'mp3', '--audio-quality', '5');
     else args.push('-f', 'bv*[vcodec^=avc1][height<=720]+ba[acodec^=mp4a]/bv*[vcodec^=avc1][height<=720]+ba/bv*[height<=720]+ba/b[height<=720]/b', '--merge-output-format', 'mp4');
-    args.push(url);
-    try { await run(bin, args, 300000); } catch (e) {
-        for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix)) rm(path.join(TMP, f));
-        // إن كان السبب قدم نسخة yt-dlp نحدّثها مرة ثم نعيد المحاولة
-        if (/unable to extract|nsig|signature|failed to parse|unable to download webpage|unsupported url/i.test((e.stderr || '') + '') && await updateYtDlp(bin)) {
-            try { await run(bin, args, 300000); }
-            catch (e2) { for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix)) rm(path.join(TMP, f)); throw e2; }
-        } else throw e;
+    const clean = () => { for (const f of fs.readdirSync(TMP)) if (f.startsWith(prefix)) rm(path.join(TMP, f)); };
+    const stripJs = (a) => { const o = []; for (let i = 0; i < a.length; i++) { if (a[i] === '--js-runtimes') { i++; continue; } o.push(a[i]); } return o; };
+    // يوتيوب يحتاج بيئة جافاسكربت (node) ومحاولات بعملاء مختلفين
+    const attempts = isYt
+        ? [['--js-runtimes', 'node'], ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=tv,mweb,web_safari'], ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=android_vr,ios']]
+        : [[]];
+    const tryRun = async (extra) => {
+        try { await runProgress(bin, [...args, ...extra, url], 300000, onProgress); }
+        catch (e) {
+            clean();
+            if (extra.includes('--js-runtimes') && /no such option|unrecognized arguments/i.test(e.stderr || '')) {
+                try { await runProgress(bin, [...args, ...stripJs(extra), url], 300000, onProgress); return; }
+                catch (e2) { clean(); throw e2; }
+            }
+            throw e;
+        }
+    };
+    let lastErr = null;
+    for (const extra of attempts) {
+        try { await tryRun(extra); lastErr = null; break; } catch (e) { lastErr = e; if (/private|not available|unsupported url|too_big|larger than/i.test(e.stderr || '')) break; }
     }
+    if (lastErr && /unable to extract|nsig|signature|failed to parse|unable to download webpage|unsupported url/i.test((lastErr.stderr || '') + '') && await updateYtDlp(bin)) {
+        try { await tryRun(attempts[0]); lastErr = null; } catch (e) { lastErr = e; }
+    }
+    if (lastErr) throw lastErr;
     const files = fs.readdirSync(TMP).filter((f) => f.startsWith(prefix) && !f.endsWith('.part')).sort().map((f) => path.join(TMP, f));
     if (!files.length) throw new Error('NO_FILE');
     return files;
@@ -624,13 +781,15 @@ const MIME = { mp4: 'video/mp4', mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audi
 
 async function mediaCodecs(file) {
     let txt = '';
-    try { txt = (await run(FFMPEG, ['-hide_banner', '-i', file], 30000)).stderr; } catch (e) { txt = e.stderr || ''; }
+    try { txt = (await run(FFMPEG, ['-hide_banner', '-i', file], 30000)).stderr; }
+    catch (e) { if (e.code === 'ENOENT') return { missing: true }; txt = e.stderr || ''; }
     return {
         video: (/Video:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
         audio: (/Audio:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
         yuv420: /yuv420p/.test(txt)
     };
 }
+const badMedia = () => Object.assign(new Error('BAD_MEDIA'), { friendly: '❌ الملف الذي تم تنزيله تالف أو غير صالح، جرّب رابطاً آخر.' });
 // يحوّل الفيديو إلى mp4 (H.264 + AAC) ليعمل صوته وصورته في واتساب دائماً
 async function makeWhatsAppMp4(buf) {
     const id = uid();
@@ -638,14 +797,31 @@ async function makeWhatsAppMp4(buf) {
     try {
         fs.writeFileSync(inp, buf);
         const k = await mediaCodecs(inp);
-        if (!k.video) return buf;
+        if (k.missing) return buf;
+        if (!k.video) throw badMedia();
         const okV = k.video === 'h264' && k.yuv420, okA = !k.audio || k.audio === 'aac';
         if (okV && okA) return buf;
         const vArgs = okV ? ['-c:v', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'];
         await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...vArgs, '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', out], 240000);
         const o = fs.readFileSync(out);
         return o.length ? o : buf;
-    } catch (e) { return buf; }
+    } catch (e) { if (e.message === 'BAD_MEDIA') throw e; return buf; }
+    finally { rm(inp, out); }
+}
+// يحوّل أي صوت إلى mp3 سليم (يمنع رسالة «المقطع الصوتي غير متوفر لوجود خلل»)
+async function makeWhatsAppAudio(buf) {
+    const id = uid();
+    const inp = path.join(TMP, `ai_${id}.bin`), out = path.join(TMP, `ao_${id}.mp3`);
+    try {
+        fs.writeFileSync(inp, buf);
+        const k = await mediaCodecs(inp);
+        if (k.missing) return buf;
+        if (!k.audio) throw badMedia();
+        if (k.audio === 'mp3' && !k.video) return buf;
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-vn', '-c:a', 'libmp3lame', '-q:a', '4', '-ar', '44100', out], 180000);
+        const o = fs.readFileSync(out);
+        return o.length ? o : buf;
+    } catch (e) { if (e.message === 'BAD_MEDIA') throw e; return buf; }
     finally { rm(inp, out); }
 }
 
@@ -654,12 +830,16 @@ async function sendBuffer(c, buf, ext, caption = '') {
     let kind = EXT_KIND[ext] || 'doc';
     if (buf.length > MAX_AS_MEDIA) kind = 'doc';
     const mimetype = MIME[ext] || 'application/octet-stream';
+    c.prog?.set(90);
     if (kind === 'video') {
         if (buf.length <= MAX_AS_MEDIA) buf = await makeWhatsAppMp4(buf);
         return c.media({ video: buf, mimetype: 'video/mp4', caption });
     }
     if (kind === 'image') return c.media({ image: buf, caption });
-    if (kind === 'audio') return c.media({ audio: buf, mimetype, ptt: false });
+    if (kind === 'audio') {
+        const fixed = await makeWhatsAppAudio(buf);
+        return c.media({ audio: fixed, mimetype: fixed === buf ? mimetype : 'audio/mpeg', ptt: false });
+    }
     return c.media({ document: buf, mimetype, fileName: `Eren_Bot_${uid()}.${ext}`, caption });
 }
 async function sendFiles(c, files, caption = '') {
@@ -672,6 +852,7 @@ async function sendFiles(c, files, caption = '') {
 }
 async function sendUrlMedia(c, url, caption = '', forceExt) {
     const { buf, type } = await httpBuffer(url, MAX_DL);
+    if (/^(text\/|application\/json)/.test(type) || buf.length < 500) throw badMedia();
     let ext = forceExt || (Object.keys(MIME).find((k) => MIME[k] === type)) || (/\.(\w{2,4})(?:\?|$)/.exec(url) || [])[1] || 'mp4';
     await sendBuffer(c, buf, ext, caption);
 }
@@ -683,10 +864,21 @@ function getUrl(c) {
 const NEED_URL = '📌 اكتب الرابط بعد الأمر، أو رد على رسالة فيها رابط.\nمثال: `.تيك https://...`';
 
 async function viaYtdlp(c, url, opts) {
-    try { return await sendFiles(c, await ytdlpDownload(url, opts), opts?.caption || ''); }
-    catch (e) { throw Object.assign(e, { friendly: friendlyDlError(e) }); }
+    const kind = opts?.audio ? 'audio' : 'video';
+    try { return await sendFiles(c, await ytdlpDownload(url, { ...opts, onProgress: (p) => c.prog?.set(8 + p * 0.72) }), opts?.caption || ''); }
+    catch (e) {
+        console.error('yt-dlp فشل:', url, '|', String(e.stderr || e.message || e).split('\n').slice(-3).join(' ').slice(0, 300));
+        let alt = null;
+        try { alt = await apiFetchMedia(url, kind); } catch (e2) {}
+        if (alt) {
+            c.prog?.set(85);
+            if (kind === 'audio') return sendBuffer(c, alt.buf, 'mp3', '');
+            const ext = Object.keys(MIME).find((k) => MIME[k] === alt.type) || (/\.(\w{2,4})(?:\?|$)/.exec(alt.from) || [])[1] || 'mp4';
+            return sendBuffer(c, alt.buf, ext, opts?.caption || '');
+        }
+        throw Object.assign(e, { friendly: e.friendly || friendlyDlError(e) });
+    }
 }
-
 async function ogDownload(c, url) {
     const r = await http(url, { timeout: 20000 });
     const mt = metaTags(await r.text());
@@ -789,11 +981,15 @@ async function cmdMedia(c, url) {
 async function cmdSearch(c) {
     const q = c.args.trim();
     if (!q) return c.reply('📌 مثال: `.بحث اغنية حماسية`');
-    const bin = await getYtDlp();
-    let out;
-    try { out = await run(bin, ['--no-warnings', '--flat-playlist', '-J', `ytsearch5:${q}`], 60000); }
-    catch (e) { return c.reply(friendlyDlError(e)); }
-    const entries = JSON.parse(out.stdout).entries || [];
+    let entries = [];
+    try {
+        const bin = await getYtDlp();
+        const out = await run(bin, ['--no-warnings', '--flat-playlist', '-J', ...cookiesArgs(), `ytsearch5:${q}`], 60000);
+        entries = JSON.parse(out.stdout).entries || [];
+    } catch (e) { entries = []; }
+    if (!entries.length) { try { entries = await searchYoutube(q); } catch (e) { entries = []; } }
+    entries = entries.slice(0, 5);
+    c.prog?.set(60);
     if (!entries.length) return c.reply('❌ لا توجد نتائج لهذا البحث.');
     const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '');
     const lines = entries.map((e, i) => `*${i + 1}.* ${e.title}\n> ⏱️ ${dur(e.duration)} | 👤 ${e.channel || e.uploader || ''}\n> 🔗 ${e.url || 'https://youtu.be/' + e.id}`);
@@ -892,31 +1088,50 @@ async function toVoiceOgg(file) {
 async function cmdVoice(c) {
     const q = c.args.trim() || quotedText(c).trim();
     if (!q) return c.reply('📌 اكتب اسم الأغنية أو الصوت بعد الأمر، مثال: `.فويس اغنية حماسية` أو `.فويس <رابط>`');
-    let files = null, title = '';
+    let files = null, apiBuf = null, title = '';
+    const pp = (p) => c.prog?.set(8 + p * 0.6);
     const direct = URL_RE.exec(q);
     if (direct) {
-        try { files = await ytdlpDownload(direct[0], { audio: true }); } catch (e) { return c.reply(friendlyDlError(e)); }
+        try { files = await ytdlpDownload(direct[0], { audio: true, onProgress: pp }); }
+        catch (e) {
+            try { const a = await apiFetchMedia(direct[0], 'audio'); if (a) apiBuf = a.buf; } catch (e2) {}
+            if (!apiBuf) return c.reply(friendlyDlError(e));
+        }
     } else {
-        let bin;
-        try { bin = await getYtDlp(); } catch (e) { return c.reply(friendlyDlError(e)); }
-        for (const prefix of ['ytsearch', 'scsearch']) {
-            try {
-                const entries = await searchAudioEntries(bin, prefix, q);
-                for (const e of entries.slice(0, 3)) {
-                    const u = entryUrl(e, prefix);
-                    if (!u) continue;
-                    try { files = await ytdlpDownload(u, { audio: true }); title = e.title || ''; break; } catch (err) { /* التالي */ }
-                }
-            } catch (err) { /* المصدر التالي */ }
-            if (files) break;
+        let bin = null;
+        try { bin = await getYtDlp(); } catch (e) { bin = null; }
+        if (bin) {
+            for (const prefix of ['ytsearch', 'scsearch']) {
+                try {
+                    const entries = await searchAudioEntries(bin, prefix, q);
+                    for (const e of entries.slice(0, 3)) {
+                        const u = entryUrl(e, prefix);
+                        if (!u) continue;
+                        try { files = await ytdlpDownload(u, { audio: true, onProgress: pp }); title = e.title || ''; break; } catch (err) { /* التالي */ }
+                    }
+                } catch (err) { /* المصدر التالي */ }
+                if (files) break;
+            }
+        }
+        if (!files) {
+            let entries = [];
+            try { entries = (await searchYoutube(q)).filter((e) => !e.duration || e.duration <= 900); } catch (e) {}
+            for (const e of entries.slice(0, 3)) {
+                try { const a = await apiFetchMedia('https://www.youtube.com/watch?v=' + e.id, 'audio'); if (a) { apiBuf = a.buf; title = e.title || ''; break; } } catch (err) {}
+            }
         }
     }
-    if (!files || !files.length) return c.reply('❌ لم أستطع جلب فويس لهذا الطلب. جرّب اسماً أدق أو اسم الفنان مع الأغنية.');
+    if (!(files && files.length) && !apiBuf) return c.reply('❌ لم أستطع جلب فويس لهذا الطلب. جرّب اسماً أدق أو اسم الفنان مع الأغنية.');
+    c.prog?.set(85);
+    const src = files && files.length ? files[0] : path.join(TMP, `vi_${uid()}.bin`);
     try {
-        const ogg = await toVoiceOgg(files[0]);
+        if (!(files && files.length)) fs.writeFileSync(src, apiBuf);
+        let ogg = null;
+        try { ogg = await toVoiceOgg(src); } catch (e) { ogg = null; }
         if (title) await c.reply(`🎙️ ${title}`);
-        await c.media({ audio: ogg, mimetype: 'audio/ogg; codecs=opus', ptt: true });
-    } finally { rm(...files); }
+        if (ogg && ogg.length > 1000) await c.media({ audio: ogg, mimetype: 'audio/ogg; codecs=opus', ptt: true });
+        else await sendBuffer(c, fs.readFileSync(src), 'mp3');
+    } finally { rm(src, ...(files || [])); }
 }
 
 // ---------------------------------------------------------------- الذكاء الاصطناعي
@@ -1031,6 +1246,8 @@ const COOLDOWN = new Map();
 const HEAVY = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'بحث', 'ميديا',
     'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود', 'حزمة', 'لرابط', 'ايدت', 'فويس']);
 let running = 0;
+// أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
+const PROGRESS = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'بحث', 'ميديا', 'ايدت', 'فويس', 'حزمة', 'تخيل']);
 
 async function sendSection(c, text) {
     let pp;
@@ -1112,8 +1329,13 @@ export async function handleFeatureCommand(ctx) {
     if (!handler) return false;
     running++;
     try {
+        if (PROGRESS.has(name) && (args || URL_RE.test(quotedText(c)))) {
+            try { c.prog = await makeProgress(c, 'جاري تجهيز طلبك').start(); } catch (e) { c.prog = null; }
+        }
         await handler(c);
+        if (c.prog) await c.prog.finish(true);
     } catch (e) {
+        if (c.prog) { try { await c.prog.finish(false); } catch (e3) {} }
         console.error(`خطأ في الأمر ${name}:`, e?.message || e);
         let text = e?.friendly || '❌ تعذر تنفيذ الأمر. تأكد من المدخلات وحاول مرة أخرى.';
         if (/^AI_/.test(e?.message || '')) text = AI_FAIL;
