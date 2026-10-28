@@ -140,3 +140,20 @@ export async function sendSectionsList(sock, jid, mentionJid) {
         }
     });
 }
+
+// بطاقة حزمة ملصقات: صورة + نص + زر «عرض مجموعة الملصقات» (رابط)
+export async function sendPackCard(sock, jid, { image, text, url, buttonText = 'عرض مجموعة الملصقات', mentionJid }) {
+    let header = { hasMediaAttachment: false };
+    if (image) {
+        const media = await prepareWAMessageMedia({ image: typeof image === 'string' ? { url: image } : image }, { upload: sock.waUploadToServer });
+        if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+    }
+    await relayInteractive(sock, jid, {
+        header,
+        body: { text },
+        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+        nativeFlowMessage: {
+            buttons: [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: buttonText, url, merchant_url: url }) }]
+        }
+    });
+}
