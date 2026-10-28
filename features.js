@@ -4,6 +4,8 @@ import os from 'os';
 import path from 'path';
 import pino from 'pino';
 import { execFile, spawn } from 'child_process';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
@@ -100,7 +102,7 @@ const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'متحرك': ['sg', 'حركي'], 'دائري': ['round'], 'طويل': ['full'],
     'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'لرابط': ['tourl', 'url'], 'ايموجي': ['emoji'],
-    'كتابة': ['ttp'], 'إطار': ['frame'], 'حزمة': ['pack'], 'قص': ['crop'], 'عكس': ['flip'],
+    'كتابة': ['ttp'], 'إطار': ['frame'], 'حزمة': ['pack'], 'باك': ['stickerpack'], 'قص': ['crop'], 'عكس': ['flip'],
     'لفيديو': ['tovideo'], 'تدوير': ['rotate'], 'رمادي': ['gray'], 'ملصقات': [],
     // التنزيل
     'تيك': ['tt', 'tiktok'], 'انستا': ['ig', 'insta'], 'فيس': ['fb'], 'يوتيوب': ['yt'], 'صوت': ['mp3'],
@@ -143,6 +145,7 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > ✍️ .كتابة <نص> ↞ ملصق نصي
 > 🧿 .إطار [لون] ↞ إطار حول الصورة
 > 📦 .حزمة <اسم> ↞ البحث عن حزمة ملصقات
+> 🗂️ .باك [اسم] ↞ تحويل صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
 > ✂️ .قص [16:9] ↞ قص الصورة
 > 🔁 .عكس ↞ قلب أفقي
 > 🎥 .لفيديو ↞ ملصق متحرك إلى فيديو
@@ -173,7 +176,7 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🔗 .رابط ↞ فحص الرابط ومعرفة منصته
 
 💡 اكتب الأمر ثم الرابط، أو رد على رسالة فيها رابط.
-⚠️ المحتوى العام فقط، والحد الأقصى 100MB.`;
+⚠️ المحتوى العام فقط، والتنزيل بدون حد للحجم.`;
 
 export const AI_SECTION = `🤖 *قِـسْـمُ الـذَّكَـاءِ الاصْـطِـنَـاعِـيِّ:*
 
@@ -742,6 +745,109 @@ async function cmdPack(c) {
     } finally { PACK_BUSY.delete(c.from); }
 }
 
+
+// ----- .باك : تحويل صور كثيرة دفعة واحدة إلى حزمة ملصقات واتساب جاهزة
+const PACK_MIN = 3, PACK_MAX = 30;                 // حدود واتساب للحزمة الواحدة
+const PACK_SESSIONS = new Map();                   // محادثة|مرسل -> جلسة جمع الصور
+const PACK_IDLE = 10 * 60 * 1000;                  // تنتهي الجلسة المفتوحة بعد 10 دقائق بلا صور
+const PACK_ALBUM_WAIT = 12 * 1000;                 // وضع الألبوم: التجهيز تلقائياً بعد آخر صورة
+const packKey = (from, sender) => `${from}|${sender}`;
+const packSenderOf = (sock, msg) => (msg.key.fromMe ? ((sock.user?.id || '').split(':')[0] + '@s.whatsapp.net') : (msg.key.participant || msg.key.remoteJid));
+
+function packTouch(s) {
+    clearTimeout(s.idleTimer); clearTimeout(s.albumTimer);
+    s.idleTimer = setTimeout(() => { if (!s.done) { s.done = true; PACK_SESSIONS.delete(s.key); } }, PACK_IDLE);
+    if (s.album && s.count >= PACK_MIN) s.albumTimer = setTimeout(() => { finishPack(s, s.c).catch(() => {}); }, PACK_ALBUM_WAIT);
+}
+function packQueue(s, sock, msg, container) {
+    if (s.done || s.count >= PACK_MAX) return false;
+    s.count++;
+    packTouch(s);
+    s.chain = s.chain.then(async () => {
+        try {
+            const buf = await downloadMediaMessage({ key: msg.key, message: container }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+            s.stickers.push(await makeSticker(buf, StickerTypes.FULL, { pack: s.name, author: AUTHOR, quality: 70 }));
+            try { await sock.sendMessage(msg.key.remoteJid, { react: { text: '✅', key: msg.key } }); } catch (e) {}
+        } catch (e) { s.count--; logErr('باك-صورة', e); }
+    });
+    if (s.count >= PACK_MAX) s.chain.then(() => finishPack(s, s.c)).catch(() => {});
+    return true;
+}
+// يُستدعى لكل رسالة واردة: يجمع الصور المرسلة أثناء وجود جلسة «.باك» مفتوحة
+export function collectPackImages(sock, messages) {
+    if (!PACK_SESSIONS.size) return;
+    for (const msg of messages || []) {
+        try {
+            if (!msg?.message || !msg.key?.remoteJid) continue;
+            const id = String(msg.key.id || '');
+            if (msg.key.fromMe && (id.startsWith('BAE5') || id.startsWith('3EB0'))) continue;   // رسائل البوت نفسه
+            const own = unwrap(msg.message);
+            if (!own?.imageMessage) continue;
+            if (String(own.imageMessage.caption || '').trim().startsWith('.')) continue;          // الصورة المرفقة بأمر يعالجها الأمر نفسه
+            const s = PACK_SESSIONS.get(packKey(msg.key.remoteJid, packSenderOf(sock, msg)));
+            if (!s || s.seen.has(id)) continue;
+            s.seen.add(id);
+            packQueue(s, sock, msg, own);
+        } catch (e) { /* تجاهل */ }
+    }
+}
+async function finishPack(s, c) {
+    if (s.done || s.finishing) return;
+    s.finishing = true;
+    clearTimeout(s.albumTimer);
+    try {
+        await s.chain;
+        if (s.stickers.length < PACK_MIN) {
+            return await c.reply(`⚠️ الحزمة تحتاج ${PACK_MIN} صور على الأقل (وصلني ${s.stickers.length}). أرسل المزيد ثم اكتب \`.باك تم\``);
+        }
+        if (PACK_BUSY.has(c.from)) return await c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
+        s.done = true; clearTimeout(s.idleTimer); PACK_SESSIONS.delete(s.key);
+        PACK_BUSY.add(c.from);
+        try {
+            const stickers = s.stickers;
+            await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${s.name} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
+            if (await sendNativePack(c, { title: s.name, author: AUTHOR, animated: false, stickers })) return;
+            let sent = 0;
+            for (const st of stickers) {
+                try { await c.sock.sendMessage(c.from, { sticker: st }); sent++; } catch (e) { logErr('إرسال-ملصق', e); }
+                await sleep(700);
+            }
+            if (!sent) return await c.reply('❌ تعذر إرسال الحزمة، حاول مرة أخرى.');
+            await c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${s.name}).`);
+        } finally { PACK_BUSY.delete(c.from); }
+    } finally { s.finishing = false; }
+}
+async function cmdPackImages(c) {
+    const key = packKey(c.from, c.sender);
+    const arg = c.args.trim();
+    const w = norm(arg.toLowerCase());
+    let s = PACK_SESSIONS.get(key);
+    if (['تم', 'انهاء', 'ارسال', 'done', 'finish'].includes(w)) {
+        if (!s) return c.reply('📌 لا توجد جلسة حزمة مفتوحة. ابدأ بـ `.باك اسم_الحزمة` ثم أرسل صورك.');
+        return finishPack(s, c);
+    }
+    if (['الغاء', 'cancel'].includes(w)) {
+        if (!s) return c.reply('📌 لا توجد جلسة حزمة مفتوحة.');
+        s.done = true; clearTimeout(s.idleTimer); clearTimeout(s.albumTimer); PACK_SESSIONS.delete(key);
+        return c.reply('🗑️ تم إلغاء الحزمة.');
+    }
+    const t = getTarget(c, ['imageMessage']);                       // صورة مرفقة بالأمر أو رد على صورة
+    const attached = !!unwrap(c.msg.message)?.imageMessage;          // صورة مرفقة بالأمر نفسه = وضع الألبوم
+    if (!s) {
+        s = { key, name: (arg || PACK).slice(0, 60), stickers: [], seen: new Set(), count: 0, chain: Promise.resolve(), done: false, finishing: false, album: attached, c };
+        PACK_SESSIONS.set(key, s);
+        packTouch(s);
+        if (attached) await c.reply(`📥 جاري استلام الصور لحزمة (${s.name})...\nسأجهّز الحزمة تلقائياً بعد وصول آخر صورة، أو اكتب \`.باك تم\` (الحد الأقصى ${PACK_MAX} صورة).`);
+        else await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${s.name} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 📥 〕 أرسل الآن صورك (من ${PACK_MIN} إلى ${PACK_MAX} صورة)\n〔 ✅ 〕 ثم اكتب \`.باك تم\` لإنشاء الحزمة\n〔 ❌ 〕 للإلغاء: \`.باك الغاء\``);
+    } else if (!t) {
+        return c.reply(`📥 جلسة الحزمة (${s.name}) مفتوحة: وصلني ${s.count} صورة.\nأرسل المزيد (حتى ${PACK_MAX}) ثم اكتب \`.باك تم\` أو \`.باك الغاء\`.`);
+    }
+    if (t) {
+        const id = String(c.msg.key.id || '');
+        if (!s.seen.has(id)) { s.seen.add(id); if (!packQueue(s, c.sock, c.msg, t.container)) await c.reply(`⚠️ وصلت الحد الأقصى ${PACK_MAX} صورة.`); }
+    }
+}
+
 // ---------------------------------------------------------------- التنزيل
 let ytdlpPromise = null;
 function getYtDlp() {
@@ -880,7 +986,7 @@ async function searchYoutube(q) {
 
 function friendlyDlError(e) {
     const s = (e.stderr || e.message || '') + '';
-    if (/larger than max|max-filesize|TOO_BIG/i.test(s)) return '⚠️ الملف أكبر من الحد المسموح (100MB).';
+    if (/larger than max|max-filesize|TOO_BIG/i.test(s)) return '⚠️ الملف كبير جداً ولا يقبله واتساب للإرسال.';
     if (/not a bot/i.test(s)) return '🔒 يوتيوب يمنع هذا الخادم مؤقتاً (تحقق الروبوت). جرّب منصة أخرى أو أضف كوكيز YTDLP_COOKIES.';
     if (/private video|private account|login required|log in|sign in|cookies|authenticat|age[- ]restrict|confirm your age|members-only|rate-limit|not a bot/i.test(s)) return '🔒 المحتوى خاص أو يتطلب تسجيل دخول، ولا أستطيع تنزيله.';
     if (/unsupported url/i.test(s)) return '❌ هذا الرابط غير مدعوم.';
@@ -1058,19 +1164,39 @@ async function sendBuffer(c, buf, ext, caption = '') {
     }
     return c.media({ document: buf, mimetype, fileName: `Eren_Bot_${uid()}.${ext}`, caption });
 }
+// ملف كبير: يُرسل مباشرة من القرص كمستند (بث مباشر بدون تحميله بالكامل في الذاكرة)
+async function sendBigFile(c, file, ext, caption = '') {
+    ext = (ext || 'bin').toLowerCase();
+    c.prog?.set(90);
+    return c.media({ document: { url: file }, mimetype: MIME[ext] || 'application/octet-stream', fileName: `Eren_Bot_${uid()}.${ext}`, caption });
+}
 async function sendFiles(c, files, caption = '') {
     try {
         for (let i = 0; i < files.length; i++) {
             const f = files[i];
-            await sendBuffer(c, fs.readFileSync(f), path.extname(f).slice(1), i === 0 ? caption : '');
+            const ext = path.extname(f).slice(1);
+            if (fs.statSync(f).size > MAX_AS_MEDIA) { await sendBigFile(c, f, ext, i === 0 ? caption : ''); continue; }
+            await sendBuffer(c, fs.readFileSync(f), ext, i === 0 ? caption : '');
         }
     } finally { rm(...files); }
 }
+// تنزيل رابط مباشر إلى ملف على القرص (بث) بلا حد للحجم ولا استهلاك للذاكرة
+async function httpToFile(url, opts = {}) {
+    const res = await http(url, { timeout: 6 * 3600 * 1000, ...opts });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const file = path.join(TMP, `dlf_${uid()}.bin`);
+    try { await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(file)); }
+    catch (e) { rm(file); throw e; }
+    return { file, size: fs.statSync(file).size, type: (res.headers.get('content-type') || '').split(';')[0].trim() };
+}
 async function sendUrlMedia(c, url, caption = '', forceExt) {
-    const { buf, type } = await httpBuffer(url, MAX_DL);
-    if (/^(text\/|application\/json)/.test(type) || buf.length < 500) throw badMedia();
-    let ext = forceExt || (Object.keys(MIME).find((k) => MIME[k] === type)) || (/\.(\w{2,4})(?:\?|$)/.exec(url) || [])[1] || 'mp4';
-    await sendBuffer(c, buf, ext, caption);
+    const { file, size, type } = await httpToFile(url);
+    try {
+        if (/^(text\/|application\/json)/.test(type) || size < 500) throw badMedia();
+        const ext = forceExt || (Object.keys(MIME).find((k) => MIME[k] === type)) || (/\.(\w{2,4})(?:\?|$)/.exec(url) || [])[1] || 'mp4';
+        if (size > MAX_AS_MEDIA) return await sendBigFile(c, file, ext, caption);
+        await sendBuffer(c, fs.readFileSync(file), ext, caption);
+    } finally { rm(file); }
 }
 
 function getUrl(c) {
@@ -1664,7 +1790,7 @@ const DL_SIMPLE = { 'تيك': cmdTikTok, 'تويتر': cmdTwitter, 'تلي': cmd
 const HANDLERS = {
     'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'متحرك': (c) => cmdSticker(c, 'متحرك'), 'دائري': (c) => cmdSticker(c, 'دائري'), 'طويل': (c) => cmdSticker(c, 'طويل'),
-    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'لرابط': cmdToLink, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'حزمة': cmdPack, 'لفيديو': cmdToVideo,
+    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'لرابط': cmdToLink, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'حزمة': cmdPack, 'باك': cmdPackImages, 'لفيديو': cmdToVideo,
     'إطار': (c) => cmdImageEdit(c, 'إطار'), 'قص': (c) => cmdImageEdit(c, 'قص'), 'عكس': (c) => cmdImageEdit(c, 'عكس'),
     'تدوير': (c) => cmdImageEdit(c, 'تدوير'), 'رمادي': (c) => cmdImageEdit(c, 'رمادي'),
     'رابط': cmdLinkInfo, 'بحث': cmdSearch, 'ايدت': cmdEdit, 'فويس': cmdVoice,
