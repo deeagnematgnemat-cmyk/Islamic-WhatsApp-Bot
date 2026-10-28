@@ -90,7 +90,7 @@ async function toEnglishName(name) {
         out = [...new Set(parts.join(' ').split(' '))].join(' ').trim();
     }
     if (!out || hasArabic(out)) out = (await translateToEnglish(raw)) || out || raw;
-    EN_CACHE.set(key, out);
+    if (out && !hasArabic(out)) EN_CACHE.set(key, out);
     return out;
 }
 const nameTokens = (...names) => [...new Set(names.join(' ').toLowerCase().split(/[\s,]+/).filter((x) => x.length >= 3))];
@@ -1236,15 +1236,33 @@ function normalizeTikItems(json) {
     return out;
 }
 
+// طابور عام لطلبات tikwm: لا يتجاوز طلباً كل 1.3 ثانية (حدّ الخدمة المجانية) حتى لا يتعطل البحث في المرة الثانية
+let tikwmChain = Promise.resolve();
+let tikwmLast = 0;
+function tikwmSlot() {
+    const p = tikwmChain.then(async () => {
+        const w = tikwmLast + 1300 - Date.now();
+        if (w > 0) await sleep(w);
+        tikwmLast = Date.now();
+    });
+    tikwmChain = p.catch(() => {});
+    return p;
+}
+
 async function tikwmSearch(host, q) {
     const body = new URLSearchParams({ keywords: q, count: '20', cursor: '0', web: '1', hd: '1' });
-    for (let i = 0; i < 2; i++) {
-        const j = await httpJson(`https://${host}/api/feed/search`, {
-            method: 'POST', body, timeout: 15000,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Referer': `https://${host}/` }
-        });
+    for (let i = 0; i < 4; i++) {
+        await tikwmSlot();
+        let j = null;
+        try {
+            const res = await http(`https://${host}/api/feed/search`, {
+                method: 'POST', body, timeout: 15000,
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Referer': `https://${host}/` }
+            });
+            j = await res.json().catch(() => null);
+        } catch (e) { logErr('tikwm', e); await sleep(800); continue; }
         if (j?.code === 0 && Array.isArray(j?.data?.videos)) return normalizeTikItems(j.data.videos);
-        if (/limit/i.test(String(j?.msg || ''))) { await sleep(1300); continue; }   // حد الطلبات: ثانية واحدة بين الطلبات
+        if (/limit/i.test(String(j?.msg || ''))) { await sleep(700 * (i + 1)); continue; }   // حد الطلبات: ننتظر ونعيد
         break;
     }
     return [];
@@ -1279,7 +1297,15 @@ async function tiktokLinksViaWeb(q) {
 }
 
 // بحث تيك توك: يجرّب عدة خدمات بالترتيب حتى تعطي نتائج
-async function tiktokSearchAny(q) {
+const TIK_SEARCH_CACHE = new Map();
+async function tiktokSearchAny(q, fresh) {
+    const hit = TIK_SEARCH_CACHE.get(q);
+    if (!fresh && hit && Date.now() - hit.t < 30 * 60 * 1000) return hit.r;
+    const r = await tiktokSearchRaw(q);
+    if (r.length) TIK_SEARCH_CACHE.set(q, { t: Date.now(), r });
+    return r;
+}
+async function tiktokSearchRaw(q) {
     const backends = [
         ['tikwm', () => tikwmSearch('www.tikwm.com', q)],
         ['tikwm2', () => tikwmSearch('tikwm.com', q)],
@@ -1303,7 +1329,7 @@ async function sendTikCandidate(c, cand, cap) {
     }
     if (cand.page) {
         try {
-            await sleep(1100);
+            await tikwmSlot();
             const j = await httpJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(cand.page), { timeout: 30000 });
             const d = j?.data; const vu = tikAbs(d?.hdplay || d?.play);
             if (j?.code === 0 && vu && !(d.images && d.images.length)) { await sendUrlMedia(c, vu, cap, 'mp4'); return true; }
@@ -1320,42 +1346,49 @@ async function cmdEdit(c) {
     const tokens = nameTokens(en, name);
     const queries = [...new Set([`${en} edit`, `${en} edit tiktok`, `${en} amv edit`, `${en} edits 4k`, `${en} capcut edit`, hasArabic(name) ? `${name} ايدت` : ''].filter(Boolean))];
 
-    // 1) نجمع مرشّحين من البحث
-    let cands = [];
-    const seen = new Set();
-    let misses = 0;
-    for (let i = 0; i < queries.length && cands.length < 14 && misses < 2; i++) {
-        if (i) await sleep(1200);
-        const found = await tiktokSearchAny(queries[i]);
-        if (!found.length) misses++;
-        for (const v of found) {
-            const key = v.id || v.page || v.plays[0];
-            if (seen.has(key)) continue;
-            seen.add(key); cands.push(v);
-        }
-    }
-    if (cands.length < 3) {
-        try { for (const v of await tiktokLinksViaWeb(`${en} edit`)) { const k = v.id; if (!seen.has(k)) { seen.add(k); cands.push(v); } } } catch (e) { logErr('ويب', e); }
-    }
-    // 2) الأنسب أولاً: العنوان يحوي اسم الشخصية + مدة معقولة
     const rel = (v) => {
         const t = `${v.title} ${v.author}`.toLowerCase();
         let sc = tokens.some((x) => t.includes(x)) ? 0 : 2;
         if (v.duration && (v.duration > 120 || v.duration < 4)) sc += 3;
         return sc;
     };
-    cands = cands.map((v, i) => ({ v, i })).sort((a, b) => rel(a.v) - rel(b.v) || a.i - b.i).map((x) => x.v);
-
-    // 3) نرسل 3 مقاطع، ونتجاوز أي مقطع يفشل
+    const tried = new Set();
     let sent = 0;
-    for (const v of cands) {
-        if (sent >= 3) break;
-        const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author || ''}`.trim();
-        if (await sendTikCandidate(c, v, cap)) sent++;
-        c.prog?.set(10 + sent * 28);
+
+    // جولتان على الأكثر: إذا تعطّلت الأولى (حد طلبات/خدمة بطيئة) ننتظر قليلاً ونعيد بدون كاش
+    for (let round = 0; round < 2 && sent < 3; round++) {
+        if (round) await sleep(3000);
+
+        // 1) نجمع مرشّحين من البحث
+        let cands = [];
+        const seen = new Set(tried);
+        let misses = 0;
+        for (let i = 0; i < queries.length && cands.length < 14 && misses < 3; i++) {
+            const found = await tiktokSearchAny(queries[i], round > 0);
+            if (!found.length) misses++;
+            for (const v of found) {
+                const key = v.id || v.page || v.plays[0];
+                if (seen.has(key)) continue;
+                seen.add(key); cands.push(v);
+            }
+        }
+        if (cands.length < 3) {
+            try { for (const v of await tiktokLinksViaWeb(`${en} edit`)) { const k = v.id; if (!seen.has(k)) { seen.add(k); cands.push(v); } } } catch (e) { logErr('ويب', e); }
+        }
+        // 2) الأنسب أولاً: العنوان يحوي اسم الشخصية + مدة معقولة
+        cands = cands.map((v, i) => ({ v, i })).sort((a, b) => rel(a.v) - rel(b.v) || a.i - b.i).map((x) => x.v);
+
+        // 3) نرسل 3 مقاطع، ونتجاوز أي مقطع يفشل
+        for (const v of cands) {
+            if (sent >= 3) break;
+            tried.add(v.id || v.page || v.plays[0]);
+            const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author || ''}`.trim();
+            if (await sendTikCandidate(c, v, cap)) sent++;
+            c.prog?.set(10 + sent * 28);
+        }
     }
     if (!sent) {
-        console.error(`ايدت: لا نتائج لـ (${name}) | الإنجليزي: ${en} | المرشحون: ${cands.length}`);
+        console.error(`ايدت: لا نتائج لـ (${name}) | الإنجليزي: ${en} | جرّبنا: ${tried.size}`);
         return c.reply(`❌ لم أجد ايديتات لـ (${name}).\nجرّب كتابة الاسم بالإنجليزية أو بشكل آخر.`);
     }
 }
