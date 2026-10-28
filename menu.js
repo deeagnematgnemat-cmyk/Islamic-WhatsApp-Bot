@@ -46,9 +46,9 @@ const BUTTONS = () => [
 let forwardCtxProvider = null;
 export function setForwardContextProvider(fn) { forwardCtxProvider = fn; }
 
-async function relayInteractive(sock, jid, interactiveMessage) {
+async function relayInteractive(sock, jid, interactiveMessage, { noForward = false } = {}) {
     try {
-        const fwd = forwardCtxProvider ? await forwardCtxProvider(sock) : null;
+        const fwd = (forwardCtxProvider && !noForward) ? await forwardCtxProvider(sock) : null;
         if (fwd) interactiveMessage = { ...interactiveMessage, contextInfo: { ...(interactiveMessage.contextInfo || {}), ...fwd } };
     } catch (e) {}
     const content = {
@@ -87,7 +87,7 @@ export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid)
         body: { text },
         ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
         nativeFlowMessage: { buttons: BUTTONS() }
-    });
+    }, { noForward: true });
 }
 
 // يقرأ رقم الصف الذي اختاره العضو من القائمة (مثل ".4") ليعالجه البوت كأنه كتب الأمر
