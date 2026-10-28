@@ -108,7 +108,7 @@ const SECTION_TEXT =
 `📲 *12. التنصيب (بوت خاص بك):*
 
 > 📥 \`.تنصيب\` ↞ يرسل لك كود ربط لرقمك
-> 🗑️ \`.الغاء_تنصيب\` ↞ حذف بوتك الخاص
+> 🗑️ \`.الغاء_تنصيب\` ↞ للمطور فقط (رقم أو «الكل»)
 > 📋 \`.قائمة_التنصيب\` ↞ عرض البوتات المنصّبة (للمطور)
 
 *طريقة التنصيب:*
@@ -152,6 +152,15 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
     if (senderNum && (!isDev || !argNum)) number = senderNum;
 
     if (isCancel) {
+        if (!isDev) { await reply('❌ هذا الأمر مخصص للمطور فقط!'); return true; }
+        const rawArg = cmd.split(' ').slice(1).join(' ').trim();
+        if (['الكل', 'الجميع', 'all', '*'].includes(rawArg.toLowerCase())) {
+            const all = [...subs.keys()];
+            if (!all.length) { await reply('📋 لا توجد بوتات منصّبة لحذفها.'); return true; }
+            for (const n of all) await removeSub(n);
+            await reply(`🗑️ تم إلغاء جميع التنصيبات (${all.length}).`);
+            return true;
+        }
         if (!/^\d{8,15}$/.test(number) || !subs.has(number)) { await reply('⚠️ لا يوجد بوت منصّب على هذا الرقم.'); return true; }
         await removeSub(number);
         await reply(`🗑️ تم حذف البوت الخاص بالرقم ${number}.`);
@@ -169,7 +178,7 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
     const existing = subs.get(number);
     if (existing) {
         await reply(existing.connected
-            ? '✅ بوتك منصّب ويعمل بالفعل.\nلحذفه اكتب: `.الغاء_تنصيب`'
+            ? '✅ بوتك منصّب ويعمل بالفعل.\nلحذفه تواصل مع المطور.'
             : '⏳ لديك محاولة ربط جارية، أدخل الكود الذي وصلك أو انتظر انتهاء مهلته (3 دقائق).');
         return true;
     }
@@ -186,7 +195,7 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
             }, { quoted: msg });
             await sock.sendMessage(from, { text: code });
         },
-        onConnected: () => sock.sendMessage(from, { text: `✅ تم تنصيب البوت بنجاح على الرقم ${number}!\nاكتب \`.بوت\` من حسابك لتجربته.\nلحذفه: \`.الغاء_تنصيب\`` }, { quoted: msg }).catch(() => {}),
+        onConnected: () => sock.sendMessage(from, { text: `✅ تم تنصيب البوت بنجاح على الرقم ${number}!\nاكتب \`.بوت\` من حسابك لتجربته.\nلحذفه تواصل مع المطور.` }, { quoted: msg }).catch(() => {}),
         onFail: () => sock.sendMessage(from, { text: '❌ تعذر الحصول على كود الربط. تأكد من الرقم وحاول مرة أخرى.' }, { quoted: msg }).catch(() => {}),
         onTimeout: () => sock.sendMessage(from, { text: '⌛ انتهت مهلة الربط. أرسل `.تنصيب` للمحاولة من جديد.' }, { quoted: msg }).catch(() => {})
     });
