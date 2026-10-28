@@ -14,7 +14,7 @@ const AUTHOR = 'Eren Bot';
 const TMP = os.tmpdir();
 const FFMPEG = process.env.FFMPEG_PATH || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
-const MAX_DL = 100 * 1024 * 1024;       // أقصى حجم للتنزيل
+const MAX_DL = Infinity;                 // التنزيل غير محدود الحجم
 const MAX_AS_MEDIA = 60 * 1024 * 1024;  // أكبر من هذا يُرسل كمستند
 
 // إعدادات الذكاء الاصطناعي (اختيارية): متغيرات البيئة في Railway
@@ -234,7 +234,7 @@ async function httpJson(url, opts) {
     return await res.json();
 }
 async function httpBuffer(url, max = MAX_DL, opts = {}) {
-    const res = await http(url, { timeout: 120000, ...opts });
+    const res = await http(url, { timeout: 60 * 60 * 1000, ...opts });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const len = Number(res.headers.get('content-length') || 0);
     if (len && len > max) throw new Error('TOO_BIG');
@@ -847,7 +847,7 @@ async function apiFetchMedia(url, kind) {
         const cands = collectUrls(j).sort((a, b) => keyScore(a.key) - keyScore(b.key));
         for (const cnd of cands.slice(0, 4)) {
             try {
-                const r = await httpBuffer(cnd.url, MAX_DL, { timeout: 120000 });
+                const r = await httpBuffer(cnd.url, MAX_DL, { timeout: 60 * 60 * 1000 });
                 if (/^(text\/|application\/json)/.test(r.type) || r.buf.length < 2000) continue;
                 return { ...r, from: cnd.url };
             } catch (e) { /* التالي */ }
@@ -914,7 +914,7 @@ async function ytdlpDownload(url, { audio = false, many = false, onProgress } = 
     const id = uid();
     const prefix = `dl_${id}`;
     const isYt = /(^|\.)(youtube\.com|youtu\.be)$/.test(hostOf(url));
-    const args = ['--no-warnings', '--newline', '--progress', '--progress-template', 'download:dlprog:%(progress._percent_str)s', '--restrict-filenames', '--max-filesize', '100M',
+    const args = ['--no-warnings', '--newline', '--progress', '--progress-template', 'download:dlprog:%(progress._percent_str)s', '--restrict-filenames',
         '--socket-timeout', '20', '--user-agent', UA, '-o', path.join(TMP, `${prefix}_%(autonumber)s.%(ext)s`)];
     if (FFMPEG !== 'ffmpeg') args.push('--ffmpeg-location', FFMPEG);
     args.push(...cookiesArgs());
