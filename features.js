@@ -592,7 +592,7 @@ async function legacyPacks(q) {
             const title = decodeHtml(mt['og:title'] || '').replace(/\s*[|\-–].*Sticker\.ly.*$/i, '').trim();
             const desc = decodeHtml(mt['og:description'] || mt['description'] || '');
             const cnt = /(\d+)\s*(?:stickers?|ملصق)/i.exec(desc) || /(\d+)\s*(?:stickers?|ملصق)/i.exec(mt['og:title'] || '');
-            if (title) packs.push({ title, author: '', count: cnt ? cnt[1] : null, link, thumbs: [], icon: mt['og:image'] || null });
+            if (title) packs.push({ id: (/sticker\.ly\/s\/([^/?#]+)/.exec(link) || [])[1] || null, title, author: '', count: cnt ? cnt[1] : null, link, thumbs: [], icon: mt['og:image'] || null });
         } catch (e) { /* تجاهل */ }
     }
     return packs;
@@ -637,6 +637,18 @@ async function stickerlyPackFiles(p) {
             const prefix = (/"resourceUrlPrefix"\s*:\s*"([^"]+)"/.exec(html) || [])[1];
             const files = [...new Set([...html.matchAll(/"fileName"\s*:\s*"([^"]+)"/g)].map((m) => m[1]))];
             if (prefix && files.length) return files.map((f) => prefix.replace(/\\\//g, '/') + f);
+            const nd = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/.exec(html);
+            if (nd) {
+                const jd = JSON.parse(nd[1]); let pre = '', names = [];
+                (function walk(o, d) {
+                    if (!o || typeof o !== 'object' || d > 9) return;
+                    if (typeof o.resourceUrlPrefix === 'string' && !pre) pre = o.resourceUrlPrefix;
+                    if (typeof o.fileName === 'string') names.push(o.fileName);
+                    for (const v of Object.values(o)) walk(v, d + 1);
+                })(jd, 0);
+                names = [...new Set(names)];
+                if (pre && names.length) return names.map((f) => (/^https?:/.test(f) ? f : pre + f));
+            }
         } catch (e) { logErr('ستيكرلي-صفحة', e); }
     }
     return p.urls || [];
@@ -665,7 +677,7 @@ function nativePackSupported() {
     } catch (e) { return false; }
 }
 async function sendNativePack(c, { title, author, animated, stickers }) {
-    if (!nativePackSupported()) return false;
+    if (!nativePackSupported()) { console.error('[حزمة-أصلية] نسخة Baileys المثبّتة لا تدعم stickerPack، حدّث المكتبة في package.json'); return false; }
     try {
         await c.sock.sendMessage(c.from, {
             stickerPack: {
@@ -725,19 +737,8 @@ async function cmdPack(c) {
             return c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${chosen.title}).${chosen.link ? `\n\n💡 لإضافة الحزمة كاملة دفعة واحدة:\n${chosen.link}` : ''}`);
         }
 
-        // 3) لم نستطع تحميل الملصقات: نعرض بطاقة الحزمة برابطها كحل أخير
-        for (const p of packs.slice(0, 2)) {
-            const text = `📦 *${p.title}*\n🎴 ${p.count ? p.count + ' ملصقاً' : 'عدد الملصقات غير معروف'}${p.author ? `\n✍️ ${p.author}` : ''}\n\n💡 اضغط «عرض مجموعة الملصقات» ثم «Add to WhatsApp» لإضافة الحزمة كاملة.`;
-            let image = null;
-            try { image = await packCollage(p.thumbs); } catch (e) {}
-            if (!image) image = p.icon || p.thumbs?.[0] || null;
-            try {
-                await sendPackCard(c.sock, c.from, { image, text, url: p.link, mentionJid: c.sender });
-            } catch (e) {
-                const caption = `${text}\n🔗 ${p.link}`;
-                try { await c.media(image ? (Buffer.isBuffer(image) ? { image, caption } : { image: { url: image }, caption }) : { text: caption }); } catch (e2) { await c.reply(caption); }
-            }
-        }
+        // 3) لم نستطع تجهيز ملصقات أي حزمة: لا نرسل رابطاً، فقط نخبر المستخدم
+        return c.reply(`❌ تعذر تجهيز ملصقات حزمة (${q}) الآن.\nجرّب اسماً آخر أو أعد المحاولة بعد قليل.`);
     } finally { PACK_BUSY.delete(c.from); }
 }
 
@@ -928,11 +929,11 @@ async function ytdlpDownload(url, { audio = false, many = false, onProgress } = 
         ? [['--js-runtimes', 'node'], ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=tv,mweb,web_safari'], ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=android_vr,ios']]
         : [[]];
     const tryRun = async (extra) => {
-        try { await runProgress(bin, [...args, ...extra, url], 300000, onProgress); }
+        try { await runProgress(bin, [...args, ...extra, url], 3 * 3600 * 1000, onProgress); }
         catch (e) {
             clean();
             if (extra.includes('--js-runtimes') && /no such option|unrecognized arguments/i.test(e.stderr || '')) {
-                try { await runProgress(bin, [...args, ...stripJs(extra), url], 300000, onProgress); return; }
+                try { await runProgress(bin, [...args, ...stripJs(extra), url], 3 * 3600 * 1000, onProgress); return; }
                 catch (e2) { clean(); throw e2; }
             }
             throw e;
@@ -1011,7 +1012,7 @@ async function makeWhatsAppMp4(buf) {
         for (let i = 0; i < attempts.length; i++) {
             rm(out);
             try {
-                await run(FFMPEG, ['-y', '-v', 'error', '-fflags', '+genpts', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...attempts[i], '-movflags', '+faststart', '-f', 'mp4', out], 300000);
+                await run(FFMPEG, ['-y', '-v', 'error', '-fflags', '+genpts', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...attempts[i], '-movflags', '+faststart', '-f', 'mp4', out], 3 * 3600 * 1000);
                 const o = fs.readFileSync(out);
                 if (o.length < 1000) continue;
                 if (await decodesOk(out, i === attempts.length - 1)) return { buf: o, thumb: await videoThumb(out) };
@@ -1352,21 +1353,60 @@ async function tiktokSearchRaw(q) {
     return [];
 }
 
-// يرسل مقطعاً واحداً: روابط التشغيل المباشرة أولاً ثم صفحة المقطع (tikwm ثم yt-dlp)
-async function sendTikCandidate(c, cand, cap) {
+// يجهّز مقطعاً واحداً (بدون إرساله): روابط التشغيل المباشرة أولاً ثم صفحة المقطع (tikwm ثم yt-dlp)
+// يرجع محتوى رسالة فيديو جاهزاً {video, mimetype, caption, jpegThumbnail} أو null
+async function prepareTikVideo(c, buf, cap) {
+    if (!buf || buf.length < 500) return null;
+    let r;
+    try { r = await makeWhatsAppMp4(buf); } catch (e) { return null; }
+    if (!r) return null;
+    if (r.unchecked) return { video: buf, mimetype: 'video/mp4', caption: cap };
+    return { video: r.buf, mimetype: 'video/mp4', caption: cap, ...(r.thumb ? { jpegThumbnail: r.thumb } : {}) };
+}
+async function prepareTikCandidate(c, cand, cap) {
     for (const u of cand.plays) {
-        try { await sendUrlMedia(c, u, cap, 'mp4'); return true; } catch (e) { logErr('ايدت-تشغيل', e); }
+        try {
+            const { buf, type } = await httpBuffer(u, MAX_DL);
+            if (/^(text\/|application\/json)/.test(type)) continue;
+            const it = await prepareTikVideo(c, buf, cap);
+            if (it) return it;
+        } catch (e) { logErr('ايدت-تشغيل', e); }
     }
     if (cand.page) {
         try {
             await tikwmSlot();
             const j = await httpJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(cand.page), { timeout: 30000 });
             const d = j?.data; const vu = tikAbs(d?.hdplay || d?.play);
-            if (j?.code === 0 && vu && !(d.images && d.images.length)) { await sendUrlMedia(c, vu, cap, 'mp4'); return true; }
+            if (j?.code === 0 && vu && !(d.images && d.images.length)) {
+                const { buf, type } = await httpBuffer(vu, MAX_DL);
+                if (!/^(text\/|application\/json)/.test(type)) { const it = await prepareTikVideo(c, buf, cap); if (it) return it; }
+            }
         } catch (e) { logErr('ايدت-tikwm', e); }
-        try { await sendFiles(c, await ytdlpDownload(cand.page, {}), cap); return true; } catch (e) { logErr('ايدت-ytdlp', e); }
+        let files = [];
+        try {
+            files = await ytdlpDownload(cand.page, {});
+            const it = await prepareTikVideo(c, fs.readFileSync(files[0]), cap);
+            if (it) return it;
+        } catch (e) { logErr('ايدت-ytdlp', e); }
+        finally { rm(...files); }
     }
-    return false;
+    return null;
+}
+
+// يرسل عدة فيديوهات كألبوم واحد متجاور (مثل بوت صديقك): رسالة ألبوم ثم كل فيديو مرتبط بها
+async function sendVideoAlbum(c, items) {
+    const B = BaileysNs.default?.generateWAMessage ? BaileysNs.default : BaileysNs;
+    const sock = c.sock, jid = c.from;
+    try {
+        const album = B.generateWAMessageFromContent(jid, { albumMessage: { expectedImageCount: 0, expectedVideoCount: items.length } }, { userJid: sock.user.id, quoted: c.msg });
+        await sock.relayMessage(jid, album.message, { messageId: album.key.id });
+        for (const it of items) {
+            const m = await B.generateWAMessage(jid, it, { upload: sock.waUploadToServer, userJid: sock.user.id });
+            m.message.messageContextInfo = { ...(m.message.messageContextInfo || {}), messageAssociation: { associationType: 1, parentMessageKey: album.key } };
+            await sock.relayMessage(jid, m.message, { messageId: m.key.id });
+        }
+        return true;
+    } catch (e) { logErr('ايدت-ألبوم', e); return false; }
 }
 
 async function cmdEdit(c) {
@@ -1383,10 +1423,10 @@ async function cmdEdit(c) {
         return sc;
     };
     const tried = new Set();
-    let sent = 0;
+    const ready = [];   // الفيديوهات الجاهزة للإرسال دفعة واحدة
 
     // جولتان على الأكثر: إذا تعطّلت الأولى (حد طلبات/خدمة بطيئة) ننتظر قليلاً ونعيد بدون كاش
-    for (let round = 0; round < 2 && sent < 3; round++) {
+    for (let round = 0; round < 2 && ready.length < 3; round++) {
         if (round) await sleep(3000);
 
         // 1) نجمع مرشّحين من البحث
@@ -1410,14 +1450,21 @@ async function cmdEdit(c) {
 
         // 3) نرسل 3 مقاطع، ونتجاوز أي مقطع يفشل
         for (const v of cands) {
-            if (sent >= 3) break;
+            if (ready.length >= 3) break;
             tried.add(v.id || v.page || v.plays[0]);
-            const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author || ''}`.trim();
-            if (await sendTikCandidate(c, v, cap)) sent++;
-            c.prog?.set(10 + sent * 28);
+            const cap = `🎞️ ايدت ${name} (${ready.length + 1}/3)\n👤 ${v.author || ''}`.trim();
+            const item = await prepareTikCandidate(c, v, cap);
+            if (item) ready.push(item);
+            c.prog?.set(10 + ready.length * 25);
         }
     }
-    if (!sent) {
+    if (ready.length) {
+        c.prog?.set(90);
+        if (ready.length >= 2 && await sendVideoAlbum(c, ready)) return;
+        for (const it of ready) await c.media(it);   // احتياط: إن تعذر الألبوم أو وُجد مقطع واحد فقط
+        return;
+    }
+    {
         console.error(`ايدت: لا نتائج لـ (${name}) | الإنجليزي: ${en} | جرّبنا: ${tried.size}`);
         return c.reply(`❌ لم أجد ايديتات لـ (${name}).\nجرّب كتابة الاسم بالإنجليزية أو بشكل آخر.`);
     }
