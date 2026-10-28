@@ -6,6 +6,7 @@ import pino from 'pino';
 import { execFile } from 'child_process';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import { sendSectionWithButtons } from './menu.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -789,6 +790,7 @@ let running = 0;
 async function sendSection(c, text) {
     let pp;
     try { pp = await c.getUserProfilePic(c.sock, c.sender); } catch (e) {}
+    if (await sendSectionWithButtons(c.sock, c.from, text, pp, c.sender)) return;
     try { await c.sock.sendMessage(c.from, { image: { url: pp }, caption: text, mentions: [c.sender] }); }
     catch (e) { await c.sock.sendMessage(c.from, { text, mentions: [c.sender] }); }
 }
