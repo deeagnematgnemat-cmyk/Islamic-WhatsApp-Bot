@@ -6,6 +6,7 @@ import pino from 'pino';
 import { execFile, spawn } from 'child_process';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import * as BaileysNs from '@whiskeysockets/baileys';
 import { sendSectionWithButtons, sendPackCard } from './menu.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
@@ -23,6 +24,76 @@ const MAX_AS_MEDIA = 60 * 1024 * 1024;  // أكبر من هذا يُرسل كم�
 // بدون مفتاح يستخدم خدمة مجانية بدون مفتاح (pollinations) وقد تكون أبطأ وأقل ثباتاً.
 
 const norm = (s) => s.replace(/[أإآا]/g, 'ا');
+
+// ---------------------------------------------------------------- تحويل اسم الشخصية من العربية إلى الإنجليزية (للبحث)
+// المنصات (تيك توك / ستيكرلي) تبحث بالإنجليزية أفضل بكثير، لذلك نحوّل الاسم أولاً
+const arNorm = (s) => String(s || '').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+const AR_EN_RAW = {
+    'ايرين': 'eren yeager', 'اورين': 'eren yeager', 'ايرن': 'eren yeager', 'ايرين يغر': 'eren yeager', 'ايرين ييغر': 'eren yeager', 'ايرين يجر': 'eren yeager', 'ايرين ييجر': 'eren yeager', 'ايرين يايغر': 'eren yeager', 'ايرين ييغير': 'eren yeager', 'ايرين جيجر': 'eren yeager',
+    'ميكاسا': 'mikasa ackerman', 'ارمين': 'armin arlert', 'ليفاي': 'levi ackerman', 'ليفي': 'levi ackerman', 'زيك': 'zeke yeager', 'راينر': 'reiner braun', 'ريانر': 'reiner braun',
+    'هانجي': 'hange zoe', 'ارفين': 'erwin smith', 'ايروين': 'erwin smith', 'ايرفين': 'erwin smith', 'اني': 'annie leonhart', 'جان': 'jean kirstein', 'غابي': 'gabi braun',
+    'غوجو': 'gojo satoru', 'جوجو': 'gojo satoru', 'قوجو': 'gojo satoru', 'غوجو ساتورو': 'gojo satoru', 'جوجو ساتورو': 'gojo satoru', 'ساتورو': 'gojo satoru', 'ساتورو غوجو': 'gojo satoru',
+    'سوكونا': 'sukuna', 'ايتادوري': 'itadori yuji', 'يوجي': 'itadori yuji', 'ميغومي': 'megumi fushiguro', 'ميجومي': 'megumi fushiguro', 'نوبارا': 'nobara kugisaki', 'توجي': 'toji fushiguro', 'نانامي': 'nanami kento', 'جيتو': 'geto suguru',
+    'ناروتو': 'naruto uzumaki', 'ساسكي': 'sasuke uchiha', 'ساسوكي': 'sasuke uchiha', 'ايتاشي': 'itachi uchiha', 'ايتاتشي': 'itachi uchiha', 'كاكاشي': 'kakashi hatake', 'مادارا': 'madara uchiha', 'اوبيتو': 'obito uchiha', 'ميناتو': 'minato namikaze',
+    'جيرايا': 'jiraiya', 'نيجي': 'neji hyuga', 'هيناتا': 'hinata hyuga', 'ساكورا': 'sakura haruno', 'غارا': 'gaara', 'جارا': 'gaara', 'شيكامارو': 'shikamaru nara', 'روك لي': 'rock lee', 'بين': 'pain akatsuki', 'ناجاتو': 'nagato',
+    'لوفي': 'luffy', 'زورو': 'zoro', 'سانجي': 'sanji', 'ايس': 'portgas d ace', 'سابو': 'sabo', 'شانكس': 'shanks', 'ترافالغار لو': 'trafalgar law', 'لو': 'trafalgar law', 'دوفلامنغو': 'doflamingo', 'ميهوك': 'mihawk',
+    'غوكو': 'goku', 'جوكو': 'goku', 'فيجيتا': 'vegeta', 'غوهان': 'gohan', 'فريزا': 'frieza', 'تورانكس': 'trunks', 'بيكولو': 'piccolo',
+    'تانجيرو': 'tanjiro kamado', 'نيزوكو': 'nezuko kamado', 'زينيتسو': 'zenitsu', 'اينوسكي': 'inosuke', 'رينغوكو': 'rengoku kyojuro', 'شينوبو': 'shinobu kocho', 'جيو': 'giyu tomioka', 'موزان': 'muzan kibutsuji', 'اكازا': 'akaza',
+    'ديكو': 'deku midoriya', 'باكوغو': 'bakugo katsuki', 'تودوروكي': 'todoroki shoto', 'اول مايت': 'all might',
+    'لايت': 'light yagami', 'ال': 'l lawliet', 'ريوك': 'ryuk',
+    'سونغ جين وو': 'sung jinwoo', 'سونج جين وو': 'sung jinwoo', 'جين وو': 'sung jinwoo', 'سونغ جينوو': 'sung jinwoo', 'جينوو': 'sung jinwoo',
+    'غون': 'gon freecss', 'كيلوا': 'killua zoldyck', 'هيسوكا': 'hisoka', 'دازاي': 'dazai osamu', 'تشويا': 'chuuya nakahara', 'ماكيما': 'makima', 'دينجي': 'denji', 'باور': 'power chainsaw man',
+    'ريم': 'rem rezero', 'سوبارو': 'subaru natsuki', 'سايتاما': 'saitama', 'جينوس': 'genos', 'ثورفين': 'thorfinn', 'شينجي': 'shinji ikari', 'ايدن': 'eden',
+    'جوكر': 'joker', 'باتمان': 'batman', 'سبايدرمان': 'spiderman', 'سبايدر مان': 'spiderman', 'ايرون مان': 'iron man', 'ثانوس': 'thanos', 'توماس شيلبي': 'thomas shelby', 'شيلبي': 'thomas shelby',
+    'رونالدو': 'cristiano ronaldo', 'ميسي': 'messi', 'نيمار': 'neymar', 'مبابي': 'mbappe'
+};
+const AR_EN = new Map(Object.entries(AR_EN_RAW).map(([k, v]) => [arNorm(k), v]));
+const EN_CACHE = new Map();
+const hasArabic = (s) => /[\u0600-\u06FF]/.test(s);
+
+async function translateToEnglish(text) {
+    try {
+        const j = await httpJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&q=' + encodeURIComponent(text), { timeout: 15000 });
+        const t = (j?.[0] || []).map((x) => x?.[0] || '').join('').trim();
+        if (t && !hasArabic(t)) return t;
+    } catch (e) { /* التالي */ }
+    try {
+        const j = await httpJson('https://api.mymemory.translated.net/get?langpair=ar%7Cen&q=' + encodeURIComponent(text), { timeout: 15000 });
+        const t = String(j?.responseData?.translatedText || '').trim();
+        if (t && !hasArabic(t) && !/MYMEMORY|INVALID/i.test(t)) return t;
+    } catch (e) { /* لا شيء */ }
+    return null;
+}
+
+async function toEnglishName(name) {
+    const raw = String(name || '').trim();
+    if (!raw || !hasArabic(raw)) return raw;
+    const key = arNorm(raw);
+    if (EN_CACHE.has(key)) return EN_CACHE.get(key);
+    let out = null;
+    if (AR_EN.has(key)) out = AR_EN.get(key);
+    else {
+        // مطابقة أطول تتابع كلمات في القاموس، والكلمات المجهولة تُترجم
+        const words = key.split(' ');
+        const parts = [];
+        for (let i = 0; i < words.length;) {
+            let hit = null, len = 0;
+            for (let n = Math.min(3, words.length - i); n >= 1; n--) {
+                const k = words.slice(i, i + n).join(' ');
+                if (AR_EN.has(k)) { hit = AR_EN.get(k); len = n; break; }
+            }
+            if (hit) { parts.push(hit); i += len; continue; }
+            const tr = await translateToEnglish(words[i]);
+            parts.push(tr || words[i]);
+            i++;
+        }
+        out = [...new Set(parts.join(' ').split(' '))].join(' ').trim();
+    }
+    if (!out || hasArabic(out)) out = (await translateToEnglish(raw)) || out || raw;
+    EN_CACHE.set(key, out);
+    return out;
+}
+const nameTokens = (...names) => [...new Set(names.join(' ').toLowerCase().split(/[\s,]+/).filter((x) => x.length >= 3))];
 
 // ---------------------------------------------------------------- الأوامر والاختصارات
 const COMMANDS = {
@@ -462,6 +533,7 @@ async function stickerlyPacks(q) {
         const files = p.resourceFiles || (p.stickers || []).map((x) => x.fileName).filter(Boolean);
         const prefix = p.resourceUrlPrefix || '';
         return {
+            id: p.packId || null,
             title: p.name, author: p.authorName || '', animated: !!p.isAnimated,
             count: files.length || p.stickerCount || null,
             link: p.packId ? `https://sticker.ly/s/${p.packId}` : null,
@@ -518,47 +590,125 @@ async function packCollage(urls) {
 }
 
 const PACK_BUSY = new Set();
+const STICKERLY_HEADERS = { 'Content-Type': 'application/json', 'User-Agent': 'androidapp.stickerly/1.17.0 (Pixel 7; U; Android 33; en-US; US)' };
+
+// القائمة الكاملة لملصقات الحزمة (نتيجة البحث تعطي أول بضعة ملصقات فقط)
+async function stickerlyPackFiles(p) {
+    if (p.id) {
+        try {
+            const j = await httpJson(`https://api.sticker.ly/v4/stickerPack/${p.id}?needRelation=true`, { timeout: 20000, headers: STICKERLY_HEADERS });
+            const r = j?.result || {};
+            const prefix = r.resourceUrlPrefix || '';
+            const files = (r.stickers || []).map((x) => x.fileName).filter(Boolean);
+            const list = files.length ? files : (r.resourceFiles || []);
+            if (list.length) return list.map((f) => (/^https?:/.test(f) ? f : prefix + f));
+        } catch (e) { logErr('ستيكرلي-تفاصيل', e); }
+    }
+    if (p.link) {   // احتياط: قراءة صفحة الحزمة نفسها
+        try {
+            const html = await (await http(p.link, { timeout: 20000 })).text();
+            const prefix = (/"resourceUrlPrefix"\s*:\s*"([^"]+)"/.exec(html) || [])[1];
+            const files = [...new Set([...html.matchAll(/"fileName"\s*:\s*"([^"]+)"/g)].map((m) => m[1]))];
+            if (prefix && files.length) return files.map((f) => prefix.replace(/\\\//g, '/') + f);
+        } catch (e) { logErr('ستيكرلي-صفحة', e); }
+    }
+    return p.urls || [];
+}
+
+// يحمّل ملصقات الحزمة ويحوّلها لملصقات واتساب سليمة (512×512 + اسم الحزمة)
+async function buildPackStickers(urls, packName, onStep) {
+    const out = [];
+    for (const u of urls.slice(0, 30)) {
+        try {
+            const { buf, type } = await httpBuffer(u, 3 * 1024 * 1024);
+            if (/^(text\/|application\/json)/.test(type) || buf.length < 200) continue;
+            out.push(await makeSticker(buf, StickerTypes.FULL, { pack: packName, author: AUTHOR, quality: 70 }));
+        } catch (e) { /* تجاهل الملصق الفاشل */ }
+        onStep?.(out.length, urls.length);
+    }
+    return out;
+}
+
+// حزمة واتساب الأصلية (بطاقة «عرض مجموعة الملصقات» + «إضافة إلى ملصقاتك»)
+// تعمل فقط إذا كانت نسخة Baileys المثبّتة تدعمها، وإلا نرجع false فتُرسل الملصقات واحداً واحداً
+function nativePackSupported() {
+    try {
+        const proto = BaileysNs.proto || BaileysNs.default?.proto;
+        return !!proto?.Message?.prototype && ('stickerPackMessage' in proto.Message.prototype);
+    } catch (e) { return false; }
+}
+async function sendNativePack(c, { title, author, animated, stickers }) {
+    if (!nativePackSupported()) return false;
+    try {
+        await c.sock.sendMessage(c.from, {
+            stickerPack: {
+                name: title, publisher: author || AUTHOR, description: `${title} • ${AUTHOR}`, cover: stickers[0],
+                stickers: stickers.map((b) => ({ sticker: b, data: b, emojis: ['🍷'], isAnimated: !!animated }))
+            }
+        }, { quoted: c.msg });
+        return true;
+    } catch (e) { logErr('حزمة-أصلية', e); return false; }
+}
+
 async function cmdPack(c) {
     const q = c.args.trim();
     if (!q) return c.reply('📌 مثال: `.حزمة ناروتو` أو `.حزمة ايرين`');
+    const en = (await toEnglishName(q)).trim();
+    const tokens = nameTokens(en, q);
+
+    // 1) البحث (بالإنجليزية أولاً لأنها أدق) ودمج النتائج بلا تكرار
     let packs = [];
-    try { packs = await stickerlyPacks(q); } catch (e) { packs = []; }
-    if (!packs.length) { try { packs = await legacyPacks(q); } catch (e) { packs = []; } }
+    const seen = new Set();
+    for (const query of [...new Set([en, `${en} sticker`, q])]) {
+        let r = [];
+        try { r = await stickerlyPacks(query); } catch (e) { logErr('ستيكرلي-بحث', e); }
+        for (const p of r) { const k = p.id || p.link; if (!seen.has(k)) { seen.add(k); packs.push(p); } }
+        if (packs.length >= 8) break;
+    }
+    if (!packs.length) { try { packs = await legacyPacks(en); } catch (e) { packs = []; } }
     if (!packs.length) return c.reply(`❌ لم أعثر على حزمة ملصقات مناسبة لـ (${q}).\nجرّب اسماً آخر أو بالإنجليزية.`);
-    // الأفضلية: إرسال ملصقات الحزمة الفعلية مباشرة في المحادثة
-    const direct = packs.find((p) => p.urls && p.urls.length);
-    if (direct) {
-        if (PACK_BUSY.has(c.from)) return c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
-        PACK_BUSY.add(c.from);
-        try {
-            const urls = direct.urls.slice(0, 30);
-            await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${direct.title} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 ✅ 〕 تم تجهيز ${urls.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
-            let sent = 0;
-            for (const u of urls) {
-                try {
-                    const { buf } = await httpBuffer(u, 2 * 1024 * 1024);
-                    await c.sock.sendMessage(c.from, { sticker: buf });
-                    sent++;
-                    c.prog?.set(8 + 90 * sent / urls.length);
-                } catch (e) { /* تجاهل الملصق الفاشل */ }
-                await new Promise((r) => setTimeout(r, 700));
-            }
-            if (!sent) return c.reply('❌ تعذر تحميل ملصقات هذه الحزمة، جرّب اسماً آخر.');
-            return c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${direct.title}).`);
-        } finally { PACK_BUSY.delete(c.from); }
-    }
-    for (const p of packs.slice(0, 2)) {
-        const text = `📦 *${p.title}*\n🎴 ${p.count ? p.count + ' ملصقاً' : 'عدد الملصقات غير معروف'}${p.author ? `\n✍️ ${p.author}` : ''}\n\n💡 اضغط «عرض مجموعة الملصقات» ثم «Add to WhatsApp» لإضافة الحزمة كاملة.`;
-        let image = null;
-        try { image = await packCollage(p.thumbs); } catch (e) {}
-        if (!image) image = p.icon || p.thumbs?.[0] || null;
-        try {
-            await sendPackCard(c.sock, c.from, { image, text, url: p.link, mentionJid: c.sender });
-        } catch (e) {
-            const caption = `${text}\n🔗 ${p.link}`;
-            try { await c.media(image ? (Buffer.isBuffer(image) ? { image, caption } : { image: { url: image }, caption }) : { text: caption }); } catch (e2) { await c.reply(caption); }
+    const rel = (p) => (tokens.some((x) => `${p.title} ${p.author}`.toLowerCase().includes(x)) ? 0 : 1);
+    packs = packs.map((p, i) => ({ p, i })).sort((a, b) => rel(a.p) - rel(b.p) || Number(a.p.animated) - Number(b.p.animated) || a.i - b.i).map((x) => x.p);
+
+    if (PACK_BUSY.has(c.from)) return c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
+    PACK_BUSY.add(c.from);
+    try {
+        // 2) نجهّز أول حزمة تعطينا ملصقات صالحة
+        let chosen = null, stickers = [];
+        for (const p of packs.slice(0, 4)) {
+            const files = await stickerlyPackFiles(p);
+            if (files.length < 3) continue;
+            stickers = await buildPackStickers(files, p.title, (n) => c.prog?.set(5 + 60 * Math.min(1, n / Math.min(30, files.length))));
+            if (stickers.length >= 3) { chosen = p; break; }
         }
-    }
+
+        if (chosen) {
+            await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${chosen.title} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
+            if (await sendNativePack(c, { title: chosen.title, author: chosen.author, animated: chosen.animated, stickers })) return;
+            let sent = 0;
+            for (const st of stickers) {
+                try { await c.sock.sendMessage(c.from, { sticker: st }); sent++; } catch (e) { logErr('إرسال-ملصق', e); }
+                c.prog?.set(70 + 28 * sent / stickers.length);
+                await sleep(700);
+            }
+            if (!sent) return c.reply('❌ تعذر إرسال ملصقات هذه الحزمة، جرّب اسماً آخر.');
+            return c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${chosen.title}).${chosen.link ? `\n\n💡 لإضافة الحزمة كاملة دفعة واحدة:\n${chosen.link}` : ''}`);
+        }
+
+        // 3) لم نستطع تحميل الملصقات: نعرض بطاقة الحزمة برابطها كحل أخير
+        for (const p of packs.slice(0, 2)) {
+            const text = `📦 *${p.title}*\n🎴 ${p.count ? p.count + ' ملصقاً' : 'عدد الملصقات غير معروف'}${p.author ? `\n✍️ ${p.author}` : ''}\n\n💡 اضغط «عرض مجموعة الملصقات» ثم «Add to WhatsApp» لإضافة الحزمة كاملة.`;
+            let image = null;
+            try { image = await packCollage(p.thumbs); } catch (e) {}
+            if (!image) image = p.icon || p.thumbs?.[0] || null;
+            try {
+                await sendPackCard(c.sock, c.from, { image, text, url: p.link, mentionJid: c.sender });
+            } catch (e) {
+                const caption = `${text}\n🔗 ${p.link}`;
+                try { await c.media(image ? (Buffer.isBuffer(image) ? { image, caption } : { image: { url: image }, caption }) : { text: caption }); } catch (e2) { await c.reply(caption); }
+            }
+        }
+    } finally { PACK_BUSY.delete(c.from); }
 }
 
 // ---------------------------------------------------------------- التنزيل
@@ -655,7 +805,7 @@ function apiEndpoints(url, kind) {
         const t = kind === 'audio' ? 'ytmp3' : 'ytmp4';
         return [`https://api.siputzx.my.id/api/d/${t}?url=`, `https://api.ryzendesu.vip/api/downloader/${t}?url=`];
     }
-    if (n === 'انستا') return ['https://api.siputzx.my.id/api/d/igdl?url=', 'https://api.ryzendesu.vip/api/downloader/igdl?url='];
+    if (n === 'انستا') return ['https://api.siputzx.my.id/api/d/igdl?url=', 'https://api.ryzendesu.vip/api/downloader/igdl?url=', 'https://api.vreden.my.id/api/igdl?url=', 'https://api.agatz.xyz/api/instagram?url='];
     if (n === 'فيس') return ['https://api.siputzx.my.id/api/d/facebook?url=', 'https://api.ryzendesu.vip/api/downloader/fbdl?url='];
     if (n === 'تيك') return ['https://api.siputzx.my.id/api/d/tiktok?url='];
     return ['https://api.siputzx.my.id/api/d/savefrom?url='];
@@ -786,26 +936,59 @@ async function mediaCodecs(file) {
     return {
         video: (/Video:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
         audio: (/Audio:\s*([a-z0-9_]+)/i.exec(txt) || [])[1] || null,
-        yuv420: /yuv420p/.test(txt)
+        yuv420: /yuv420p(?![0-9a-z])/i.test(txt)
     };
 }
 const badMedia = () => Object.assign(new Error('BAD_MEDIA'), { friendly: '❌ الملف الذي تم تنزيله تالف أو غير صالح، جرّب رابطاً آخر.' });
-// يحوّل الفيديو إلى mp4 (H.264 + AAC) ليعمل صوته وصورته في واتساب دائماً
+// يتأكد أن الملف يُفكّ ترميزه فعلاً (هذا ما يمنع رسالة «الفيديو غير متوفر لوجود خلل في الملف المرئي»)
+async function decodesOk(file, lenient = false) {
+    try {
+        const r = await run(FFMPEG, ['-v', 'error', '-i', file, '-t', '6', '-f', 'null', '-'], 120000);
+        return lenient ? true : !String(r.stderr || '').trim();
+    } catch (e) { return false; }
+}
+// صورة مصغّرة من أول ثانية (بدونها تظهر الشاشة سوداء في واتساب)
+async function videoThumb(file) {
+    const out = path.join(TMP, `th_${uid()}.jpg`);
+    try {
+        for (const ss of ['0.5', '0']) {
+            try {
+                await run(FFMPEG, ['-y', '-v', 'error', '-ss', ss, '-i', file, '-frames:v', '1', '-vf', 'scale=320:-2', '-q:v', '6', out], 40000);
+                const b = fs.readFileSync(out);
+                if (b.length > 500) return b;
+            } catch (e) { /* جرّب الثانية الأولى */ }
+        }
+        return null;
+    } finally { rm(out); }
+}
+// يعيد بناء أي فيديو كملف mp4 قياسي (H.264 + AAC + faststart) ثم يتحقق منه قبل الإرسال
+// يرجع: { buf, thumb } عند النجاح، { unchecked: true } إن لم يوجد ffmpeg، أو null إن تعذر إصلاحه
 async function makeWhatsAppMp4(buf) {
     const id = uid();
     const inp = path.join(TMP, `mi_${id}.bin`), out = path.join(TMP, `mo_${id}.mp4`);
     try {
         fs.writeFileSync(inp, buf);
         const k = await mediaCodecs(inp);
-        if (k.missing) return buf;
+        if (k.missing) return { unchecked: true };
         if (!k.video) throw badMedia();
         const okV = k.video === 'h264' && k.yuv420, okA = !k.audio || k.audio === 'aac';
-        if (okV && okA) return buf;
-        const vArgs = okV ? ['-c:v', 'copy'] : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'];
-        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...vArgs, '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart', out], 240000);
-        const o = fs.readFileSync(out);
-        return o.length ? o : buf;
-    } catch (e) { if (e.message === 'BAD_MEDIA') throw e; return buf; }
+        const audio = ['-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-ar', '44100'];
+        const encV = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-profile:v', 'main', '-level', '4.0', '-pix_fmt', 'yuv420p', '-vf', "scale='trunc(min(1280,iw)/2)*2':-2"];
+        const attempts = [];
+        if (okV && okA) attempts.push(['-c:v', 'copy', '-c:a', 'copy']);
+        if (okV) attempts.push(['-c:v', 'copy', ...audio]);
+        attempts.push([...encV, ...audio]);
+        for (let i = 0; i < attempts.length; i++) {
+            rm(out);
+            try {
+                await run(FFMPEG, ['-y', '-v', 'error', '-fflags', '+genpts', '-i', inp, '-map', '0:v:0', '-map', '0:a:0?', ...attempts[i], '-movflags', '+faststart', '-f', 'mp4', out], 300000);
+                const o = fs.readFileSync(out);
+                if (o.length < 1000) continue;
+                if (await decodesOk(out, i === attempts.length - 1)) return { buf: o, thumb: await videoThumb(out) };
+            } catch (e) { /* المحاولة التالية */ }
+        }
+        return null;
+    } catch (e) { if (e.message === 'BAD_MEDIA') throw e; return { unchecked: true }; }
     finally { rm(inp, out); }
 }
 // يحوّل أي صوت إلى mp3 سليم (يمنع رسالة «المقطع الصوتي غير متوفر لوجود خلل»)
@@ -832,8 +1015,10 @@ async function sendBuffer(c, buf, ext, caption = '') {
     const mimetype = MIME[ext] || 'application/octet-stream';
     c.prog?.set(90);
     if (kind === 'video') {
-        if (buf.length <= MAX_AS_MEDIA) buf = await makeWhatsAppMp4(buf);
-        return c.media({ video: buf, mimetype: 'video/mp4', caption });
+        const r = await makeWhatsAppMp4(buf);
+        if (!r) return c.media({ document: buf, mimetype: 'video/mp4', fileName: `Eren_Bot_${uid()}.mp4`, caption });   // تعذر إصلاحه: يُرسل كملف بدل فيديو تالف
+        if (r.unchecked) return c.media({ video: buf, mimetype: 'video/mp4', caption });
+        return c.media({ video: r.buf, mimetype: 'video/mp4', caption, ...(r.thumb ? { jpegThumbnail: r.thumb } : {}) });
     }
     if (kind === 'image') return c.media({ image: buf, caption });
     if (kind === 'audio') {
@@ -876,8 +1061,26 @@ async function viaYtdlp(c, url, opts) {
             const ext = Object.keys(MIME).find((k) => MIME[k] === alt.type) || (/\.(\w{2,4})(?:\?|$)/.exec(alt.from) || [])[1] || 'mp4';
             return sendBuffer(c, alt.buf, ext, opts?.caption || '');
         }
+        if (/(^|\.)instagram\.com$/.test(hostOf(url)) && kind === 'video') {
+            try { return await igMirrorDownload(c, url, opts?.caption || ''); } catch (e3) {}
+        }
         throw Object.assign(e, { friendly: e.friendly || friendlyDlError(e) });
     }
+}
+// بدائل إنستغرام: مواقع مرآة تعرض الفيديو مباشرة في وسوم og:video
+async function igMirrorDownload(c, url, caption = '') {
+    let u; try { u = new URL(url); } catch (e) { throw new Error('NO_MEDIA'); }
+    for (const host of ['www.kkinstagram.com', 'www.instagramez.com', 'www.vxinstagram.com']) {
+        try {
+            const m = new URL(u.href); m.hostname = host; m.search = '';
+            const r = await http(m.href, { timeout: 20000, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)' } });
+            const mt = metaTags(await r.text());
+            const v = mt['og:video:secure_url'] || mt['og:video:url'] || mt['og:video'];
+            if (!v) continue;
+            return await sendUrlMedia(c, new URL(decodeHtml(v), m.href).href, caption, 'mp4');
+        } catch (e) { /* المرآة التالية */ }
+    }
+    throw new Error('NO_MEDIA');
 }
 async function ogDownload(c, url) {
     const r = await http(url, { timeout: 20000 });
@@ -999,72 +1202,162 @@ async function cmdSearch(c) {
 // ---- ايدت: 3 مقاطع (ايديتات) من تيك توك للشخصية
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const tikAbs = (u) => (u && u.startsWith('/') ? 'https://www.tikwm.com' + u : u);
+const TIK_PAGE_RE = /tiktok\.com\/@([\w.\-]+)\/video\/(\d{15,22})/i;
+const logErr = (tag, e) => console.error(`[${tag}]`, String(e?.message || e).slice(0, 160));
 
-async function tiktokSearchVideos(q) {
-    const body = new URLSearchParams({ keywords: q, count: '20', cursor: '0', web: '1', hd: '1' });
-    const j = await httpJson('https://www.tikwm.com/api/feed/search', {
-        method: 'POST', body, timeout: 30000,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
-    });
-    return (j?.code === 0 && Array.isArray(j?.data?.videos)) ? j.data.videos : [];
+// يحوّل أي رد JSON من واجهات البحث المختلفة إلى قائمة موحّدة {id, title, author, duration, plays[], page}
+function normalizeTikItems(json) {
+    const out = [];
+    const PLAY_KEYS = ['hdplay', 'play', 'nowm', 'no_watermark', 'nowatermark', 'video', 'video_url', 'videoUrl', 'download', 'dl', 'url'];
+    (function walk(o, depth) {
+        if (!o || typeof o !== 'object' || depth > 7 || out.length >= 60) return;
+        if (Array.isArray(o)) { o.forEach((x) => walk(x, depth + 1)); return; }
+        const plays = [];
+        let page = null;
+        for (const k of PLAY_KEYS) {
+            const v = o[k];
+            if (typeof v !== 'string') continue;
+            if (TIK_PAGE_RE.test(v)) { page = page || v; continue; }
+            const u = tikAbs(v);
+            if (/^https?:\/\//.test(u) && /(\.mp4|tikwm|tiktokcdn|tiktokv|byteoversea|musical|video)/i.test(u)) plays.push(u);
+        }
+        for (const v of Object.values(o)) if (!page && typeof v === 'string' && TIK_PAGE_RE.test(v)) page = TIK_PAGE_RE.exec(v)[0].replace(/^/, 'https://www.');
+        if (plays.length || page) {
+            const author = o.author && typeof o.author === 'object' ? (o.author.nickname || o.author.unique_id || '') : (o.author || o.nickname || o.username || '');
+            out.push({
+                id: String(o.video_id || o.aweme_id || o.id || (page && TIK_PAGE_RE.exec(page)?.[2]) || plays[0]),
+                title: String(o.title || o.desc || o.description || ''), author: String(author || ''),
+                duration: Number(o.duration) || 0, plays: [...new Set(plays)], page, plays_count: Number(o.play_count || o.digg_count || 0) || 0
+            });
+            return;
+        }
+        for (const v of Object.values(o)) walk(v, depth + 1);
+    })(json, 0);
+    return out;
 }
 
-// احتياط: بحث عام عن روابط تيك توك ثم جلب كل رابط
-async function tiktokLinksViaWeb(q) {
-    const r = await http('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:tiktok.com ${q}`), { timeout: 20000 });
-    const html = await r.text();
-    const links = [];
-    for (const m of html.matchAll(/class="result__a"[^>]*href="([^"]+)"/g)) {
-        let href = decodeHtml(m[1]);
-        const u = /uddg=([^&]+)/.exec(href);
-        if (u) href = decodeURIComponent(u[1]);
-        if (/tiktok\.com\/@[^/]+\/video\/\d+/.test(href) && !links.includes(href)) links.push(href);
-        if (links.length >= 6) break;
+async function tikwmSearch(host, q) {
+    const body = new URLSearchParams({ keywords: q, count: '20', cursor: '0', web: '1', hd: '1' });
+    for (let i = 0; i < 2; i++) {
+        const j = await httpJson(`https://${host}/api/feed/search`, {
+            method: 'POST', body, timeout: 15000,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Referer': `https://${host}/` }
+        });
+        if (j?.code === 0 && Array.isArray(j?.data?.videos)) return normalizeTikItems(j.data.videos);
+        if (/limit/i.test(String(j?.msg || ''))) { await sleep(1300); continue; }   // حد الطلبات: ثانية واحدة بين الطلبات
+        break;
     }
-    return links;
+    return [];
+}
+
+// روابط تيك توك عبر محركات البحث العامة (احتياط)
+async function tiktokLinksViaWeb(q) {
+    const links = [];
+    const add = (u) => { const m = TIK_PAGE_RE.exec(u || ''); if (m) { const l = `https://www.tiktok.com/@${m[1]}/video/${m[2]}`; if (!links.includes(l)) links.push(l); } };
+    try {
+        const r = await http('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(`site:tiktok.com ${q}`), { timeout: 20000 });
+        const html = await r.text();
+        for (const m of html.matchAll(/class="result__a"[^>]*href="([^"]+)"/g)) {
+            let href = decodeHtml(m[1]);
+            const u = /uddg=([^&]+)/.exec(href);
+            if (u) href = decodeURIComponent(u[1]);
+            add(href);
+        }
+    } catch (e) { logErr('ddg', e); }
+    if (links.length < 4) {
+        try {
+            const r = await http('https://www.bing.com/search?setlang=en&q=' + encodeURIComponent(`site:tiktok.com/@ "${q}" video`), { timeout: 20000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+            const html = (await r.text()).replace(/&#8250;|&rsaquo;|›/g, '/').replace(/\s+/g, '');
+            for (const m of html.matchAll(/tiktok\.com\/@([\w.\-]+)\/video\/(\d{15,22})/g)) add(m[0]);
+            const raw = await (await http('https://www.bing.com/search?setlang=en&q=' + encodeURIComponent(`site:tiktok.com/@ "${q}" video`), { timeout: 20000 })).text();
+            for (const m of raw.matchAll(/[?&]u=a1([A-Za-z0-9_\-]+)/g)) {
+                try { add(Buffer.from(m[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch (e) {}
+            }
+        } catch (e) { logErr('bing', e); }
+    }
+    return links.slice(0, 10).map((page) => ({ id: TIK_PAGE_RE.exec(page)[2], title: '', author: TIK_PAGE_RE.exec(page)[1], duration: 0, plays: [], page, plays_count: 0 }));
+}
+
+// بحث تيك توك: يجرّب عدة خدمات بالترتيب حتى تعطي نتائج
+async function tiktokSearchAny(q) {
+    const backends = [
+        ['tikwm', () => tikwmSearch('www.tikwm.com', q)],
+        ['tikwm2', () => tikwmSearch('tikwm.com', q)],
+        ...[
+            `https://api.siputzx.my.id/api/s/tiktok?query=${encodeURIComponent(q)}`,
+            `https://api.ryzendesu.vip/api/search/tiktok?query=${encodeURIComponent(q)}`,
+            `https://api.vreden.my.id/api/ttsearch?query=${encodeURIComponent(q)}`,
+            `https://api.agatz.xyz/api/tiktoksearch?message=${encodeURIComponent(q)}`
+        ].map((u) => [hostOf(u), async () => normalizeTikItems(await httpJson(u, { timeout: 15000 }))])
+    ];
+    for (const [name, fn] of backends) {
+        try { const r = await fn(); if (r.length) return r; } catch (e) { logErr('بحث تيك:' + name, e); }
+    }
+    return [];
+}
+
+// يرسل مقطعاً واحداً: روابط التشغيل المباشرة أولاً ثم صفحة المقطع (tikwm ثم yt-dlp)
+async function sendTikCandidate(c, cand, cap) {
+    for (const u of cand.plays) {
+        try { await sendUrlMedia(c, u, cap, 'mp4'); return true; } catch (e) { logErr('ايدت-تشغيل', e); }
+    }
+    if (cand.page) {
+        try {
+            await sleep(1100);
+            const j = await httpJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(cand.page), { timeout: 30000 });
+            const d = j?.data; const vu = tikAbs(d?.hdplay || d?.play);
+            if (j?.code === 0 && vu && !(d.images && d.images.length)) { await sendUrlMedia(c, vu, cap, 'mp4'); return true; }
+        } catch (e) { logErr('ايدت-tikwm', e); }
+        try { await sendFiles(c, await ytdlpDownload(cand.page, {}), cap); return true; } catch (e) { logErr('ايدت-ytdlp', e); }
+    }
+    return false;
 }
 
 async function cmdEdit(c) {
     const name = c.args.trim() || quotedText(c).trim();
     if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر، مثال: `.ايدت ايرين` أو `.ايدت غوجو`');
-    const q = `${name} edit`;
-    const tokens = name.toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
-    let videos = [];
-    try { videos = await tiktokSearchVideos(q); } catch (e) { videos = []; }
-    videos = videos.filter((v) => (v.hdplay || v.play) && (!v.duration || v.duration <= 120));
-    // المقاطع التي يحوي عنوانها اسم الشخصية أولاً
-    videos.sort((a, b) => {
-        const sa = tokens.some((t) => (a.title || '').toLowerCase().includes(t)) ? 0 : 1;
-        const sb = tokens.some((t) => (b.title || '').toLowerCase().includes(t)) ? 0 : 1;
-        return sa - sb;
-    });
-    let sent = 0;
-    for (const v of videos) {
-        if (sent >= 3) break;
-        try {
-            const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author?.nickname || v.author?.unique_id || ''}`.trim();
-            await sendUrlMedia(c, tikAbs(v.hdplay || v.play), cap, 'mp4');
-            sent++;
-        } catch (e) { /* ننتقل للمقطع التالي */ }
-    }
-    if (sent < 3) {
-        let links = [];
-        try { links = await tiktokLinksViaWeb(q); } catch (e) {}
-        for (const link of links) {
-            if (sent >= 3) break;
-            try {
-                await sleep(1200);
-                const j = await httpJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(link), { timeout: 30000 });
-                const d = j?.data;
-                const vu = tikAbs(d?.hdplay || d?.play);
-                if (j?.code === 0 && vu && !(d.images && d.images.length)) {
-                    await sendUrlMedia(c, vu, `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${d.author?.nickname || ''}`.trim(), 'mp4');
-                    sent++;
-                }
-            } catch (e) { /* تجاهل */ }
+    const en = (await toEnglishName(name)).trim();
+    const tokens = nameTokens(en, name);
+    const queries = [...new Set([`${en} edit`, `${en} edit tiktok`, `${en} amv edit`, `${en} edits 4k`, `${en} capcut edit`, hasArabic(name) ? `${name} ايدت` : ''].filter(Boolean))];
+
+    // 1) نجمع مرشّحين من البحث
+    let cands = [];
+    const seen = new Set();
+    let misses = 0;
+    for (let i = 0; i < queries.length && cands.length < 14 && misses < 2; i++) {
+        if (i) await sleep(1200);
+        const found = await tiktokSearchAny(queries[i]);
+        if (!found.length) misses++;
+        for (const v of found) {
+            const key = v.id || v.page || v.plays[0];
+            if (seen.has(key)) continue;
+            seen.add(key); cands.push(v);
         }
     }
-    if (!sent) return c.reply(`❌ لم أجد ايديتات لـ (${name}).\nجرّب كتابة الاسم بالإنجليزية أو بشكل آخر.`);
+    if (cands.length < 3) {
+        try { for (const v of await tiktokLinksViaWeb(`${en} edit`)) { const k = v.id; if (!seen.has(k)) { seen.add(k); cands.push(v); } } } catch (e) { logErr('ويب', e); }
+    }
+    // 2) الأنسب أولاً: العنوان يحوي اسم الشخصية + مدة معقولة
+    const rel = (v) => {
+        const t = `${v.title} ${v.author}`.toLowerCase();
+        let sc = tokens.some((x) => t.includes(x)) ? 0 : 2;
+        if (v.duration && (v.duration > 120 || v.duration < 4)) sc += 3;
+        return sc;
+    };
+    cands = cands.map((v, i) => ({ v, i })).sort((a, b) => rel(a.v) - rel(b.v) || a.i - b.i).map((x) => x.v);
+
+    // 3) نرسل 3 مقاطع، ونتجاوز أي مقطع يفشل
+    let sent = 0;
+    for (const v of cands) {
+        if (sent >= 3) break;
+        const cap = `🎞️ ايدت ${name} (${sent + 1}/3)\n👤 ${v.author || ''}`.trim();
+        if (await sendTikCandidate(c, v, cap)) sent++;
+        c.prog?.set(10 + sent * 28);
+    }
+    if (!sent) {
+        console.error(`ايدت: لا نتائج لـ (${name}) | الإنجليزي: ${en} | المرشحون: ${cands.length}`);
+        return c.reply(`❌ لم أجد ايديتات لـ (${name}).\nجرّب كتابة الاسم بالإنجليزية أو بشكل آخر.`);
+    }
 }
 
 // ---- فويس: يجلب الصوت حسب الاسم (يوتيوب ثم ساوند كلاود) ويرسله كرسالة صوتية
