@@ -603,8 +603,7 @@ if (isGroup && !isFromMe && !isSenderDev) {
 }    
 
 const rawBody = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId || getButtonId(msg.message) || '';
-// زر «القائمة الرئيسية» يصل أحياناً كنص عادي، فنحوّله إلى أمر .بوت
-const body = /^🏠?\s*القائمة الرئيسية$/.test(rawBody.trim()) ? '.بوت' : rawBody;    
+const body = rawBody;    
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
