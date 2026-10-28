@@ -173,15 +173,6 @@ async function sendBotMessage(sock, jid, content, options = {}) {
         finalContent = { ...content };
     }
 
-    finalContent.buttons = [
-        {
-            buttonId: 'channel_btn',
-            buttonText: { displayText: 'عرض القناة' },
-            type: 1,
-            url: BOT_CHANNEL_URL
-        }
-    ];
-
     return await sock.sendMessage(jid, {
         ...finalContent,
         ...options
@@ -357,6 +348,50 @@ function cleanTextForComparison(str) {
 let isPairingRequested = false;
 let lastPairingAt = 0;
 
+// ===== جعل كل رسائل البوت معاد توجيهها من القناة =====
+const CHANNEL_INVITE_CODE = '0029Vb8jc2PFHWq9IwKDk50d';
+const CHANNEL_FWD_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
+let channelFwdInfo = null;
+let channelFwdPromise = null;
+function getChannelFwdInfo(sock) {
+    if (channelFwdInfo) return Promise.resolve(channelFwdInfo);
+    if (!channelFwdPromise) {
+        channelFwdPromise = (async () => {
+            try {
+                const meta = await sock.newsletterMetadata('invite', CHANNEL_INVITE_CODE);
+                if (meta?.id) channelFwdInfo = { newsletterJid: meta.id, newsletterName: CHANNEL_FWD_NAME };
+            } catch (e) {}
+            channelFwdPromise = null;
+            return channelFwdInfo;
+        })();
+    }
+    return channelFwdPromise;
+}
+const NO_FWD_KEYS = ['react', 'delete', 'forward', 'edit', 'pin', 'poll', 'disappearingMessagesInMessage'];
+function enableChannelForward(sock) {
+    const origSend = sock.sendMessage.bind(sock);
+    sock.sendMessage = async (jid, content, options) => {
+        try {
+            if (content && typeof content === 'object' && typeof jid === 'string' && !jid.endsWith('@newsletter') && jid !== 'status@broadcast' && !NO_FWD_KEYS.some(k => k in content)) {
+                const ch = channelFwdInfo || await Promise.race([getChannelFwdInfo(sock), new Promise(r => setTimeout(() => r(null), 2500))]);
+                if (ch) {
+                    content = {
+                        ...content,
+                        contextInfo: {
+                            ...(content.contextInfo || {}),
+                            isForwarded: true,
+                            forwardingScore: 1,
+                            forwardedNewsletterMessageInfo: { newsletterJid: ch.newsletterJid, newsletterName: ch.newsletterName, serverMessageId: 100 + Math.floor(Math.random() * 900) }
+                        }
+                    };
+                }
+            }
+        } catch (e) {}
+        return origSend(jid, content, options);
+    };
+    sock.ev.on('connection.update', ({ connection }) => { if (connection === 'open') getChannelFwdInfo(sock); });
+}
+
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 const { version } = await fetchLatestBaileysVersion();
@@ -372,6 +407,7 @@ shouldSyncHistoryMessage: () => false,
 markOnlineOnConnect: true
 });
 
+enableChannelForward(sock);
 sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
@@ -491,7 +527,7 @@ if (action === 'add' && settings.welcome) {
 } catch (e) {}
 });
 
-sock.ev.on('messages.upsert', async (m) => {
+const onUpsert = async (m) => {
 if (!['notify', 'append'].includes(m.type)) return;
 
 const msg = m.messages[0];     
@@ -2257,6 +2293,12 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
     return sendBotMessage(sock, from, { text: rewardText, mentions: [sender] });
 }
 
+};
+
+// معالجة كل الرسائل الواصلة معاً (واتساب قد يرسل عدة رسائل في دفعة واحدة) وبشكل متوازٍ
+sock.ev.on('messages.upsert', (m) => {
+    if (!m.messages || m.messages.length <= 1) { onUpsert(m).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e)); return; }
+    for (const one of m.messages) onUpsert({ ...m, messages: [one] }).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e));
 });
 
 }
