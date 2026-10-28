@@ -148,7 +148,22 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
 
     // تحديد الرقم: العضو العادي رقمه فقط، والمطور يقدر يكتب رقماً
     const argNum = cmd.split(' ').slice(1).join('').replace(/[^0-9]/g, '');
-    const senderNum = sender.endsWith('@s.whatsapp.net') ? sender.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
+    // رقم صاحب الطلب: من المعرّف المباشر، وإن كان @lid (مجموعات/حسابات جديدة) نأخذ رقمه الحقيقي من بيانات الرسالة
+    const pnOf = (j) => (typeof j === 'string' && j.endsWith('@s.whatsapp.net')) ? j.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
+    let senderNum = pnOf(sender);
+    if (!senderNum) {
+        const k = msg.key || {};
+        for (const j of [k.participantPn, k.participantAlt, k.senderPn, k.remoteJidAlt, msg.participant_pn]) {
+            senderNum = pnOf(j);
+            if (senderNum) break;
+        }
+    }
+    if (!senderNum) {
+        try {
+            const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(sender);
+            senderNum = pnOf(pn) || String(pn || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+        } catch (e) {}
+    }
     let number = argNum;
     if (senderNum && (!isDev || !argNum)) number = senderNum;
 
