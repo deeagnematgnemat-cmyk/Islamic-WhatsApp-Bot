@@ -203,13 +203,30 @@ const URL_RE = /https?:\/\/[^\s<>"'،]+/i;
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return ''; } };
 
 async function http(url, opts = {}) {
-    const res = await fetch(url, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(opts.timeout || 30000),
-        ...opts,
-        headers: { 'User-Agent': UA, ...(opts.headers || {}) }
-    });
-    return res;
+    const tmo = opts.timeout || 30000;
+    const attempts = tmo <= 30000 ? 3 : 1;   // طلبات البحث/API القصيرة تُعاد تلقائياً، أما التنزيلات الكبيرة فمرة واحدة
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const res = await fetch(url, {
+                redirect: 'follow',
+                signal: AbortSignal.timeout(tmo),
+                ...opts,
+                // من المحاولة الثانية: اتصال جديد (يتجاوز اتصالاً قديماً ميتاً كان يسبب فشل الطلب الثاني)
+                headers: { 'User-Agent': UA, ...(opts.headers || {}), ...(i ? { Connection: 'close' } : {}) }
+            });
+            if (i < attempts - 1 && (res.status === 429 || (res.status >= 502 && res.status <= 504))) {
+                await new Promise((r) => setTimeout(r, 900 * (i + 1)));
+                continue;
+            }
+            return res;
+        } catch (e) {
+            lastErr = e;
+            if (e?.name === 'TimeoutError' || i === attempts - 1) break;
+            await new Promise((r) => setTimeout(r, 700 * (i + 1)));
+        }
+    }
+    throw lastErr;
 }
 async function httpJson(url, opts) {
     const res = await http(url, opts);
@@ -522,7 +539,17 @@ async function cmdImageEdit(c, op) {
 const decodeHtml = (s) => (s || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
 // البحث في Sticker.ly مباشرة (يعطي الاسم والعدد وصور الملصقات)
+const PACK_SEARCH_CACHE = new Map();
 async function stickerlyPacks(q) {
+    let r = [];
+    for (let i = 0; i < 2 && !r.length; i++) {
+        if (i) await sleep(1500);
+        try { r = await stickerlyPacksRaw(q); } catch (e) { logErr('ستيكرلي-بحث', e); }
+    }
+    if (r.length) { PACK_SEARCH_CACHE.set(q, r); return r; }
+    return PACK_SEARCH_CACHE.get(q) || [];   // فشل الخادم الآن: نستخدم آخر نتيجة ناجحة لنفس البحث
+}
+async function stickerlyPacksRaw(q) {
     const j = await httpJson('https://api.sticker.ly/v4/stickerPack/smartSearch', {
         method: 'POST', timeout: 20000,
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'androidapp.stickerly/1.17.0 (Pixel 7; U; Android 33; en-US; US)' },
@@ -656,16 +683,19 @@ async function cmdPack(c) {
     const en = (await toEnglishName(q)).trim();
     const tokens = nameTokens(en, q);
 
-    // 1) البحث (بالإنجليزية أولاً لأنها أدق) ودمج النتائج بلا تكرار
+    // 1) البحث (بالإنجليزية أولاً لأنها أدق) ودمج النتائج بلا تكرار؛ جولتان قبل الاستسلام
     let packs = [];
     const seen = new Set();
-    for (const query of [...new Set([en, `${en} sticker`, q])]) {
-        let r = [];
-        try { r = await stickerlyPacks(query); } catch (e) { logErr('ستيكرلي-بحث', e); }
-        for (const p of r) { const k = p.id || p.link; if (!seen.has(k)) { seen.add(k); packs.push(p); } }
-        if (packs.length >= 8) break;
+    for (let round = 0; round < 2 && !packs.length; round++) {
+        if (round) await sleep(2500);
+        for (const query of [...new Set([en, `${en} sticker`, q])]) {
+            let r = [];
+            try { r = await stickerlyPacks(query); } catch (e) { logErr('ستيكرلي-بحث', e); }
+            for (const p of r) { const k = p.id || p.link; if (!seen.has(k)) { seen.add(k); packs.push(p); } }
+            if (packs.length >= 8) break;
+        }
+        if (!packs.length) { try { packs = await legacyPacks(en); } catch (e) { packs = []; } }
     }
-    if (!packs.length) { try { packs = await legacyPacks(en); } catch (e) { packs = []; } }
     if (!packs.length) return c.reply(`❌ لم أعثر على حزمة ملصقات مناسبة لـ (${q}).\nجرّب اسماً آخر أو بالإنجليزية.`);
     const rel = (p) => (tokens.some((x) => `${p.title} ${p.author}`.toLowerCase().includes(x)) ? 0 : 1);
     packs = packs.map((p, i) => ({ p, i })).sort((a, b) => rel(a.p) - rel(b.p) || Number(a.p.animated) - Number(b.p.animated) || a.i - b.i).map((x) => x.p);
