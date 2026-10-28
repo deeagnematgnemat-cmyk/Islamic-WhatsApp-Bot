@@ -99,7 +99,7 @@ export function getButtonId(message) {
 
 // ===== أزرار تحت كل قسم: [قائمة الأقسام] [القائمة الرئيسية] =====
 const SECTION_NAV_BUTTONS = () => [
-    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '📋 قائمة الأقسام', id: '.قائمة_الاقسام' }) },
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '📋 قائمة الأقسام', sections: SECTIONS }) },
     { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '🏠 القائمة الرئيسية', id: '.بوت' }) }
 ];
 
