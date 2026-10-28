@@ -233,9 +233,8 @@ async function cmdSteal(c) {
     const t = getTarget(c, ['stickerMessage']);
     if (!t) return c.reply('📌 رد على ملصق بالأمر `.سرقة` أو `.سرقة اسم_الحزمة`');
     const buf = await download(c, t);
-    const pack = c.args || PACK;
-    const author = c.msg.pushName || AUTHOR;
-    await c.media({ sticker: await makeSticker(buf, StickerTypes.DEFAULT, { pack, author, quality: 80 }) });
+    const rights = c.args || c.msg.pushName || String(c.sender || '').split('@')[0].split(':')[0];
+    await c.media({ sticker: await makeSticker(buf, StickerTypes.DEFAULT, { pack: rights, author: rights, quality: 80 }) });
 }
 
 async function cmdToImage(c) {
@@ -786,7 +785,6 @@ const COOLDOWN = new Map();
 const HEAVY = new Set(['تيك', 'انستا', 'فيس', 'يوتيوب', 'صوت', 'فيديو', 'صورة', 'بنترست', 'تويتر', 'سناب', 'ثريدز', 'تلي', 'بحث', 'ميديا',
     'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود', 'حزمة', 'لرابط']);
 let running = 0;
-const MAX_RUNNING = 3;
 
 async function sendSection(c, text) {
     let pp;
@@ -855,7 +853,6 @@ export async function handleFeatureCommand(ctx) {
     if (HEAVY.has(name)) {
         const last = COOLDOWN.get(ctx.sender) || 0;
         if (Date.now() - last < 4000) { await c.reply('⏳ انتظر بضع ثوانٍ قبل الأمر التالي.'); return true; }
-        if (running >= MAX_RUNNING) { await c.reply('⏳ البوت مشغول بطلبات أخرى، حاول بعد قليل.'); return true; }
         COOLDOWN.set(ctx.sender, Date.now());
     }
 
