@@ -42,7 +42,15 @@ const BUTTONS = () => [
     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '🌐 جروب التنصيب', url: INSTALL_GROUP_URL, merchant_url: INSTALL_GROUP_URL }) }
 ];
 
+// مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
+let forwardCtxProvider = null;
+export function setForwardContextProvider(fn) { forwardCtxProvider = fn; }
+
 async function relayInteractive(sock, jid, interactiveMessage) {
+    try {
+        const fwd = forwardCtxProvider ? await forwardCtxProvider(sock) : null;
+        if (fwd) interactiveMessage = { ...interactiveMessage, contextInfo: { ...(interactiveMessage.contextInfo || {}), ...fwd } };
+    } catch (e) {}
     const content = {
         viewOnceMessage: {
             message: {
@@ -87,4 +95,48 @@ export function getButtonId(message) {
     const r = message?.interactiveResponseMessage?.nativeFlowResponseMessage;
     if (!r || !r.paramsJson) return '';
     try { return JSON.parse(r.paramsJson).id || ''; } catch (e) { return ''; }
+}
+
+// ===== أزرار تحت كل قسم: [قائمة الأقسام] [القائمة الرئيسية] =====
+const SECTION_NAV_BUTTONS = () => [
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '📋 قائمة الأقسام', id: '.قائمة_الاقسام' }) },
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '🏠 القائمة الرئيسية', id: '.بوت' }) }
+];
+
+// ترجع true إذا أُرسل القسم مع الزرّين، وfalse إذا فشل (ليُرسل القسم بالطريقة القديمة)
+export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJid) {
+    try {
+        let header = { hasMediaAttachment: false };
+        if (imageUrl) {
+            try {
+                const media = await prepareWAMessageMedia({ image: { url: imageUrl } }, { upload: sock.waUploadToServer });
+                if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+            } catch (e) {}
+        }
+        await relayInteractive(sock, jid, {
+            header,
+            body: { text },
+            ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+            nativeFlowMessage: { buttons: SECTION_NAV_BUTTONS() }
+        });
+        return true;
+    } catch (e) {
+        console.error('تعذر إرسال القسم مع الأزرار:', e?.message || e);
+        return false;
+    }
+}
+
+// يعرض قائمة الأقسام كاملة (زر الأقسام) ومعها زر القائمة الرئيسية
+export async function sendSectionsList(sock, jid, mentionJid) {
+    await relayInteractive(sock, jid, {
+        header: { hasMediaAttachment: false },
+        body: { text: '📋 *قائمة الأقسام*\n\nاضغط على زر «الأقسام» ثم اختر القسم الذي تريده.' },
+        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+        nativeFlowMessage: {
+            buttons: [
+                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
+                { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '🏠 القائمة الرئيسية', id: '.بوت' }) }
+            ]
+        }
+    });
 }
