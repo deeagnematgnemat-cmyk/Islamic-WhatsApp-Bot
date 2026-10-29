@@ -103,7 +103,7 @@ const SECTION_NAV_BUTTONS = () => [
 ];
 
 // ترجع true إذا أُرسل القسم مع الزرّين، وfalse إذا فشل (ليُرسل القسم بالطريقة القديمة)
-export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJid) {
+export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJid, extraButtons = []) {
     try {
         let header = { hasMediaAttachment: false };
         if (imageUrl) {
@@ -116,13 +116,36 @@ export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJ
             header,
             body: { text },
             ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
-            nativeFlowMessage: { buttons: SECTION_NAV_BUTTONS() }
+            nativeFlowMessage: { buttons: [...SECTION_NAV_BUTTONS(), ...extraButtons] }
         });
         return true;
     } catch (e) {
         console.error('تعذر إرسال القسم مع الأزرار:', e?.message || e);
         return false;
     }
+}
+
+// زر «الحماية» تحت قائمة الأقسام: لكل حماية صفّان (تفعيل / تعطيل) وضغطه ينفّذ الأمر مباشرة
+export function protectionButton(settings = {}) {
+    const state = (v) => (v ? '🟢 مفعلة حالياً' : '🔴 معطلة حالياً');
+    const item = (title, on, off, cur) => ({
+        title,
+        rows: [
+            { header: '', title: '✅ تفعيل', description: `${state(cur)} • .${on}`, id: `.${on}` },
+            { header: '', title: '⛔ تعطيل', description: `${state(cur)} • .${off}`, id: `.${off}` }
+        ]
+    });
+    return {
+        name: 'single_select',
+        buttonParamsJson: JSON.stringify({
+            title: '🛡️ الحماية',
+            sections: [
+                item('🔗 حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
+                item('🤬 حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
+                item('📇 حماية جهات الاتصال', 'حظر_جهات', 'سماح_جهات', settings.antiContact)
+            ]
+        })
+    };
 }
 
 // يعرض قائمة الأقسام كاملة (زر الأقسام)
