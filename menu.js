@@ -41,7 +41,7 @@ const SECTIONS = [
 const BUTTONS = () => [
     { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '📢 قناة المطور', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
-    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '🌐 جروب التنصيب', url: INSTALL_GROUP_URL, merchant_url: INSTALL_GROUP_URL }) }
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '👑 المطور', id: '.معلومات_المطور' }) }
 ];
 
 // مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
