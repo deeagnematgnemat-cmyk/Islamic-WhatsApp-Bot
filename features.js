@@ -32,6 +32,10 @@ const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'دائري': ['round'], 'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'ايموجي': ['emoji'],
     'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
+    // الصور
+    'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
+    'بدون_خلفية': ['removebg'], 'تحسين': ['enhance'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
+    'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل (القسم فارغ: لا توجد فيه أوامر)
     'تحميل': [],
     // الذكاء الاصطناعي
@@ -43,7 +47,7 @@ for (const [name, aliases] of Object.entries(COMMANDS)) {
     CANON[norm(name)] = name;
     for (const a of aliases) CANON[norm(a)] = name;
 }
-CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء';
+CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء'; CANON['15'] = 'صور';
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
@@ -70,6 +74,26 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
 
 💡 أرسل الأمر مع الصورة أو رد على صورة/فيديو/ملصق.`;
+
+export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
+
+> 🔎 .صورة [عدد] <بحث> ↞ صورة من الإنترنت
+> 📌 .بنتريست [عدد] <بحث> ↞ مجموعة صور من بنتريست
+> 📱 .خلفية [عدد] <بحث> ↞ خلفيات جوال عالية الجودة
+> 🧑‍🎤 .بروفايل [عدد] <اسم> ↞ صور شخصية (pfp)
+> 🎌 .انمي [اسم] ↞ صورة أنمي عشوائية أو باسم
+> ✂️ .بدون_خلفية ↞ إزالة خلفية الصورة
+> ✨ .تحسين ↞ رفع وضوح الصورة وجودتها
+> 🌫️ .تغبيش [1-60] ↞ تغبيش الصورة
+> ⚫ .ابيض_اسود ↞ تحويل الصورة لأبيض وأسود
+> 🗜️ .ضغط [5-90] ↞ تصغير حجم الصورة
+> 🔄 .صيغة png|jpg|webp ↞ تغيير صيغة الصورة
+> 📖 .قراءة [لغة] ↞ استخراج النص من الصورة
+> 🌐 .ترجمة_صورة [لغة] ↞ ترجمة النص داخل الصورة
+> 👤 .صورتي ↞ صورة حسابك
+> 👥 .صورته @عضو ↞ صورة حساب عضو
+
+💡 أوامر التعديل: أرسل الصورة مع الأمر أو رد على صورة به.`;
 
 export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِيـلِ مِـنَ الـرَّابِـطِ:*
 
@@ -866,6 +890,348 @@ async function cmdCharPack(c) {
     } finally { PACK_BUSY.delete(c.from); }
 }
 
+// ================================================================ قسم الصور
+const IMG_MAX = 8;                                     // أقصى عدد صور في أمر واحد
+const NEED_IMG = '📌 أرسل صورة مع الأمر، أو رد على صورة بالأمر.';
+
+async function sharpOrFail() {
+    const sharp = await getSharp();
+    if (!sharp) { const e = new Error('NO_SHARP'); e.friendly = '❌ مكتبة معالجة الصور (sharp) غير مثبّتة على السيرفر.'; throw e; }
+    return sharp;
+}
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+
+// أي صورة (png/webp/gif/avif...) -> jpeg مناسب للإرسال (الشفافية تصبح خلفية بيضاء)
+async function toJpeg(buf, { maxSide = 2048, quality = 90 } = {}) {
+    const sharp = await sharpOrFail();
+    return await sharp(buf, { failOn: 'none' }).rotate().resize(maxSide, maxSide, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality }).toBuffer();
+}
+
+// ---- البحث عن روابط صور: Pinterest أولاً ثم Bing
+async function pinterestUrls(q) {
+    const urls = [];
+    const add = (u) => { if (u && !urls.includes(u)) urls.push(u); };
+    try {
+        const data = JSON.stringify({ options: { isPrefetch: false, query: q, scope: 'pins', no_fetch_context_on_resource: false }, context: {} });
+        const src = `/search/pins/?q=${encodeURIComponent(q)}&rs=typed`;
+        const j = await httpJson(`https://www.pinterest.com/resource/BaseSearchResource/get/?source_url=${encodeURIComponent(src)}&data=${encodeURIComponent(data)}`, {
+            timeout: 25000,
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Source-Url': src, 'X-Pinterest-AppState': 'active' }
+        });
+        for (const r of (j?.resource_response?.data?.results || [])) add(r?.images?.orig?.url || r?.images?.['736x']?.url);
+    } catch (e) { logErr('صور-pinterest', e); }
+    if (!urls.length) {
+        try {   // بديل: روابط الصور من صفحة البحث نفسها
+            const html = await (await http(`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(q)}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).text();
+            for (const m of html.matchAll(/https:\/\/i\.pinimg\.com\/(?:236x|474x|564x|736x|originals)\/[0-9a-f/]+\.(?:jpg|png|webp)/g)) add(m[0].replace(/\/(236x|474x|564x)\//, '/736x/'));
+        } catch (e) { logErr('صور-pinterest-صفحة', e); }
+    }
+    return urls;
+}
+async function bingUrls(q, aspect) {
+    const urls = [];
+    try {
+        const qft = '+filterui:imagesize-large' + (aspect ? `+filterui:aspect-${aspect}` : '');
+        const res = await http(`https://www.bing.com/images/async?q=${encodeURIComponent(q)}&first=0&count=50&mmasync=1&adlt=strict&qft=${encodeURIComponent(qft)}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const html = await res.text();
+        for (const m of html.matchAll(/murl&quot;:&quot;(https?:.+?)&quot;/g)) {
+            const u = m[1].replace(/&amp;/g, '&');
+            if (/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !urls.includes(u)) urls.push(u);
+        }
+    } catch (e) { logErr('صور-bing', e); }
+    return urls;
+}
+async function findImageUrls(queries, want, aspect) {
+    const urls = [], seen = new Set();
+    const add = (list) => { for (const u of list) if (!seen.has(u)) { seen.add(u); urls.push(u); } };
+    for (const q of queries) {
+        add(await pinterestUrls(q));
+        if (urls.length < want * 4) add(await bingUrls(q, aspect));
+        if (urls.length >= want * 4) break;
+    }
+    return urls;
+}
+
+// ---- تنزيل الصور مع التنقية: تالفة/صغيرة/مكررة/شكل غير مناسب تُتجاهل
+// orient: 'tall' للخلفيات، 'square' للصور الشخصية، وإلا أي شكل
+async function fetchImages(urls, count, { orient, minSide = 400, maxSide = 2048 } = {}) {
+    const sharp = await sharpOrFail();
+    const out = [], hashes = [];
+    for (let i = 0; i < urls.length && out.length < count; i += 8) {
+        const got = await mapLimit(urls.slice(i, i + 8), 8, async (u) => {
+            const { buf, type } = await httpBuffer(u, 15 * 1024 * 1024, { timeout: 20000, headers: { Referer: new URL(u).origin + '/' } });
+            if (type && !/^image\//.test(type)) return null;
+            const meta = await sharp(buf, { failOn: 'none' }).metadata();   // يفشل مع التالف فتُتجاهل
+            if (!meta.width || !meta.height || Math.min(meta.width, meta.height) < minSide) return null;
+            const hw = meta.height / meta.width;
+            if (orient === 'tall' && hw < 1.5) return null;
+            if (orient === 'square' && (hw < 0.8 || hw > 1.25)) return null;
+            if (!orient && (hw > 3 || hw < 0.33)) return null;
+            return { jpg: await toJpeg(buf, { maxSide }), h: await hashOf(sharp, buf) };
+        });
+        for (const g of got) {
+            if (!g || out.length >= count) continue;
+            if (hashes.some((h) => h.reduce((n, v, k) => n + (v !== g.h[k] ? 1 : 0), 0) <= 5)) continue;
+            out.push(g.jpg); hashes.push(g.h);
+        }
+    }
+    return out;
+}
+
+// الكلمات العربية تُترجم للإنجليزية (نتائج أفضل) مع إبقاء الأصل كاحتياط
+async function searchTerms(text) {
+    const terms = [text];
+    if (/[\u0600-\u06FF]/.test(text)) {
+        try { const en = (await gtranslate(text, 'en')).text.trim(); if (en && en.toLowerCase() !== text.toLowerCase()) terms.unshift(en); } catch (e) { /* نكمل بالأصل */ }
+    }
+    return terms;
+}
+
+async function sendImages(c, images, caption) {
+    let sent = 0;
+    for (let i = 0; i < images.length; i++) {
+        try { await c.media({ image: images[i], ...(i === 0 && caption ? { caption } : {}) }); sent++; } catch (e) { logErr('صور-إرسال', e); }
+        if (i < images.length - 1) await sleep(700);
+    }
+    return sent;
+}
+
+const IMG_KINDS = {
+    'صورة':    { def: 1, orient: undefined, aspect: '',       q: (t) => [t],                                   title: 'صورة' },
+    'بنتريست': { def: 6, orient: undefined, aspect: '',       q: (t) => [t, `${t} aesthetic`],                 title: 'بنتريست' },
+    'خلفية':   { def: 3, orient: 'tall',    aspect: 'tall',   q: (t) => [`${t} wallpaper`, `${t} phone wallpaper hd`], title: 'خلفية' },
+    'بروفايل': { def: 4, orient: 'square',  aspect: 'square', q: (t) => [`${t} pfp`, `${t} icon`, `${t} aesthetic`],   title: 'بروفايل' }
+};
+async function cmdImageSearch(c, kind) {
+    const k = IMG_KINDS[kind];
+    let arg = c.args.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).trim(), count = k.def;
+    const m = /^(\d{1,2})\s+(.+)$/.exec(arg);
+    if (m) { count = Math.min(IMG_MAX, Math.max(1, parseInt(m[1], 10))); arg = m[2].trim(); }
+    if (!arg) return c.reply(`📌 اكتب ما تريد البحث عنه.\nمثال: \`.${kind} ${kind === 'بروفايل' ? 'ايرين' : kind === 'خلفية' ? 'سيارات' : 'قطط'}\` أو \`.${kind} 5 ${kind === 'بروفايل' ? 'ايرين' : 'قطط'}\``);
+    arg = arg.slice(0, 80);
+    await c.reply(`🔎 جاري البحث عن (${arg})...`);
+    const terms = await searchTerms(arg);
+    const queries = terms.flatMap((t) => k.q(t));
+    const urls = await findImageUrls(queries, count, k.aspect);
+    let images = urls.length ? await fetchImages(urls, count, { orient: k.orient, maxSide: kind === 'خلفية' ? 2560 : 2048 }) : [];
+    if (!images.length && k.orient && urls.length) images = await fetchImages(urls, count, { maxSide: 2048 });   // احتياط: نخفف شرط الشكل
+    console.error(`[صور] ${kind} (${terms.join(' | ')}): ${urls.length} رابط -> ${images.length} صورة`);
+    if (!images.length) return c.reply(`❌ لم أجد صوراً مناسبة لـ (${arg}). جرّب كلمة أخرى أو اكتبها بالإنجليزية.`);
+    await sendImages(c, images, `🖼️ ${k.title}: ${arg}`);
+}
+
+// ---- .انمي : صورة أنمي عشوائية (آمنة SFW) أو بحث باسم
+async function cmdAnimeImg(c) {
+    const arg = c.args.trim().slice(0, 80);
+    if (arg) {
+        const terms = await searchTerms(arg);
+        const urls = await findImageUrls(terms.flatMap((t) => [`${t} anime`, `${t} anime pfp`]), 1);
+        const imgs = urls.length ? await fetchImages(urls, 1) : [];
+        if (!imgs.length) return c.reply(`❌ لم أجد صور أنمي لـ (${arg}).`);
+        return void await sendImages(c, imgs, `🎌 أنمي: ${arg}`);
+    }
+    const cats = ['waifu', 'neko', 'shinobu', 'megumin'];
+    const cat = cats[Math.floor(Math.random() * cats.length)];
+    const apis = [
+        async () => (await httpJson(`https://api.waifu.pics/sfw/${cat}`, { timeout: 20000 })).url,
+        async () => (await httpJson('https://nekos.best/api/v2/neko', { timeout: 20000 })).results?.[0]?.url
+    ];
+    for (const api of apis) {
+        try {
+            const u = await api();
+            if (!u) continue;
+            const { buf } = await httpBuffer(u, 15 * 1024 * 1024, { timeout: 25000 });
+            return void await sendImages(c, [await toJpeg(buf)], '🎌 أنمي عشوائي');
+        } catch (e) { logErr('صور-انمي', e); }
+    }
+    // احتياط أخير: بحث Pinterest
+    const urls = await findImageUrls(['anime pfp', 'anime aesthetic'], 1);
+    const imgs = urls.length ? await fetchImages(urls, 1) : [];
+    if (!imgs.length) return c.reply('❌ تعذر جلب صورة أنمي الآن، حاول لاحقاً.');
+    await sendImages(c, imgs, '🎌 أنمي');
+}
+
+// ---- أدوات التعديل المحلية (sharp): الهدف صورة مرفقة أو مردود عليها
+const IMG_KINDS_IN = ['imageMessage', 'stickerMessage', 'documentMessage'];
+async function getInputImage(c) {
+    const t = getTarget(c, IMG_KINDS_IN);
+    if (!t) { await c.reply(NEED_IMG); return null; }
+    return await download(c, t);
+}
+const numArg = (c, def, min, max) => { const n = parseFloat(String(c.args).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def; };
+
+async function cmdBlur(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const out = await sharp(buf, { failOn: 'none' }).rotate().resize(2048, 2048, { fit: 'inside', withoutEnlargement: true }).blur(numArg(c, 10, 0.5, 60)).flatten({ background: '#ffffff' }).jpeg({ quality: 90 }).toBuffer();
+    await c.media({ image: out, caption: '🌫️ تم التغبيش. (للتحكم: `.تغبيش 30`)' });
+}
+async function cmdBW(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const out = await sharp(buf, { failOn: 'none' }).rotate().resize(2048, 2048, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).greyscale().normalise().jpeg({ quality: 90 }).toBuffer();
+    await c.media({ image: out, caption: '⚫⚪ تم التحويل إلى أبيض وأسود.' });
+}
+async function cmdCompress(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const q = Math.round(numArg(c, 35, 5, 90));
+    const out = await sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: q, mozjpeg: true }).toBuffer();
+    await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'compressed.jpg', caption: `🗜️ الحجم: ${fmtSize(buf.length)} ← ${fmtSize(out.length)} (الجودة ${q}%)\nللتحكم: \`.ضغط 20\`` });
+}
+async function cmdEnhance(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const img = sharp(buf, { failOn: 'none' }).rotate();
+    const meta = await sharp(buf, { failOn: 'none' }).rotate().metadata();
+    const rot = (meta.orientation || 1) >= 5;
+    const w = rot ? meta.height : meta.width, h = rot ? meta.width : meta.height;
+    if (!w || !h) throw new Error('BAD_IMAGE');
+    let f = Math.min(2, 4096 / Math.max(w, h)); if (f < 1.05) f = 1;
+    const out = await img.resize(Math.round(w * f), Math.round(h * f), { kernel: 'lanczos3' }).flatten({ background: '#ffffff' })
+        .modulate({ saturation: 1.1 }).linear(1.04, -3).sharpen({ sigma: 1.1, m1: 1, m2: 2 }).jpeg({ quality: 95 }).toBuffer();
+    await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'enhanced.jpg', caption: `✨ تم تحسين الصورة (${w}×${h} ← ${Math.round(w * f)}×${Math.round(h * f)}).\nأُرسلت كملف للحفاظ على الجودة.` });
+}
+async function cmdFormat(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    let fmt = c.args.trim().toLowerCase().replace(/^\./, '');
+    if (fmt === 'jpeg') fmt = 'jpg';
+    if (!fmt) fmt = 'png';
+    if (!['png', 'jpg', 'webp'].includes(fmt)) return c.reply('📌 الصيغ المتاحة: `png` | `jpg` | `webp`\nمثال: `.صيغة png`');
+    let p = sharp(buf, { failOn: 'none' }).rotate();
+    if (fmt === 'jpg') p = p.flatten({ background: '#ffffff' }).jpeg({ quality: 92 });
+    else if (fmt === 'png') p = p.png();
+    else p = p.webp({ quality: 90 });
+    const out = await p.toBuffer();
+    await c.media({ document: out, mimetype: fmt === 'jpg' ? 'image/jpeg' : `image/${fmt}`, fileName: `image.${fmt}`, caption: `🔄 تم التحويل إلى ${fmt.toUpperCase()} (${fmtSize(out.length)}).` });
+}
+
+// ---- إزالة الخلفية: remove.bg إن وُجد REMOVEBG_API_KEY، وإلا طريقة محلية تنجح مع الخلفيات الموحدة
+// تملأ من الأطراف كل ما يشبه لون الخلفية وتجعله شفافاً. data: RGBA خام. تعيد null إذا لم تكن الخلفية موحدة.
+function floodRemoveBg(data, w, h, tol = 42) {
+    const idx = (x, y) => (y * w + x) * 4;
+    const border = [];
+    for (let x = 0; x < w; x++) { border.push([x, 0], [x, h - 1]); }
+    for (let y = 1; y < h - 1; y++) { border.push([0, y], [w - 1, y]); }
+    let r = 0, g = 0, b = 0;
+    for (const [x, y] of border) { const i = idx(x, y); r += data[i]; g += data[i + 1]; b += data[i + 2]; }
+    r /= border.length; g /= border.length; b /= border.length;
+    const near = (i) => Math.hypot(data[i] - r, data[i + 1] - g, data[i + 2] - b) <= tol;
+    const similar = border.filter(([x, y]) => near(idx(x, y))).length;
+    if (similar / border.length < 0.7) return null;                  // الخلفية غير موحدة
+    const seen = new Uint8Array(w * h), stack = [];
+    for (const [x, y] of border) if (near(idx(x, y)) && !seen[y * w + x]) { seen[y * w + x] = 1; stack.push(y * w + x); }
+    while (stack.length) {
+        const p = stack.pop(), x = p % w, y = (p - (p % w)) / w;
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const q = ny * w + nx;
+            if (!seen[q] && near(q * 4)) { seen[q] = 1; stack.push(q); }
+        }
+    }
+    let removed = 0;
+    for (let p = 0; p < w * h; p++) if (seen[p]) { data[p * 4 + 3] = 0; removed++; }
+    // تنعيم الحواف: البكسلات المجاورة للمحذوف تصبح نصف شفافة
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const p = y * w + x;
+        if (!seen[p] && (seen[p - 1] || seen[p + 1] || seen[p - w] || seen[p + w])) data[p * 4 + 3] = 140;
+    }
+    return removed / (w * h) > 0.02 && removed / (w * h) < 0.97 ? data : null;   // لا شيء حُذف أو حُذف كل شيء = فشل
+}
+async function cmdRemoveBg(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    let png = null;
+    if (process.env.REMOVEBG_API_KEY) {
+        try {
+            const jpg = await toJpeg(buf, { maxSide: 2500, quality: 92 });
+            const form = new FormData();
+            form.append('image_file', new Blob([jpg], { type: 'image/jpeg' }), 'image.jpg');
+            form.append('size', 'auto');
+            const res = await fetch('https://api.remove.bg/v1.0/removebg', { method: 'POST', headers: { 'X-Api-Key': process.env.REMOVEBG_API_KEY }, body: form, signal: AbortSignal.timeout(90000) });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            png = Buffer.from(await res.arrayBuffer());
+        } catch (e) { logErr('صور-removebg', e); }
+    }
+    if (!png) {
+        const { data, info } = await sharp(buf, { failOn: 'none' }).rotate().resize(1400, 1400, { fit: 'inside', withoutEnlargement: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        const res = floodRemoveBg(data, info.width, info.height);
+        if (!res) {
+            const e = new Error('BG_COMPLEX');
+            e.friendly = '⚠️ الخلفية معقدة ولا يمكن إزالتها بالطريقة المحلية (تعمل مع الخلفيات الموحدة اللون).\nللحصول على نتيجة دقيقة مع أي صورة، أضف مفتاح remove.bg المجاني في متغير `REMOVEBG_API_KEY`.';
+            throw e;
+        }
+        png = await sharp(res, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+    }
+    await c.media({ document: png, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (PNG شفاف).' });
+}
+
+// ---- قراءة النص من الصورة (OCR) عبر ocr.space (مفتاح مجاني اختياري OCR_API_KEY)
+const OCR_LANGS = { 'عربي': 'ara', 'العربية': 'ara', 'انجليزي': 'eng', 'إنجليزي': 'eng', 'فرنسي': 'fre', 'الماني': 'ger', 'ألماني': 'ger', 'اسباني': 'spa', 'إسباني': 'spa', 'تركي': 'tur', 'روسي': 'rus', 'ياباني': 'jpn', 'كوري': 'kor', 'صيني': 'chs', 'ايطالي': 'ita', 'إيطالي': 'ita' };
+async function ocrCall(buf, lang, engine) {
+    const sharp = await sharpOrFail();
+    let img = null;
+    for (const [side, q] of [[1800, 80], [1400, 68], [1000, 55]]) {   // الخدمة المجانية تقبل حتى 1MB
+        img = await sharp(buf, { failOn: 'none' }).rotate().resize(side, side, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: q }).toBuffer();
+        if (img.length < 900 * 1024) break;
+    }
+    const body = new URLSearchParams({ base64Image: 'data:image/jpeg;base64,' + img.toString('base64'), language: lang, OCREngine: String(engine), scale: 'true', detectOrientation: 'true', isOverlayRequired: 'false' });
+    const j = await httpJson('https://api.ocr.space/parse/image', {
+        method: 'POST', timeout: 45000, body,
+        headers: { apikey: process.env.OCR_API_KEY || 'helloworld', 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    if (j?.IsErroredOnProcessing) throw new Error('OCR: ' + [].concat(j.ErrorMessage || '').join(' ').slice(0, 100));
+    return (j?.ParsedResults || []).map((r) => r.ParsedText || '').join('\n').replace(/\r/g, '').trim();
+}
+async function readImageText(buf, langWord) {
+    const key = Object.keys(OCR_LANGS).find((k) => norm(k) === norm(langWord || ''));
+    if (key) return await ocrCall(buf, OCR_LANGS[key], 1);
+    let best = '';
+    for (const [lang, engine] of [['ara', 1], ['eng', 2]]) {          // بدون لغة محددة: نجرّب العربية ثم الإنجليزية ونأخذ الأفضل
+        try { const t = await ocrCall(buf, lang, engine); if (t.length > best.length) best = t; } catch (e) { logErr('صور-ocr', e); }
+        if (best.length > 25) break;
+    }
+    return best;
+}
+async function cmdOCR(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const text = await readImageText(buf, c.args.trim().split(/\s+/)[0]);
+    if (!text) return c.reply('❌ لم أستطع قراءة نص من هذه الصورة. جرّب صورة أوضح، أو حدّد اللغة مثل: `.قراءة انجليزي`');
+    await c.reply(`📖 *النص المستخرج:*\n\n${text.slice(0, 3800)}`);
+}
+async function cmdOCRTranslate(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const text = await readImageText(buf, '');
+    if (!text) return c.reply('❌ لم أستطع قراءة نص من هذه الصورة. جرّب صورة أوضح.');
+    const w = c.args.trim().split(/\s+/)[0];
+    const langKey = Object.keys(LANGS).find((k) => norm(k) === norm(w || ''));
+    let tl = langKey ? LANGS[langKey] : '', r;
+    const src = text.slice(0, 3000);
+    r = await gtranslate(src, tl || 'ar');
+    if (!tl && (r.from || '').startsWith('ar')) r = await gtranslate(src, 'en');
+    await c.reply(`🌐 *الترجمة:*\n\n${r.text.slice(0, 3000)}\n\n📖 *النص الأصلي:*\n${text.slice(0, 700)}${text.length > 700 ? '...' : ''}`);
+}
+
+// ---- صور الحسابات: .صورتي / .صورته @عضو
+async function sendAvatar(c, jid, label) {
+    let url = null;
+    try { url = await c.sock.profilePictureUrl(jid, 'image'); } catch (e) { /* لا توجد صورة أو الخصوصية تمنعها */ }
+    if (!url) return c.reply('🚫 لا توجد صورة بروفايل لهذا الحساب، أو أن إعدادات الخصوصية تمنع عرضها.');
+    const { buf } = await httpBuffer(url, 15 * 1024 * 1024, { timeout: 25000 });
+    await c.media({ image: buf, caption: `👤 ${label}` });
+}
+async function cmdMyAvatar(c) { await sendAvatar(c, c.sender, 'صورتك'); }
+async function cmdAvatar(c) {
+    const own = unwrap(c.msg.message);
+    const ci = own?.extendedTextMessage?.contextInfo;
+    let jid = ci?.mentionedJid?.[0] || ci?.participant;
+    if (!jid) { const d = c.args.replace(/[^\d]/g, ''); if (d.length >= 8 && d.length <= 15) jid = d + '@s.whatsapp.net'; }
+    if (!jid) return c.reply('📌 منشن العضو أو رد على رسالته أو اكتب رقمه.\nمثال: `.صورته @العضو`');
+    await sendAvatar(c, jid, 'صورة الحساب');
+}
+
 // ---------------------------------------------------------------- أدوات مساعدة عامة
 // عدّاد تقدم حي: رسالة تُعدَّل كل بضع ثوانٍ من 0% إلى 100% حتى يجهز الطلب
 function makeProgress(c, label) {
@@ -1011,7 +1377,7 @@ async function cmdSummarize(c) {
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['حزمة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -1025,9 +1391,13 @@ async function sendSection(c, text) {
 }
 
 const HANDLERS = {
-    'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'ذكاء': (c) => sendSection(c, AI_SECTION),
+    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
-    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 'لفيديو': cmdToVideo,
+    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
+    'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
+    'انمي': cmdAnimeImg, 'بدون_خلفية': cmdRemoveBg, 'تحسين': cmdEnhance, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
+    'قراءة': cmdOCR, 'ترجمة_صورة': cmdOCRTranslate, 'صورتي': cmdMyAvatar, 'صورته': cmdAvatar,
+    'لفيديو': cmdToVideo,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
