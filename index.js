@@ -144,6 +144,14 @@ process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
 
 const DEVELOPER_NUMBER = '962796163926';
+// ===== حماية أوامر المطور داخل البوتات الفرعية =====
+// البوت الفرعي لا يقبل أوامر المطور إلا من حساب المطور الأساسي أو حساب البوت الرئيسي
+const MAIN_BOT_NUMBER = String(global.botnumber || '962795106901').replace(/[^0-9]/g, '');
+const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات'];
+function isMainAccount(senderJid) {
+const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
+}
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
@@ -239,7 +247,7 @@ const validCommands = [
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت',
+'صفر', 'بوت', 'معلومات_المطور',
 '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
@@ -819,6 +827,9 @@ let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, '
 let cmdBase = cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
+
+// البوت الفرعي: رفض أي أمر خاص بالمطور من غير المطور الأساسي وحساب البوت الرئيسي
+if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender)) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
 
 if (commandReactionEnabled) {    
     try {    
@@ -1830,6 +1841,38 @@ if (cmdBase === 'قائمة_الاقسام') {
     try { await sendSectionsList(sock, from, sender); }
     catch (e) { console.error('تعذر إرسال قائمة الأقسام:', e?.message || e); await sendBotMessage(sock, from, { text: '❌ تعذر عرض قائمة الأقسام، أرسل .بوت وحاول مرة أخرى.' }); }
     return;
+}
+
+if (cmdBase === 'معلومات_المطور') {
+    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ الأَسَـاسِـي ┃ ♛*
+
+*❐═━━━═╊⊰👑⊱╉═━━━═❐*
+
+> «┃ 👑︙صَـانِـعُ هَـذَا الـعَـمَـلِ وَمُـطَـوِّرُهُ،
+> ┃ ✦︙بَـنَـى كُـلَّ تَـفْـصِـيـلَـةٍ بِـشَـغَـفٍ وَإِتْـقَـان،
+> ┃ 🍷︙لِـيَـكُـونَ حُـضُـورُ الـبُـوتِ مُـخْـتَـلِـفاً وَأَثَـرُهُ بَـاقِـيـاً.»
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+> 👤 *الاسم ⇠* 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
+> 📱 *رقم المطور ⇠* +${DEVELOPER_NUMBER}
+> 🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}
+
+*❐═━━━═╊⊰♟️⊱╉═━━━═❐*
+
+📩 *لِلتَّـوَاصُـلِ مَـعَـهُ:*
+> ✦ لِـطَـلَـبِ تَـنْـصِـيـبِ بُـوتٍ خَـاصٍّ بِـكَ
+> ✦ لِـلاسْـتِـفْـسَـارِ أَوِ الـدَّعْـمِ الـفَـنِّـي
+> ✦ لِلاقْـتِـرَاحَـاتِ وَالـمُـلَاحَـظَـات
+
+> تَـوَاصَـلْ مَـعَـهُ مُـبَـاشَـرَةً عَـلَى الـرَّقَـمِ أَعْـلَاهُ ✨
+
+　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
+    try {
+        return await sendBotMessage(sock, from, { video: { url: getBotCommandsVideo() }, gifPlayback: true, mimetype: 'video/mp4', caption: devInfoText });
+    } catch (e) {
+        return sendBotMessage(sock, from, { text: devInfoText });
+    }
 }
 
 if (cmdBase === 'بوت') {    
