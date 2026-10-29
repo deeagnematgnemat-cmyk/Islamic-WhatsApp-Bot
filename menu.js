@@ -207,3 +207,30 @@ export async function sendPackCard(sock, jid, { image, text, url, buttonText = '
         }
     });
 }
+
+// ============ كاروسيل فيديوهات أفقي (كل فيديو في بطاقة) ============
+export async function sendVideoCarousel(sock, jid, cards, { text = '', footer = '' } = {}) {
+    const built = [];
+    for (const card of cards.slice(0, 10)) {
+        try {
+            const media = await prepareWAMessageMedia({ video: card.video }, { upload: sock.waUploadToServer });
+            if (!media || !media.videoMessage) continue;
+            const buttons = card.url
+                ? [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: card.button || '🔗 فتح في تيك توك', url: card.url, merchant_url: card.url }) }]
+                : [{ name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: card.button || '🎬 إيديت', id: '.' }) }];
+            built.push({
+                header: { hasMediaAttachment: true, videoMessage: media.videoMessage },
+                body: { text: card.body || ' ' },
+                footer: { text: card.footer || ' ' },
+                nativeFlowMessage: { buttons }
+            });
+        } catch (e) { console.error('فشل رفع فيديو للبطاقة:', e?.message || e); }
+    }
+    if (built.length < 2) throw new Error('CAROUSEL_TOO_FEW_CARDS');
+    await relayInteractive(sock, jid, {
+        header: { hasMediaAttachment: false },
+        body: { text: text || ' ' },
+        footer: { text: footer || ' ' },
+        carouselMessage: { cards: built, messageVersion: 1 }
+    }, { noForward: true });
+}
