@@ -687,6 +687,12 @@ async function charPackFromStickerly(keywords) {
         } catch (e) { logErr('حزمة-stickerly', e); }
         if (packs.length >= 6) break;
     }
+    // نبقي الحزم المطابقة لاسم الشخصية فقط، وإن لم توجد حزمة مطابقة نترك المصدر التالي يتولى الأمر
+    const toks = keywords.flatMap((k) => k.toLowerCase().split(/\s+/)).filter((t) => t.length >= 3 && !/[\u0600-\u06FF]/.test(t));
+    if (toks.length) {
+        const rel = packs.filter((p) => { const hay = `${p.name || ''} ${p.authorName || ''} ${(p.tags || []).join(' ')}`.toLowerCase(); return toks.some((t) => hay.includes(t)); });
+        packs.length = 0; packs.push(...rel);
+    }
     if (!packs.length) return [];
     // الأفضل أولاً: الحزم الكاملة (30) ثم الأكثر مشاهدة/تصديراً
     packs.sort((a, b) => (Math.min(b.resourceFiles.length, CHAR_PACK_SIZE) - Math.min(a.resourceFiles.length, CHAR_PACK_SIZE)) || ((b.exportCount || b.viewCount || 0) - (a.exportCount || a.viewCount || 0)));
@@ -705,11 +711,43 @@ async function charPackFromStickerly(keywords) {
     return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
 }
 
-// المصدر الاحتياطي: صور من Pinterest تتحول إلى ملصقات
+// ---- مصادر الصور (Pinterest ثم Bing): تنقية الجودة ثم تحويلها إلى ملصقات مربعة
+const hashOf = async (sharp, buf) => {   // بصمة صغيرة لتجاهل الصور المكررة
+    const px = await sharp(buf).resize(8, 8, { fit: 'fill' }).greyscale().raw().toBuffer();
+    const avg = px.reduce((a, b) => a + b, 0) / px.length;
+    return Array.from(px, (v) => (v >= avg ? 1 : 0));
+};
+async function imagesToStickers(urls, title, { minSide = 300 } = {}) {
+    const sharp = await getSharp();
+    if (!sharp) return [];
+    const out = [], hashes = [];
+    for (let i = 0; i < urls.length && out.length < CHAR_PACK_SIZE; i += 8) {
+        const got = await mapLimit(urls.slice(i, i + 8), 8, async (u) => {
+            const { buf, type } = await httpBuffer(u, 8 * 1024 * 1024, { timeout: 15000, headers: { Referer: new URL(u).origin + '/' } });
+            if (type && !/^image\//.test(type)) return null;
+            const meta = await sharp(buf).metadata();                       // يفشل مع الصور التالفة فتُتجاهل
+            if (!meta.width || !meta.height || Math.min(meta.width, meta.height) < minSide) return null;   // صغيرة/ضعيفة
+            const ratio = meta.width / meta.height;
+            if (ratio > 2.2 || ratio < 0.45) return null;                   // بانر أو شريط طويل
+            const square = await sharp(buf).rotate().resize(512, 512, { fit: 'cover', position: 'attention' }).png().toBuffer();
+            return { square, h: await hashOf(sharp, square) };
+        });
+        for (const g of got) {
+            if (!g || out.length >= CHAR_PACK_SIZE) continue;
+            if (hashes.some((h) => h.reduce((n, v, k) => n + (v !== g.h[k] ? 1 : 0), 0) <= 5)) continue;   // مكررة
+            try { out.push(await makeSticker(g.square, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 80 })); hashes.push(g.h); } catch (e) { /* تجاهل */ }
+        }
+    }
+    return out;
+}
+const IMG_QUERIES = (kw) => [`${kw} pfp`, `${kw} aesthetic`, `${kw} icons`, kw];   // صور واضحة ومربعة غالباً
+
+// المصدر الاحتياطي: صور Pinterest عالية الجودة
 async function charPackFromPinterest(keywords, title) {
     const urls = [], seen = new Set();
+    const add = (u) => { if (u && !seen.has(u)) { seen.add(u); urls.push(u); } };
     for (const kw of keywords) {
-        for (const q of [`${kw} sticker`, kw]) {
+        for (const q of IMG_QUERIES(kw)) {
             try {
                 const data = JSON.stringify({ options: { isPrefetch: false, query: q, scope: 'pins', no_fetch_context_on_resource: false }, context: {} });
                 const src = `/search/pins/?q=${encodeURIComponent(q)}&rs=typed`;
@@ -717,30 +755,29 @@ async function charPackFromPinterest(keywords, title) {
                     timeout: 25000,
                     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Source-Url': src, 'X-Pinterest-AppState': 'active' }
                 });
-                for (const r of (j?.resource_response?.data?.results || [])) {
-                    const u = r?.images?.['736x']?.url || r?.images?.orig?.url;
-                    if (u && !seen.has(u)) { seen.add(u); urls.push(u); }
-                }
-            } catch (e) { logErr('حزمة-pinterest', e); }
-            if (urls.length >= CHAR_PACK_SIZE + 10) break;
+                for (const r of (j?.resource_response?.data?.results || [])) add(r?.images?.orig?.url || r?.images?.['736x']?.url);
+            } catch (e) {
+                logErr('حزمة-pinterest', e);
+                // بديل: قراءة روابط الصور من صفحة البحث نفسها
+                try {
+                    const html = await (await http(`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(q)}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).text();
+                    for (const m of html.matchAll(/https:\/\/i\.pinimg\.com\/(?:236x|474x|564x|736x|originals)\/[0-9a-f/]+\.(?:jpg|png|webp)/g)) add(m[0].replace(/\/(236x|474x|564x)\//, '/736x/'));
+                } catch (e2) { logErr('حزمة-pinterest-صفحة', e2); }
+            }
+            if (urls.length >= CHAR_PACK_SIZE * 3) break;
         }
-        if (urls.length >= CHAR_PACK_SIZE + 10) break;
+        if (urls.length >= CHAR_PACK_SIZE * 3) break;
     }
-    if (!urls.length) return [];
-    const got = await mapLimit(urls.slice(0, CHAR_PACK_SIZE + 10), 4, async (u) => {
-        const { buf } = await httpBuffer(u, 8 * 1024 * 1024, { timeout: 30000 });
-        return await makeSticker(buf, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 70 });
-    });
-    return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
+    return urls.length ? await imagesToStickers(urls, title) : [];
 }
 
-// المصدر الثالث: صور Bing (يعمل غالباً من السيرفرات) وتتحول إلى ملصقات
+// المصدر الأخير: صور Bing بجودة كبيرة فقط
 async function charPackFromBing(keywords, title) {
     const urls = [], seen = new Set();
     for (const kw of keywords) {
-        for (const q of [`${kw} sticker`, kw]) {
+        for (const q of IMG_QUERIES(kw)) {
             try {
-                const res = await http(`https://www.bing.com/images/async?q=${encodeURIComponent(q)}&first=0&count=50&mmasync=1&adlt=off`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+                const res = await http(`https://www.bing.com/images/async?q=${encodeURIComponent(q)}&first=0&count=50&mmasync=1&adlt=off&qft=${encodeURIComponent('+filterui:imagesize-large+filterui:photo-photo')}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const html = await res.text();
                 for (const m of html.matchAll(/murl&quot;:&quot;(https?:[^&]+?)&quot;/g)) {
@@ -748,20 +785,11 @@ async function charPackFromBing(keywords, title) {
                     if (/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !seen.has(u)) { seen.add(u); urls.push(u); }
                 }
             } catch (e) { logErr('حزمة-bing', e); }
-            if (urls.length >= CHAR_PACK_SIZE * 2) break;
+            if (urls.length >= CHAR_PACK_SIZE * 3) break;
         }
-        if (urls.length >= CHAR_PACK_SIZE * 2) break;
+        if (urls.length >= CHAR_PACK_SIZE * 3) break;
     }
-    if (!urls.length) return [];
-    const out = [];
-    for (let i = 0; i < urls.length && out.length < CHAR_PACK_SIZE; i += 8) {   // دفعات صغيرة حتى نتوقف عند اكتمال 30
-        const got = await mapLimit(urls.slice(i, i + 8), 8, async (u) => {
-            const { buf } = await httpBuffer(u, 6 * 1024 * 1024, { timeout: 15000 });
-            return await makeSticker(buf, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 70 });
-        });
-        out.push(...got.filter(Boolean));
-    }
-    return out.slice(0, CHAR_PACK_SIZE);
+    return urls.length ? await imagesToStickers(urls, title) : [];
 }
 
 // المصدر الاختياري: حزم تليجرام (يحتاج متغير TELEGRAM_BOT_TOKEN من @BotFather وهو مجاني)
@@ -814,8 +842,8 @@ async function cmdCharPack(c) {
         const SOURCES = [
             ['Sticker.ly', () => charPackFromStickerly(keywords)],
             ['Telegram', () => charPackFromTelegram(keywords, title)],
-            ['Bing', () => charPackFromBing(keywords, title)],
-            ['Pinterest', () => charPackFromPinterest(keywords, title)]
+            ['Pinterest', () => charPackFromPinterest(keywords, title)],
+            ['Bing', () => charPackFromBing(keywords, title)]
         ];
         let stickers = [];
         for (const [label, fn] of SOURCES) {
