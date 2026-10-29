@@ -127,12 +127,13 @@ export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJ
 
 // زر «الحماية» تحت قائمة الأقسام: لكل حماية صفّان (تفعيل / تعطيل) وضغطه ينفّذ الأمر مباشرة
 export function protectionButton(settings = {}) {
+    const dot = (v) => (v ? '🟢' : '🔴');
     const state = (v) => (v ? '🟢 مفعلة حالياً' : '🔴 معطلة حالياً');
-    const item = (title, on, off, cur) => ({
-        title,
+    const item = (icon, label, on, off, cur) => ({
+        title: `${dot(cur)} ${label}`,
         rows: [
-            { header: '', title: '✅ تفعيل', description: `${state(cur)} • .${on}`, id: `.${on}` },
-            { header: '', title: '⛔ تعطيل', description: `${state(cur)} • .${off}`, id: `.${off}` }
+            { header: '', title: `✅ تفعيل ${label}`, description: `${state(cur)} • .${on}`, id: `.${on}` },
+            { header: '', title: `⛔ تعطيل ${label}`, description: `${state(cur)} • .${off}`, id: `.${off}` }
         ]
     });
     return {
@@ -140,9 +141,9 @@ export function protectionButton(settings = {}) {
         buttonParamsJson: JSON.stringify({
             title: '🛡️ الحماية',
             sections: [
-                item('🔗 حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
-                item('🤬 حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
-                item('📇 حماية جهات الاتصال', 'حظر_جهات', 'سماح_جهات', settings.antiContact)
+                item('🔗', 'حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
+                item('🤬', 'حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
+                item('📇', 'حماية الجهات', 'حظر_جهات', 'سماح_جهات', settings.antiContact)
             ]
         })
     };
