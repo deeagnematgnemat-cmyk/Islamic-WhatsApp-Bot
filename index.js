@@ -9,7 +9,7 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand } from './subbot.js';
-import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider } from './menu.js';
+import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 
 const PORT = process.env.PORT || 8080;
@@ -1888,7 +1888,7 @@ if (cmdBase === '1') {
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton(settings)]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: text1, mentions: [sender] });
     }
