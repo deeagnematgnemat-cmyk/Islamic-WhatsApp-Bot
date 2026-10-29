@@ -258,7 +258,6 @@ const validCommands = [
 'نكتة', 'ماذا_لو', 'قول',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
-'ملصق', 's', 'لصورة', 'toimage', 'ملصق_متحرك', 'فيديو_لملصق', 'متحرك_لفيديو', 'ملصق_رابط', 'ملصق_نصي', 'حزمة', 'مساعدة_الملصقات'
 ];
 validCommands.push(...featureCommandNames);
 
@@ -1092,211 +1091,6 @@ if (activeGames[from]) {
         return sendBotMessage(sock, from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` });    
     }    
 }    
-
-if (cmd === 'مساعدة_الملصقات') {
-    const stickerHelpText = `╭━━━〔 🎨 〕━━━╮\n『 قِـسْـمُ الـمَـلْـصَـقَـات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n> 🎨 \`.ملصق\` أو \`.s\` ↞ تحويل الصورة إلى ملصق.\n> 🖼️ \`.لصورة\` ↞ تحويل الملصق إلى صورة.\n> 🔗 \`.ملصق_رابط <الرابط>\` ↞ إنشاء ملصق من رابط صورة مباشر.\n> ✍️ \`.ملصق_نصي <النص>\` ↞ إنشاء ملصق نصي أنيق.\n> 🎞️ \`.ملصق_متحرك\` ↞ إنشاء ملصق متحرك (فيديو/صورة متحركة).\n> 🎬 \`.فيديو_لملصق\` ↞ تحويل فيديو إلى ملصق متحرك.\n> 🎥 \`.متحرك_لفيديو\` ↞ تحويل ملصق متحرك إلى فيديو قابل للتشغيل.\n> 📦 \`.حزمة <اسم الشخصية>\` ↞ جلب حزمة ملصقات للشخصية (ناروتو، إيرين، إيتاتشي...).\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
-    return sendBotMessage(sock, from, { text: stickerHelpText });
-}
-
-if (cmd === 'ملصق' || cmd === 's') {
-    try {
-        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
-        const mime = Object.keys(qMsg)[0];
-        if (!['imageMessage', 'videoMessage', 'documentMessage'].includes(mime)) {
-            return sendBotMessage(sock, from, { text: `📌 يرجى إرسال صورة أو فيديو أو الرد عليها بكلمة \`.ملصق\`` });
-        }
-        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        
-        const sticker = new Sticker(mediaStream, {
-            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: 'Eren Bot',
-            type: StickerTypes.DEFAULT,
-            categories: ['✨', '🍷'],
-            quality: 50
-        });
-        const buffer = await sticker.toBuffer();
-        return sendBotMessage(sock, from, { sticker: buffer }, { quoted: msg });
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `❌ فشل إنشاء الملصق، تأكد من إرسال وسائط صالحة.` });
-    }
-}
-
-if (cmd === 'لصورة' || cmd === 'toimage') {
-    try {
-        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (!qMsg || !qMsg.stickerMessage) {
-            return sendBotMessage(sock, from, { text: `📌 يرجى الرد على ملصق بكلمة \`.لصورة\` لتحويله.` });
-        }
-        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        return sendBotMessage(sock, from, { image: mediaStream, caption: `✨ *تم تحويل الملصق إلى صورة بنجاح!*` }, { quoted: msg });
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `❌ فشل تحويل الملصق إلى صورة.` });
-    }
-}
-
-if (cmd.startsWith('ملصق_رابط')) {
-    const url = trimmedBody.replace(/^\.ملصق_رابط/i, '').trim();
-    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-        return sendBotMessage(sock, from, { text: `📌 الاستخدام الصحيح: \`.ملصق_رابط <رابط الصورة المباشر>\`` });
-    }
-    try {
-        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-        const contentType = response.headers['content-type'] || '';
-        if (!contentType.includes('image')) {
-            return sendBotMessage(sock, from, { text: `❌ الرابط المدخل لا يؤدي إلى صورة مباشرة صالحة!` });
-        }
-        const buffer = Buffer.from(response.data);
-        const sticker = new Sticker(buffer, {
-            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: 'Eren Bot',
-            type: StickerTypes.DEFAULT,
-            quality: 50
-        });
-        const stickerBuffer = await sticker.toBuffer();
-        return sendBotMessage(sock, from, { sticker: stickerBuffer }, { quoted: msg });
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `❌ تعذر جلب الصورة من الرابط، تأكد من أن الرابط مباشر وصالح.` });
-    }
-}
-
-if (cmd.startsWith('ملصق_نصي')) {
-    const textQuery = trimmedBody.replace(/^\.ملصق_نصي/i, '').trim();
-    if (!textQuery) {
-        return sendBotMessage(sock, from, { text: `📌 الاستخدام الصحيح: \`.ملصق_نصي <النص المطلوب>\`` });
-    }
-    try {
-        const imgApiUrl = `https://api.lolhuman.xyz/api/text2image?apikey=gapis&text=${encodeURIComponent(textQuery)}`;
-        const response = await axios.get(imgApiUrl, { responseType: 'arraybuffer', timeout: 15000 });
-        const contentType = response.headers['content-type'] || '';
-        if (!contentType.includes('image')) {
-            return sendBotMessage(sock, from, { text: `❌ فشل توليد صورة النص من الخدمة السحابية.` });
-        }
-        const buffer = Buffer.from(response.data);
-        const sticker = new Sticker(buffer, {
-            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: 'Eren Bot',
-            type: StickerTypes.FULL,
-            quality: 50
-        });
-        const stickerBuffer = await sticker.toBuffer();
-        return sendBotMessage(sock, from, { sticker: stickerBuffer }, { quoted: msg });
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `⚠️ عذراً، تعذر توليد الملصق النصي حالياً. يرجى تجربة نص قصير آخر.` });
-    }
-}
-
-if (cmd === 'ملصق_متحرك' || cmd === 'فيديو_لملصق') {
-    try {
-        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage || msg.message;
-        const mime = Object.keys(qMsg)[0];
-        if (!['videoMessage', 'documentMessage'].includes(mime) && !qMsg.videoMessage) {
-            return sendBotMessage(sock, from, { text: `📌 يرجى إرسال فيديو قصير أو الرد عليه بكلمة \`.ملصق_متحرك\`` });
-        }
-        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        
-        const sticker = new Sticker(mediaStream, {
-            pack: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』',
-            author: 'Eren Bot',
-            type: StickerTypes.CROPPED,
-            categories: ['✨', '🍷'],
-            quality: 30
-        });
-        const buffer = await sticker.toBuffer();
-        return sendBotMessage(sock, from, { sticker: buffer }, { quoted: msg });
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `❌ فشل تحويل الفيديو إلى ملصق متحرك.` });
-    }
-}
-
-if (cmd === 'متحرك_لفيديو') {
-    try {
-        const qMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (!qMsg || !qMsg.stickerMessage) {
-            return sendBotMessage(sock, from, { text: `📌 يرجى الرد على ملصق متحرك بكلمة \`.متحرك_لفيديو\` لتحويله.` });
-        }
-        
-        const mediaStream = await downloadMediaMessage({ key: msg.key, message: qMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        
-        const tempDir = os.tmpdir();
-        const inputWebp = path.join(tempDir, `input_${Date.now()}.webp`);
-        const outputMp4 = path.join(tempDir, `output_${Date.now()}.mp4`);
-
-        fs.writeFileSync(inputWebp, mediaStream);
-
-        await new Promise((resolve, reject) => {
-            ffmpeg(inputWebp)
-                .inputFormat('webp')
-                .outputOptions([
-                    '-pix_fmt yuv420p',
-                    '-c:v libx264',
-                    '-movflags +faststart',
-                    '-loop 0'
-                ])
-                .toFormat('mp4')
-                .on('end', resolve)
-                .on('error', reject)
-                .save(outputMp4);
-        });
-
-        const videoBuffer = fs.readFileSync(outputMp4);
-        try { fs.unlinkSync(inputWebp); fs.unlinkSync(outputMp4); } catch (e) {}
-
-        return sendBotMessage(sock, from, { 
-            video: videoBuffer, 
-            caption: `✨ *تم تحويل الملصق المتحرك إلى فيديو صالح ويعمل بكفاءة!*`, 
-            mimetype: 'video/mp4',
-            ptt: false
-        }, { quoted: msg });
-
-    } catch (e) {
-        console.error('خطأ تحويل المتحرك لفيديو:', e);
-        return sendBotMessage(sock, from, { text: `❌ فشل تحويل الملصق المتحرك إلى فيديو صالح.` });
-    }
-}
-
-if (cmd.startsWith('حزمة')) {
-    const characterName = trimmedBody.replace(/^\.حزمة/i, '').trim();
-    if (!characterName) {
-        return sendBotMessage(sock, from, { text: `📌 الاستخدام الصحيح: \`.حزمة <اسم الشخصية>\`\nمثال: \`.حزمة ناروتو\`` });
-    }
-    try {
-        const searchApi = `https://api.lolhuman.xyz/api/pinterest?apikey=gapis&query=${encodeURIComponent(characterName + ' sticker anime')}`;
-        const res = await axios.get(searchApi, { timeout: 15000 });
-        const results = res.data?.result;
-
-        if (!results || !Array.isArray(results) || results.length === 0) {
-            return sendBotMessage(sock, from, { text: `❌ لم يتم العثور على حزمة ملصقات للشخصية (${characterName}).` });
-        }
-
-        let countSent = 0;
-        for (let i = 0; i < Math.min(results.length, 3); i++) {
-            try {
-                let imgUrl = results[i];
-                let imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 10000 });
-                let imgBuffer = Buffer.from(imgRes.data);
-                
-                let stickerObj = new Sticker(imgBuffer, {
-                    pack: `حزمة: ${characterName}`,
-                    author: 'Eren Bot',
-                    type: StickerTypes.DEFAULT,
-                    quality: 40
-                });
-                let stBuffer = await stickerObj.toBuffer();
-                await sendBotMessage(sock, from, { sticker: stBuffer });
-                countSent++;
-                await new Promise(r => setTimeout(r, 1000));
-            } catch (err) {}
-        }
-
-        if (countSent > 0) {
-            return sendBotMessage(sock, from, { text: `✅ *تم إرسال (${countSent}) ملصقات حقيقية بنجاح لشخصية (${characterName})!*` });
-        } else {
-            return sendBotMessage(sock, from, { text: `❌ تعذر تحميل وتشكيل ملصقات هذه الحزمة.` });
-        }
-    } catch (e) {
-        return sendBotMessage(sock, from, { text: `❌ عذراً، خدمة جلب الحزم غير متوفرة حالياً.` });
-    }
-}
 
 async function startFirstRound(sock, from, gameType) {
     if (activeGames[from]) {
@@ -2318,14 +2112,14 @@ if (cmdBase === '10' || cmd === 'اللقب' || cmd === 'الالقب') {
 if (cmdBase === '11') {
     const stickerMenuText = `🎨 *قسـم الملصقات:*
 
-> 🎨 \`.ملصق\` ↞ تحويل إلى ملصق
-> 🖼️ \`.لصورة\` ↞ تحويل لصورة
-> 🔗 \`.ملصق_رابط\` ↞ ملصق من رابط
-> ✍️ \`.ملصق_نصي\` ↞ ملصق نصي
-> 🎞️ \`.ملصق_متحرك\` ↞ ملصق متحرك
-> 🎬 \`.فيديو_لملصق\` ↞ فيديو لملصق
-> 🎥 \`.متحرك_لفيديو\` ↞ متحرك لفيديو
-> 📦 \`.حزمة <اسم الشخصية>\` ↞ حزمة ملصقات`;
+> 🎨 \`.ملصق\` ↞ صورة أو فيديو إلى ملصق
+> 🥷 \`.سرقة\` ↞ إعادة نشر ملصق باسمك
+> 😀 \`.ايموجي\` ↞ إيموجي إلى ملصق
+> ✍️ \`.كتابة <نص>\` ↞ ملصق نصي
+> 🖼️ \`.لصورة\` ↞ ملصق إلى صورة
+> ⭕ \`.دائري\` ↞ ملصق دائري
+> 🎥 \`.لفيديو\` ↞ ملصق متحرك إلى فيديو
+> 🗂️ \`.باك\` ↞ حزمة ملصقات`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
