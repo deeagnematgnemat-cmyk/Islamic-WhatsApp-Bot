@@ -734,6 +734,69 @@ async function charPackFromPinterest(keywords, title) {
     return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
 }
 
+// المصدر الثالث: صور Bing (يعمل غالباً من السيرفرات) وتتحول إلى ملصقات
+async function charPackFromBing(keywords, title) {
+    const urls = [], seen = new Set();
+    for (const kw of keywords) {
+        for (const q of [`${kw} sticker`, kw]) {
+            try {
+                const res = await http(`https://www.bing.com/images/async?q=${encodeURIComponent(q)}&first=0&count=50&mmasync=1&adlt=off`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const html = await res.text();
+                for (const m of html.matchAll(/murl&quot;:&quot;(https?:[^&]+?)&quot;/g)) {
+                    const u = m[1].replace(/&amp;/g, '&');
+                    if (/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !seen.has(u)) { seen.add(u); urls.push(u); }
+                }
+            } catch (e) { logErr('حزمة-bing', e); }
+            if (urls.length >= CHAR_PACK_SIZE * 2) break;
+        }
+        if (urls.length >= CHAR_PACK_SIZE * 2) break;
+    }
+    if (!urls.length) return [];
+    const out = [];
+    for (let i = 0; i < urls.length && out.length < CHAR_PACK_SIZE; i += 8) {   // دفعات صغيرة حتى نتوقف عند اكتمال 30
+        const got = await mapLimit(urls.slice(i, i + 8), 8, async (u) => {
+            const { buf } = await httpBuffer(u, 6 * 1024 * 1024, { timeout: 15000 });
+            return await makeSticker(buf, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 70 });
+        });
+        out.push(...got.filter(Boolean));
+    }
+    return out.slice(0, CHAR_PACK_SIZE);
+}
+
+// المصدر الاختياري: حزم تليجرام (يحتاج متغير TELEGRAM_BOT_TOKEN من @BotFather وهو مجاني)
+async function charPackFromTelegram(keywords, title) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return [];
+    const names = [];
+    for (const kw of keywords) {
+        for (const u of [`https://www.bing.com/search?q=${encodeURIComponent(kw + ' telegram stickers addstickers')}`, `https://html.duckduckgo.com/html/?q=${encodeURIComponent(kw + ' telegram stickers t.me/addstickers')}`]) {
+            try {
+                const res = await http(u, { timeout: 25000 });
+                let html = await res.text();
+                try { html += ' ' + decodeURIComponent(html); } catch (e) { /* تجاهل */ }
+                for (const m of html.matchAll(/t\.me\/addstickers\/([A-Za-z0-9_]{3,64})/g)) if (!names.includes(m[1])) names.push(m[1]);
+            } catch (e) { logErr('حزمة-تليجرام-بحث', e); }
+        }
+    }
+    const api = (m, q) => httpJson(`https://api.telegram.org/bot${token}/${m}?${q}`, { timeout: 25000 });
+    const files = [];
+    for (const n of names.slice(0, 6)) {
+        try {
+            const set = (await api('getStickerSet', 'name=' + encodeURIComponent(n))).result;
+            for (const s of (set?.stickers || [])) if (!s.is_animated && !s.is_video) files.push(s.file_id);
+        } catch (e) { logErr('حزمة-تليجرام-حزمة', e); }
+        if (files.length >= CHAR_PACK_SIZE + 6) break;
+    }
+    if (!files.length) return [];
+    const got = await mapLimit(files.slice(0, CHAR_PACK_SIZE + 6), 4, async (id) => {
+        const fp = (await api('getFile', 'file_id=' + encodeURIComponent(id))).result?.file_path;
+        const { buf } = await httpBuffer(`https://api.telegram.org/file/bot${token}/${fp}`, 2 * 1024 * 1024, { timeout: 30000 });
+        return await makeSticker(buf, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 70 });
+    });
+    return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
+}
+
 async function cmdCharPack(c) {
     const name = c.args.replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.حزمة ايرين` أو `.حزمة Eren Yeager`');
@@ -747,10 +810,20 @@ async function cmdCharPack(c) {
             try { const en = (await gtranslate(name, 'en')).text.trim(); if (en && en.toLowerCase() !== name.toLowerCase()) keywords.unshift(en); } catch (e) { /* نكمل بالاسم الأصلي */ }
         }
         const title = (keywords[0] || name).slice(0, 60);
+        // نجرب المصادر بالترتيب: أول مصدر يعطي 20 ملصقاً أو أكثر نعتمده، وإلا نحتفظ بأفضل نتيجة
+        const SOURCES = [
+            ['Sticker.ly', () => charPackFromStickerly(keywords)],
+            ['Telegram', () => charPackFromTelegram(keywords, title)],
+            ['Bing', () => charPackFromBing(keywords, title)],
+            ['Pinterest', () => charPackFromPinterest(keywords, title)]
+        ];
         let stickers = [];
-        try { stickers = await charPackFromStickerly(keywords); } catch (e) { logErr('حزمة-بحث', e); }
-        if (stickers.length < PACK_MIN) {
-            try { stickers = await charPackFromPinterest(keywords, title); } catch (e) { logErr('حزمة-بحث-احتياطي', e); }
+        for (const [label, fn] of SOURCES) {
+            let r = [];
+            try { r = await fn(); } catch (e) { logErr('حزمة-' + label, e); }
+            console.error(`[حزمة] المصدر ${label}: ${r.length} ملصق للبحث (${keywords.join(' | ')})`);
+            if (r.length > stickers.length) stickers = r;
+            if (stickers.length >= 20) break;
         }
         if (stickers.length < PACK_MIN) return await c.reply(`❌ لم أجد ملصقات كافية للشخصية (${name}). جرّب كتابة الاسم بالإنجليزية أو اسماً آخر.`);
         await c.reply(`〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
