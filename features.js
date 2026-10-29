@@ -10,7 +10,7 @@ import { pipeline } from 'stream/promises';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
-import { sendSectionWithButtons, sendPackCard } from './menu.js';
+import { sendSectionWithButtons, sendPackCard, sendImageCarousel } from './menu.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -34,7 +34,7 @@ const COMMANDS = {
     'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
     // الصور
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
-    'بدون_خلفية': ['removebg'], 'تحسين': ['enhance'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
+    'بدون_خلفية': ['removebg', 'ازالة_الخلفية', 'ازالة_خلفية', 'ازالة', 'حذف_الخلفية'], 'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل (القسم فارغ: لا توجد فيه أوامر)
     'تحميل': [],
@@ -82,7 +82,7 @@ export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
 > 📱 .خلفية [عدد] <بحث> ↞ خلفيات جوال عالية الجودة
 > 🧑‍🎤 .بروفايل [عدد] <اسم> ↞ صور شخصية (pfp)
 > 🎌 .انمي [اسم] ↞ صورة أنمي عشوائية أو باسم
-> ✂️ .بدون_خلفية ↞ إزالة خلفية الصورة
+> ✂️ .ازالة_الخلفية ↞ إزالة خلفية الصورة (PNG شفاف)
 > ✨ .تحسين ↞ رفع وضوح الصورة وجودتها
 > 🌫️ .تغبيش [1-60] ↞ تغبيش الصورة
 > ⚫ .ابيض_اسود ↞ تحويل الصورة لأبيض وأسود
@@ -958,6 +958,7 @@ async function findImageUrls(queries, want, aspect) {
 async function fetchImages(urls, count, { orient, minSide = 400, maxSide = 2048 } = {}) {
     const sharp = await sharpOrFail();
     const out = [], hashes = [];
+    out.urls = [];                                       // مصدر كل صورة (لزر «فتح الصورة» في المعرض)
     for (let i = 0; i < urls.length && out.length < count; i += 8) {
         const got = await mapLimit(urls.slice(i, i + 8), 8, async (u) => {
             const { buf, type } = await httpBuffer(u, 15 * 1024 * 1024, { timeout: 20000, headers: { Referer: new URL(u).origin + '/' } });
@@ -968,12 +969,12 @@ async function fetchImages(urls, count, { orient, minSide = 400, maxSide = 2048 
             if (orient === 'tall' && hw < 1.5) return null;
             if (orient === 'square' && (hw < 0.8 || hw > 1.25)) return null;
             if (!orient && (hw > 3 || hw < 0.33)) return null;
-            return { jpg: await toJpeg(buf, { maxSide }), h: await hashOf(sharp, buf) };
+            return { jpg: await toJpeg(buf, { maxSide }), h: await hashOf(sharp, buf), u };
         });
         for (const g of got) {
             if (!g || out.length >= count) continue;
             if (hashes.some((h) => h.reduce((n, v, k) => n + (v !== g.h[k] ? 1 : 0), 0) <= 5)) continue;
-            out.push(g.jpg); hashes.push(g.h);
+            out.push(g.jpg); out.urls.push(g.u); hashes.push(g.h);
         }
     }
     return out;
@@ -988,7 +989,15 @@ async function searchTerms(text) {
     return terms;
 }
 
-async function sendImages(c, images, caption) {
+// عدة صور = معرض أفقي (كل صورة في بطاقة بجانب الأخرى)، وصورة واحدة = رسالة عادية
+async function sendImages(c, images, caption, label) {
+    if (images.length >= 2) {
+        try {
+            const cards = images.map((img, i) => ({ image: img, body: `${label || '🖼️'} (${i + 1}/${images.length})`, footer: '『✦』 Eren Bot 『✦』', url: images.urls?.[i], button: '🔗 فتح الصورة' }));
+            await sendImageCarousel(c.sock, c.from, cards, { text: caption || '🖼️', footer: '👈 مرّر لرؤية باقي الصور' });
+            return images.length;
+        } catch (e) { logErr('صور-معرض', e); }   // إن فشل المعرض نرسل الصور واحدة واحدة
+    }
     let sent = 0;
     for (let i = 0; i < images.length; i++) {
         try { await c.media({ image: images[i], ...(i === 0 && caption ? { caption } : {}) }); sent++; } catch (e) { logErr('صور-إرسال', e); }
@@ -1014,11 +1023,12 @@ async function cmdImageSearch(c, kind) {
     const terms = await searchTerms(arg);
     const queries = terms.flatMap((t) => k.q(t));
     const urls = await findImageUrls(queries, count, k.aspect);
-    let images = urls.length ? await fetchImages(urls, count, { orient: k.orient, maxSide: kind === 'خلفية' ? 2560 : 2048 }) : [];
-    if (!images.length && k.orient && urls.length) images = await fetchImages(urls, count, { maxSide: 2048 });   // احتياط: نخفف شرط الشكل
+    const side = count >= 2 ? (kind === 'خلفية' ? 1600 : 1280) : (kind === 'خلفية' ? 2560 : 2048);   // المعرض يحتاج صوراً أخف
+    let images = urls.length ? await fetchImages(urls, count, { orient: k.orient, maxSide: side }) : [];
+    if (!images.length && k.orient && urls.length) images = await fetchImages(urls, count, { maxSide: side });   // احتياط: نخفف شرط الشكل
     console.error(`[صور] ${kind} (${terms.join(' | ')}): ${urls.length} رابط -> ${images.length} صورة`);
     if (!images.length) return c.reply(`❌ لم أجد صوراً مناسبة لـ (${arg}). جرّب كلمة أخرى أو اكتبها بالإنجليزية.`);
-    await sendImages(c, images, `🖼️ ${k.title}: ${arg}`);
+    await sendImages(c, images, `🖼️ ${k.title}: ${arg}`, `🖼️ ${arg}`);
 }
 
 // ---- .انمي : صورة أنمي عشوائية (آمنة SFW) أو بحث باسم
@@ -1083,15 +1093,21 @@ async function cmdCompress(c) {
 async function cmdEnhance(c) {
     const buf = await getInputImage(c); if (!buf) return;
     const sharp = await sharpOrFail();
-    const img = sharp(buf, { failOn: 'none' }).rotate();
-    const meta = await sharp(buf, { failOn: 'none' }).rotate().metadata();
-    const rot = (meta.orientation || 1) >= 5;
-    const w = rot ? meta.height : meta.width, h = rot ? meta.width : meta.height;
+    const asFile = /ملف|file|doc/i.test(c.args);
+    const o = await sharp(buf, { failOn: 'none' }).rotate().toBuffer({ resolveWithObject: true });   // يثبّت اتجاه الصورة ويعطي أبعادها الحقيقية
+    const w = o.info.width, h = o.info.height, long = Math.max(w, h);
     if (!w || !h) throw new Error('BAD_IMAGE');
-    let f = Math.min(2, 4096 / Math.max(w, h)); if (f < 1.05) f = 1;
-    const out = await img.resize(Math.round(w * f), Math.round(h * f), { kernel: 'lanczos3' }).flatten({ background: '#ffffff' })
-        .modulate({ saturation: 1.1 }).linear(1.04, -3).sharpen({ sigma: 1.1, m1: 1, m2: 2 }).jpeg({ quality: 95 }).toBuffer();
-    await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'enhanced.jpg', caption: `✨ تم تحسين الصورة (${w}×${h} ← ${Math.round(w * f)}×${Math.round(h * f)}).\nأُرسلت كملف للحفاظ على الجودة.` });
+    let f = long < 1000 ? Math.min(3, 2048 / long) : Math.min(2, 2560 / long);   // الصور الصغيرة تُكبَّر أكثر
+    if (f < 1.05) f = 1;
+    const W = Math.round(w * f), H = Math.round(h * f);
+    let p = sharp(o.data, { failOn: 'none' }).flatten({ background: '#ffffff' });
+    if (long < 900) p = p.median(3);                                  // تخفيف التشويش والحبيبات في الصور الصغيرة
+    p = p.resize(W, H, { kernel: 'lanczos3' });                        // تكبير عالي الجودة
+    try { p = p.clahe({ width: Math.max(16, Math.round(W / 8)), height: Math.max(16, Math.round(H / 8)), maxSlope: 2 }); } catch (e) { /* نسخة sharp لا تدعمها */ }
+    const out = await p.modulate({ saturation: 1.12, brightness: 1.02 }).sharpen({ sigma: 1.3, m1: 0.8, m2: 2.5 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
+    const cap = `✨ تم تحسين الصورة (${w}×${h} ← ${W}×${H}).`;
+    if (asFile) await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'enhanced.jpg', caption: cap });
+    else await c.media({ image: out, caption: cap + '\n💡 للحصول على الملف بأعلى دقة اكتب `.تحسين ملف`' });
 }
 async function cmdFormat(c) {
     const buf = await getInputImage(c); if (!buf) return;
@@ -1140,32 +1156,51 @@ function floodRemoveBg(data, w, h, tol = 42) {
     }
     return removed / (w * h) > 0.02 && removed / (w * h) < 0.97 ? data : null;   // لا شيء حُذف أو حُذف كل شيء = فشل
 }
+let RMBG_QUEUE = Promise.resolve();                                   // نموذج الذكاء الاصطناعي ثقيل: صورة واحدة في كل مرة
+async function removeBgAI(png) {
+    const run = async () => {
+        const mod = await import('@imgly/background-removal-node');   // يعمل داخل السيرفر نفسه بلا مفتاح ولا موقع
+        const blob = await Promise.race([
+            mod.removeBackground(new Blob([png], { type: 'image/png' }), { output: { format: 'image/png' } }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('RMBG_TIMEOUT')), 180000))
+        ]);
+        return Buffer.from(await blob.arrayBuffer());
+    };
+    const job = RMBG_QUEUE.then(run, run);
+    RMBG_QUEUE = job.catch(() => {});
+    return await job;
+}
 async function cmdRemoveBg(c) {
     const buf = await getInputImage(c); if (!buf) return;
     const sharp = await sharpOrFail();
-    let png = null;
-    if (process.env.REMOVEBG_API_KEY) {
+    await c.reply('✂️ جاري إزالة الخلفية... (أول مرة قد تستغرق دقيقة لتحميل النموذج)');
+    const png0 = await sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
+    let png = null, how = '';
+    if (process.env.REMOVEBG_API_KEY) {                                // 1) remove.bg (أدق نتيجة، يحتاج مفتاحاً)
         try {
-            const jpg = await toJpeg(buf, { maxSide: 2500, quality: 92 });
             const form = new FormData();
-            form.append('image_file', new Blob([jpg], { type: 'image/jpeg' }), 'image.jpg');
+            form.append('image_file', new Blob([await toJpeg(buf, { maxSide: 2500, quality: 92 })], { type: 'image/jpeg' }), 'image.jpg');
             form.append('size', 'auto');
             const res = await fetch('https://api.remove.bg/v1.0/removebg', { method: 'POST', headers: { 'X-Api-Key': process.env.REMOVEBG_API_KEY }, body: form, signal: AbortSignal.timeout(90000) });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            png = Buffer.from(await res.arrayBuffer());
+            png = Buffer.from(await res.arrayBuffer()); how = 'remove.bg';
         } catch (e) { logErr('صور-removebg', e); }
     }
-    if (!png) {
-        const { data, info } = await sharp(buf, { failOn: 'none' }).rotate().resize(1400, 1400, { fit: 'inside', withoutEnlargement: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-        const res = floodRemoveBg(data, info.width, info.height);
-        if (!res) {
-            const e = new Error('BG_COMPLEX');
-            e.friendly = '⚠️ الخلفية معقدة ولا يمكن إزالتها بالطريقة المحلية (تعمل مع الخلفيات الموحدة اللون).\nللحصول على نتيجة دقيقة مع أي صورة، أضف مفتاح remove.bg المجاني في متغير `REMOVEBG_API_KEY`.';
-            throw e;
-        }
-        png = await sharp(res, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+    if (!png) {                                                        // 2) نموذج ذكاء اصطناعي محلي يعمل لأي صورة
+        try { png = await removeBgAI(png0); how = 'AI'; } catch (e) { logErr('صور-removebg-ai', e); }
     }
-    await c.media({ document: png, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (PNG شفاف).' });
+    if (!png) {                                                        // 3) احتياط: خلفية موحدة اللون فقط
+        const { data, info } = await sharp(png0, { failOn: 'none' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        const res = floodRemoveBg(data, info.width, info.height);
+        if (res) { png = await sharp(res, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(); how = 'محلي'; }
+    }
+    console.error(`[صور] إزالة الخلفية: ${how || 'فشلت كل الطرق'}`);
+    if (!png) {
+        const e = new Error('RMBG_FAILED');
+        e.friendly = '❌ تعذرت إزالة الخلفية. تأكد أن حزمة `@imgly/background-removal-node` مثبّتة (npm install) أو أضف مفتاح `REMOVEBG_API_KEY`.';
+        throw e;
+    }
+    await c.media({ document: png, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (PNG شفاف، أُرسل كملف للحفاظ على الشفافية).' });
 }
 
 // ---- قراءة النص من الصورة (OCR) عبر ocr.space (مفتاح مجاني اختياري OCR_API_KEY)
