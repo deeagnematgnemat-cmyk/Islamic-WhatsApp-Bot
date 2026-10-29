@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
-import { initSubBots, handleSubBotCommand } from './subbot.js';
+import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
 import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 
@@ -240,7 +240,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -615,7 +615,7 @@ if (globalBotStopped && !isSenderDev) return;
 const groupSettingsForCheck = getGroupSetting(from);
 
 // الوضع الخاص: يتجاهل الأوامر لغير المطورين، لكن الحماية تبقى شغالة (تُنفَّذ قبل الخروج أدناه)
-const privateBlocked = groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender);
+const privateBlocked = (groupSettingsForCheck.botMode === 'private' && !isSenderDev && !isVipUser(sender)) || await isSubBotPrivateBlocked({ sock, msg, sender, isFromMe });
 
 if (isGroup && !isFromMe) {    
     const groupSt = getGroupSetting(from);    
