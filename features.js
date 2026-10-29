@@ -31,7 +31,7 @@ const norm = (s) => s.replace(/[أإآا]/g, 'ا');
 const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'دائري': ['round'], 'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'ايموجي': ['emoji'],
-    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
+    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
     // التنزيل (القسم فارغ: لا توجد فيه أوامر)
     'تحميل': [],
     // الذكاء الاصطناعي
@@ -67,6 +67,7 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > ⭕ .دائري ↞ ملصق دائري
 > 🎥 .لفيديو ↞ ملصق متحرك إلى فيديو
 > 🗂️ .باك [اسم] ↞ صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
+> 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
 
 💡 أرسل الأمر مع الصورة أو رد على صورة/فيديو/ملصق.`;
 
@@ -651,6 +652,119 @@ async function cmdPackImages(c) {
     }
 }
 
+// ----- .حزمة <اسم الشخصية> : يجلب حزمة ملصقات جاهزة (حتى 30) من الإنترنت ويرسلها كحزمة واتساب أصلية
+const CHAR_PACK_SIZE = 30;
+const STICKERLY_UA = 'androidapp.stickerly/1.17.0 (Pixel 7; U; Android 33; ar-SA; SA;)';
+
+// المصدر الأول: Sticker.ly (حزم ملصقات جاهزة بصيغة واتساب webp)
+async function stickerlySearch(keyword) {
+    const res = await http('https://api.sticker.ly/v4/stickerPack/smartSearch', {
+        method: 'POST', timeout: 25000,
+        headers: { 'User-Agent': STICKERLY_UA, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, enabledKeywordSearch: true, filter: { extendSearchResult: false, onlyAnimated: false, onlyStatic: true } })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    return (j?.result?.stickerPacks || []).filter((p) => p && !p.isAnimated && p.resourceUrlPrefix && Array.isArray(p.resourceFiles) && p.resourceFiles.length);
+}
+const isWebp = (b) => b && b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
+
+// تنزيل مجموعة روابط بالتوازي (بحد أقصى 6 معاً) مع تجاهل الفاشل
+async function mapLimit(items, limit, fn) {
+    const out = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (i < items.length) { const k = i++; try { out[k] = await fn(items[k], k); } catch (e) { out[k] = null; } }
+    }));
+    return out;
+}
+
+async function charPackFromStickerly(keywords) {
+    const seenPacks = new Set(), packs = [];
+    for (const kw of keywords) {
+        try {
+            for (const p of await stickerlySearch(kw)) { if (!seenPacks.has(p.packId)) { seenPacks.add(p.packId); packs.push(p); } }
+        } catch (e) { logErr('حزمة-stickerly', e); }
+        if (packs.length >= 6) break;
+    }
+    if (!packs.length) return [];
+    // الأفضل أولاً: الحزم الكاملة (30) ثم الأكثر مشاهدة/تصديراً
+    packs.sort((a, b) => (Math.min(b.resourceFiles.length, CHAR_PACK_SIZE) - Math.min(a.resourceFiles.length, CHAR_PACK_SIZE)) || ((b.exportCount || b.viewCount || 0) - (a.exportCount || a.viewCount || 0)));
+    const urls = [], seen = new Set();
+    for (const p of packs.slice(0, 4)) {
+        for (const f of p.resourceFiles) {
+            const u = p.resourceUrlPrefix + f;
+            if (!seen.has(u)) { seen.add(u); urls.push(u); }
+        }
+        if (urls.length >= CHAR_PACK_SIZE + 6) break;     // زيادة بسيطة تعوّض الملفات التالفة
+    }
+    const got = await mapLimit(urls.slice(0, CHAR_PACK_SIZE + 6), 6, async (u) => {
+        const { buf } = await httpBuffer(u, 400 * 1024, { timeout: 30000 });
+        return isWebp(buf) ? buf : null;
+    });
+    return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
+}
+
+// المصدر الاحتياطي: صور من Pinterest تتحول إلى ملصقات
+async function charPackFromPinterest(keywords, title) {
+    const urls = [], seen = new Set();
+    for (const kw of keywords) {
+        for (const q of [`${kw} sticker`, kw]) {
+            try {
+                const data = JSON.stringify({ options: { isPrefetch: false, query: q, scope: 'pins', no_fetch_context_on_resource: false }, context: {} });
+                const src = `/search/pins/?q=${encodeURIComponent(q)}&rs=typed`;
+                const j = await httpJson(`https://www.pinterest.com/resource/BaseSearchResource/get/?source_url=${encodeURIComponent(src)}&data=${encodeURIComponent(data)}`, {
+                    timeout: 25000,
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Pinterest-Source-Url': src, 'X-Pinterest-AppState': 'active' }
+                });
+                for (const r of (j?.resource_response?.data?.results || [])) {
+                    const u = r?.images?.['736x']?.url || r?.images?.orig?.url;
+                    if (u && !seen.has(u)) { seen.add(u); urls.push(u); }
+                }
+            } catch (e) { logErr('حزمة-pinterest', e); }
+            if (urls.length >= CHAR_PACK_SIZE + 10) break;
+        }
+        if (urls.length >= CHAR_PACK_SIZE + 10) break;
+    }
+    if (!urls.length) return [];
+    const got = await mapLimit(urls.slice(0, CHAR_PACK_SIZE + 10), 4, async (u) => {
+        const { buf } = await httpBuffer(u, 8 * 1024 * 1024, { timeout: 30000 });
+        return await makeSticker(buf, StickerTypes.FULL, { pack: title, author: AUTHOR, quality: 70 });
+    });
+    return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
+}
+
+async function cmdCharPack(c) {
+    const name = c.args.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.حزمة ايرين` أو `.حزمة Eren Yeager`');
+    if (PACK_BUSY.has(c.from)) return c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
+    PACK_BUSY.add(c.from);
+    try {
+        await c.reply(`╭━━━〔 📦 〕━━━╮\n『 ${name} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 🔎 〕 جاري البحث عن ملصقات الشخصية وتجهيز الحزمة...`);
+        // الأسماء العربية تُترجم للإنجليزية لأن مواقع الملصقات تبحث بالإنجليزية غالباً
+        const keywords = [name];
+        if (/[\u0600-\u06FF]/.test(name)) {
+            try { const en = (await gtranslate(name, 'en')).text.trim(); if (en && en.toLowerCase() !== name.toLowerCase()) keywords.unshift(en); } catch (e) { /* نكمل بالاسم الأصلي */ }
+        }
+        const title = (keywords[0] || name).slice(0, 60);
+        let stickers = [];
+        try { stickers = await charPackFromStickerly(keywords); } catch (e) { logErr('حزمة-بحث', e); }
+        if (stickers.length < PACK_MIN) {
+            try { stickers = await charPackFromPinterest(keywords, title); } catch (e) { logErr('حزمة-بحث-احتياطي', e); }
+        }
+        if (stickers.length < PACK_MIN) return await c.reply(`❌ لم أجد ملصقات كافية للشخصية (${name}). جرّب كتابة الاسم بالإنجليزية أو اسماً آخر.`);
+        await c.reply(`〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
+        if (await sendNativePack(c, { title, author: AUTHOR, animated: false, stickers })) return;
+        let sent = 0;
+        for (const st of stickers) {
+            try { await c.sock.sendMessage(c.from, { sticker: st }); sent++; } catch (e) { logErr('إرسال-ملصق', e); }
+            await sleep(700);
+        }
+        if (!sent) return await c.reply('❌ تعذر إرسال الحزمة، حاول مرة أخرى.');
+        await c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${title}).`);
+    } finally { PACK_BUSY.delete(c.from); }
+}
+
 // ---------------------------------------------------------------- أدوات مساعدة عامة
 // عدّاد تقدم حي: رسالة تُعدَّل كل بضع ثوانٍ من 0% إلى 100% حتى يجهز الطلب
 function makeProgress(c, label) {
@@ -796,7 +910,7 @@ async function cmdSummarize(c) {
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['حزمة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -812,7 +926,7 @@ async function sendSection(c, text) {
 const HANDLERS = {
     'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
-    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'لفيديو': cmdToVideo,
+    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 'لفيديو': cmdToVideo,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
