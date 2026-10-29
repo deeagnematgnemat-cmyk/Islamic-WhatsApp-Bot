@@ -335,8 +335,8 @@ botMode: 'public',
 antiOtherBots: false
 };
 }
-// تفعيل الترحيب والتوديع والحماية في جميع المجموعات دائماً
-Object.assign(groupSettings[groupId], { welcome: true, goodbye: true, antiLink: true, antiBadWords: true, antiContact: true });
+// تفعيل الترحيب والتوديع دائماً (الحماية مفعلة افتراضياً ويمكن تعطيلها بأوامر الحماية)
+Object.assign(groupSettings[groupId], { welcome: true, goodbye: true });
 return groupSettings[groupId];
 }
 
