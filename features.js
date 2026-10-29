@@ -10,7 +10,7 @@ import { pipeline } from 'stream/promises';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
-import { sendSectionWithButtons, sendPackCard, sendImageCarousel } from './menu.js';
+import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel } from './menu.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -38,6 +38,7 @@ const COMMANDS = {
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل (القسم فارغ: لا توجد فيه أوامر)
     'تحميل': [],
+    'تيك': ['tiktok', 'تيكتوك', 'tt'], 'ايدت': ['edit', 'ايديت', 'ادت'],
     // الذكاء الاصطناعي
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
@@ -51,7 +52,7 @@ CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكا�
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
-const LINK_COMMANDS = new Set(['تلخيص']);
+const LINK_COMMANDS = new Set(['تلخيص', 'تيك']);
 export function isFeatureLinkCommand(body) {
     const t = String(body || '').trim();
     if (!t.startsWith('.')) return false;
@@ -97,7 +98,10 @@ export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
 
 export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِيـلِ مِـنَ الـرَّابِـطِ:*
 
-> 🚧 لا توجد أوامر في هذا القسم حالياً.`;
+> 🎵 .تيك <رابط> ↞ تنزيل فيديو/صور تيك توك بدون علامة مائية
+> 🎬 .ايدت <اسم الشخصية> ↞ 5 تصاميم (إيديت) للشخصية من تيك توك في بطاقات أفقية
+
+💡 مثال: \`.ايدت ايرين\``;
 
 export const AI_SECTION = `🤖 *قِـسْـمُ الـذَّكَـاءِ الاصْـطِـنَـاعِـيِّ:*
 
@@ -1410,9 +1414,97 @@ async function cmdSummarize(c) {
     await c.reply(clip(`📝 *الملخص:*\n\n${out}`));
 }
 
+// ---------------------------------------------------------------- تيك توك
+const TIKWM = 'https://www.tikwm.com';
+const absUrl = (u) => !u ? '' : (u.startsWith('http') ? u : TIKWM + u);
+
+async function tikwmInfo(link) {
+    const j = await httpJson(`${TIKWM}/api/?url=${encodeURIComponent(link)}&hd=1`, { timeout: 30000 });
+    if (!j || j.code !== 0 || !j.data) throw Object.assign(new Error('TIK_FAIL'), { friendly: '❌ تعذر جلب الفيديو، تأكد أن الرابط صحيح وعام.' });
+    return j.data;
+}
+
+async function cmdTikTok(c) {
+    const link = (URL_RE.exec(c.args || '') || URL_RE.exec(quotedText(c)) || [])[0];
+    if (!link || !/tiktok\.com|vt\.tiktok|vm\.tiktok/i.test(link)) return c.reply('📌 مثال: `.تيك https://vt.tiktok.com/xxxx`\nأو رد على رسالة فيها رابط تيك توك.');
+    await c.reply('⏳ جاري التنزيل...');
+    const d = await tikwmInfo(link);
+    const caption = `🎵 *${(d.title || 'تيك توك').slice(0, 300)}*\n👤 ${d.author?.unique_id || ''}\n\n${PACK}`;
+    // منشور صور (سلايدشو)
+    if (Array.isArray(d.images) && d.images.length) {
+        for (const img of d.images.slice(0, 10)) {
+            try { const { buf } = await httpBuffer(img, MAX_DL); await c.media({ image: buf }); } catch (e) {}
+        }
+        return c.reply(caption);
+    }
+    const src = absUrl(d.hdplay || d.play);
+    if (!src) throw Object.assign(new Error('TIK_NOURL'), { friendly: '❌ لم أجد رابط الفيديو.' });
+    const { buf } = await httpBuffer(src, MAX_DL);
+    await c.media({ video: buf, mimetype: 'video/mp4', caption });
+}
+
+// بحث تيك توك عن إيديتات شخصية
+async function tikSearch(keywords, count = 20) {
+    const body = new URLSearchParams({ keywords, count: String(count), cursor: '0', hd: '1' }).toString();
+    const j = await httpJson(`${TIKWM}/api/feed/search`, {
+        method: 'POST', timeout: 30000,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body
+    });
+    return (j && j.code === 0 && j.data && Array.isArray(j.data.videos)) ? j.data.videos : [];
+}
+
+async function cmdEdit(c) {
+    const name = (c.args || '').trim();
+    if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.ايدت ايرين` أو `.ايدت رونالدو`');
+    await c.reply(`🔎 جاري جلب إيديتات *${name}* من تيك توك...`);
+
+    // نجرب أكثر من صيغة بحث حتى نجمع 5 مقاطع
+    const queries = [`${name} edit`, `${name} ايديت`, `${name} edit capcut`];
+    const seen = new Set(); const picked = [];
+    for (const q of queries) {
+        let vids = [];
+        try { vids = await tikSearch(q); } catch (e) { console.error('tikSearch:', e?.message); }
+        for (const v of vids) {
+            const id = v.video_id || v.id;
+            if (!id || seen.has(id)) continue;
+            if (!v.play && !v.hdplay) continue;
+            if (v.duration && v.duration > 90) continue;      // نتجنب المقاطع الطويلة
+            seen.add(id); picked.push(v);
+            if (picked.length >= 5) break;
+        }
+        if (picked.length >= 5) break;
+        await new Promise((r) => setTimeout(r, 1200));         // الخدمة المجانية تسمح بطلب كل ثانية تقريباً
+    }
+    if (!picked.length) return c.reply('❌ لم أجد إيديتات لهذا الاسم، جرّب كتابته بالإنجليزي.');
+
+    // تنزيل الفيديوهات بالتوازي ثم إرسالها كبطاقات أفقية
+    const cards = [];
+    const results = await Promise.allSettled(picked.map((v) => httpBuffer(absUrl(v.play || v.hdplay), 50 * 1024 * 1024)));
+    results.forEach((r, i) => {
+        if (r.status !== 'fulfilled') return;
+        const v = picked[i];
+        const user = v.author?.unique_id || '';
+        cards.push({
+            video: r.value.buf,
+            body: `🎬 إيديت ${i + 1}\n${(v.title || '').replace(/\s+/g, ' ').slice(0, 120)}`,
+            footer: user ? `@${user}` : PACK,
+            url: user ? `https://www.tiktok.com/@${user}/video/${v.video_id || v.id}` : undefined,
+            button: '🔗 فتح في تيك توك'
+        });
+    });
+
+    try {
+        await sendVideoCarousel(c.sock, c.from, cards, { text: `🎬 *إيديتات ${name}*`, footer: '👈 مرّر لرؤية باقي التصاميم' });
+    } catch (e) {
+        // احتياط: إذا لم يدعم الواتساب الكاروسيل عند المستخدم نرسل كل فيديو برسالة
+        console.error('فشل الكاروسيل، إرسال عادي:', e?.message || e);
+        for (const cd of cards) { try { await c.media({ video: cd.video, mimetype: 'video/mp4', caption: cd.body }); } catch (e2) {} }
+    }
+}
+
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['تيك', 'ايدت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -1426,7 +1518,7 @@ async function sendSection(c, text) {
 }
 
 const HANDLERS = {
-    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'ذكاء': (c) => sendSection(c, AI_SECTION),
+    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'تيك': cmdTikTok, 'ايدت': cmdEdit, 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
