@@ -11,6 +11,64 @@ const PAIR_TIMEOUT_MS = 3 * 60 * 1000; // مهلة إدخال الكود: 3 دق
 let startBotFn = null;
 const subs = new Map(); // الرقم -> بيانات البوت الفرعي
 
+// ----- إعدادات كل بوت منصّب (الوضع + المشرفون) تُحفظ في ملف مستقل
+const SETTINGS_FILE = './subbots_settings.json';
+let settingsStore = {};
+try { settingsStore = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) || {}; } catch (e) { settingsStore = {}; }
+
+function saveSettings() {
+    try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settingsStore)); } catch (e) {}
+}
+
+function getSettings(number) {
+    if (!settingsStore[number]) settingsStore[number] = { mode: 'public', mods: [] };
+    const st = settingsStore[number];
+    if (st.mode !== 'private') st.mode = 'public';
+    if (!Array.isArray(st.mods)) st.mods = [];
+    return st;
+}
+
+const ownerOf = (sock) => (sock?.user?.id || '').split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
+
+// يستخرج الرقم الحقيقي من معرّف (يدعم @lid)
+async function numberOfJid(sock, msg, jid, useMsgKeys = false) {
+    const pnOf = (j) => (typeof j === 'string' && j.endsWith('@s.whatsapp.net')) ? j.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
+    let num = pnOf(jid);
+    if (num) return num;
+    if (useMsgKeys) {
+        const k = msg?.key || {};
+        for (const j of [k.participantPn, k.participantAlt, k.senderPn, k.remoteJidAlt, msg?.participant_pn]) {
+            num = pnOf(j);
+            if (num) return num;
+        }
+    }
+    try {
+        const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(jid);
+        return pnOf(pn) || String(pn || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    } catch (e) { return ''; }
+}
+
+function fmtDuration(ms) {
+    const m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+    if (d) return `${d} يوم و${h % 24} ساعة`;
+    if (h) return `${h} ساعة و${m % 60} دقيقة`;
+    return `${m} دقيقة`;
+}
+
+// يُستدعى من index.js: هل يتجاهل هذا البوت المنصّب المرسل لأن الوضع «خاص»؟
+export async function isSubBotPrivateBlocked({ sock, msg, sender, isFromMe }) {
+    try {
+        if (!sock?.isSubBot) return false;
+        const owner = ownerOf(sock);
+        const st = getSettings(owner);
+        if (st.mode !== 'private') return false;
+        if (isFromMe) return false;
+        const num = await numberOfJid(sock, msg, sender, true);
+        if (num && (num === owner || st.mods.includes(num))) return false;
+        return true;
+    } catch (e) { return false; }
+}
+
 function saveList() {
     try { fs.writeFileSync(LIST_FILE, JSON.stringify([...subs.values()].filter(e => e.connected).map(e => e.number))); } catch (e) {}
 }
@@ -34,6 +92,7 @@ function launch(number, opts = {}) {
             sock.ev.on('connection.update', ({ connection }) => {
                 if (connection === 'open' && !entry.connected) {
                     entry.connected = true;
+                    entry.connectedAt = Date.now();
                     clearTimeout(entry.timer);
                     saveList();
                     if (opts.onConnected) opts.onConnected();
@@ -92,6 +151,7 @@ async function removeSub(number) {
     try { entry.sock?.end?.(undefined); } catch (e) {}
     try { entry.sock?.ws?.close(); } catch (e) {}
     try { fs.rmSync(entry.dir, { recursive: true, force: true }); } catch (e) {}
+    if (settingsStore[number]) { delete settingsStore[number]; saveSettings(); }
     saveList();
     return true;
 }
@@ -120,8 +180,128 @@ const SECTION_TEXT =
 
 ⚠️ الحد الأقصى للبوتات المنصّبة: ${MAX_SUBBOTS}`;
 
+const SECTION16_TEXT =
+`🔧 *16. الفرعي (التحكم ببوتك المنصّب):*
+
+> 📊 \`.حالة_بوتي\` ↞ حالة بوتك ومدة تشغيله
+> 🔄 \`.اعادة_تشغيل\` ↞ إعادة تشغيل بوتك أنت فقط
+> 🗑️ \`.حذف_بوتي\` ↞ حذف بوتك نهائياً (يطلب تأكيداً)
+> 🔒 \`.وضع_خاص\` ↞ البوت لك وللمشرفين الذين حددتهم فقط
+> 🌐 \`.وضع_عام\` ↞ البوت للجميع
+> 👥 \`.مشرف_بوتي <رقم>\` ↞ إضافة مشرف (أو بالرد على رسالته / منشنه)
+> ➖ \`.مشرف_بوتي حذف <رقم>\` ↞ إزالة مشرف
+> 📋 \`.مشرف_بوتي\` ↞ عرض المشرفين
+
+*ملاحظات:*
+• أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.
+• تغيير الوضع وإدارة المشرفين وإعادة التشغيل والحذف لصاحب البوت فقط.
+• في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.`;
+
+const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي'];
+const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل'];   // موجودة أصلاً للبوت الرئيسي: نعترضها داخل البوت المنصّب فقط
+
+// أوامر قسم «الفرعي». ترجع true إذا عالجت الأمر
+async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
+    const reply = (text, mentions) => sock.sendMessage(from, { text, ...(mentions ? { mentions } : {}) }, { quoted: msg });
+
+    if (cmdBase === '16' || cmdBase === 'الفرعي') {
+        if (!(await sendSectionWithButtons(sock, from, SECTION16_TEXT, null, sender))) await reply(SECTION16_TEXT);
+        return true;
+    }
+
+    const isNew = SUB_ONLY.includes(cmdBase);
+    const isOverride = SUB_OVERRIDE.includes(cmdBase) && sock.isSubBot;
+    if (!isNew && !isOverride) return false;
+
+    if (!sock.isSubBot) {
+        await reply('⚠️ أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.\nأرسل `.تنصيب` لتنصيب بوتك.');
+        return true;
+    }
+
+    const owner = ownerOf(sock);
+    const st = getSettings(owner);
+    const entry = subs.get(owner);
+    const senderNum = msg.key?.fromMe ? owner : await numberOfJid(sock, msg, sender, true);
+    const isOwner = !!senderNum && senderNum === owner;
+    const isMod = isOwner || st.mods.includes(senderNum);
+
+    if (cmdBase === 'حالة_بوتي') {
+        if (!isMod) { await reply('❌ هذا الأمر لصاحب البوت ومشرفيه فقط.'); return true; }
+        const up = entry?.connectedAt ? fmtDuration(Date.now() - entry.connectedAt) : 'غير معروف';
+        await reply(`📊 *حالة بوتك:*\n\n> 📱 الرقم: ${owner}\n> 🟢 الحالة: يعمل\n> ⏱️ مدة التشغيل: ${up}\n> ${st.mode === 'private' ? '🔒 الوضع: خاص' : '🌐 الوضع: عام'}\n> 👥 عدد المشرفين: ${st.mods.length}`);
+        return true;
+    }
+
+    if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت فقط.'); return true; }
+
+    if (cmdBase === 'وضع_خاص') {
+        st.mode = 'private'; saveSettings();
+        await reply('🔒 تم تفعيل *الوضع الخاص*.\nبوتك الآن يستجيب لك ولمشرفيك فقط' + (st.mods.length ? ` (${st.mods.length} مشرف).` : '.\nلإضافة مشرف: `.مشرف_بوتي <رقم>`'));
+        return true;
+    }
+
+    if (cmdBase === 'وضع_عام') {
+        st.mode = 'public'; saveSettings();
+        await reply('🌐 تم تفعيل *الوضع العام*.\nبوتك الآن يستجيب للجميع.');
+        return true;
+    }
+
+    if (cmdBase === 'اعادة_تشغيل') {
+        await reply('🔄 جاري إعادة تشغيل بوتك... سيعود خلال ثوانٍ.');
+        if (entry) entry.connectedAt = Date.now();
+        setTimeout(() => { try { sock.end(new Error('restart')); } catch (e) {} }, 1500);
+        return true;
+    }
+
+    if (cmdBase === 'حذف_بوتي') {
+        const arg = cmd.split(' ').slice(1).join(' ').trim();
+        if (arg !== 'تأكيد' && arg !== 'تاكيد') {
+            await reply('⚠️ سيتم فصل بوتك وحذف جلسته نهائياً.\nللتأكيد اكتب: `.حذف_بوتي تأكيد`');
+            return true;
+        }
+        await reply('🗑️ تم حذف بوتك. يمكنك التنصيب من جديد بـ `.تنصيب` من البوت الرئيسي.');
+        setTimeout(() => { removeSub(owner); }, 1500);
+        return true;
+    }
+
+    // ----- مشرف_بوتي
+    const args = cmd.split(' ').slice(1).join(' ').trim();
+    const ctx = msg.message?.extendedTextMessage?.contextInfo || {};
+    const isRemove = /^(حذف|ازالة|إزالة|ازاله)(\s|$)/.test(args.replace(/[أإآا]/g, 'ا')) || /^(حذف|ازالة|ازاله)(\s|$)/.test(args);
+    const digits = args.replace(/^(حذف|ازالة|إزالة|ازاله)/, '').replace(/[^0-9]/g, '');
+    let target = '';
+    if (/^\d{8,15}$/.test(digits)) target = digits;
+    else if (ctx.mentionedJid?.length) target = await numberOfJid(sock, msg, ctx.mentionedJid[0]);
+    else if (ctx.participant) target = await numberOfJid(sock, msg, ctx.participant);
+
+    if (!target) {
+        if (args && !/^(حذف|ازالة|إزالة|ازاله)$/.test(args)) { await reply('⚠️ اكتب الرقم مع رمز الدولة، أو رد على رسالة الشخص، أو اعمل له منشن.\nمثال: `.مشرف_بوتي 962791234567`'); return true; }
+        if (isRemove) { await reply('⚠️ حدد من تريد إزالته: `.مشرف_بوتي حذف 962791234567` أو بالرد/المنشن.'); return true; }
+        const list = st.mods.length ? st.mods.map((n, i) => `> ${i + 1}. ${n}`).join('\n') : '> لا يوجد مشرفون حالياً';
+        await reply(`👥 *مشرفو بوتك (${st.mods.length}):*\n\n${list}\n\nللإضافة: \`.مشرف_بوتي <رقم>\`\nللحذف: \`.مشرف_بوتي حذف <رقم>\``);
+        return true;
+    }
+
+    if (target === owner) { await reply('⚠️ هذا رقمك أنت، أنت صاحب البوت أصلاً.'); return true; }
+
+    if (isRemove) {
+        if (!st.mods.includes(target)) { await reply('⚠️ هذا الرقم ليس ضمن مشرفيك.'); return true; }
+        st.mods = st.mods.filter(n => n !== target); saveSettings();
+        await reply(`➖ تمت إزالة ${target} من مشرفي بوتك.`);
+        return true;
+    }
+
+    if (st.mods.includes(target)) { await reply('⚠️ هذا الرقم مضاف مسبقاً كمشرف.'); return true; }
+    if (st.mods.length >= 20) { await reply('❌ الحد الأقصى للمشرفين 20.'); return true; }
+    st.mods.push(target); saveSettings();
+    await reply(`✅ تمت إضافة ${target} كمشرف على بوتك.\nيستطيع استخدام البوت حتى في الوضع الخاص.`);
+    return true;
+}
+
 // ترجع true إذا عالجت الأمر. تُستدعى من index.js
 export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
+    if (await handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev })) return true;
+
     const isTansib = cmdBase === 'تنصيب';
     const isCancel = cmdBase === 'الغاء_تنصيب';
     const isList = cmdBase === 'قائمة_التنصيب';
