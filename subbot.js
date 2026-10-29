@@ -194,8 +194,9 @@ const SECTION16_TEXT =
 
 *ملاحظات:*
 • أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.
-• تغيير الوضع وإدارة المشرفين وإعادة التشغيل والحذف لصاحب البوت فقط.
-• في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.`;
+• قسم الفرعي وكل أوامره لصاحب البوت والمطور فقط.
+• في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.
+• دور المشرف الوحيد: أن يستجيب له البوت في الوضع الخاص.`;
 
 const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي'];
 const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل'];   // موجودة أصلاً للبوت الرئيسي: نعترضها داخل البوت المنصّب فقط
@@ -204,7 +205,16 @@ const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل']
 async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
     const reply = (text, mentions) => sock.sendMessage(from, { text, ...(mentions ? { mentions } : {}) }, { quoted: msg });
 
+    // داخل البوت المنصّب: قسم الفرعي وأوامره لصاحب البوت والمطور فقط (المشرفون وظيفتهم الاستجابة في الوضع الخاص فقط)
+    let senderNum = '', isOwner = true;
+    if (sock.isSubBot) {
+        const ownerNum = ownerOf(sock);
+        senderNum = msg.key?.fromMe ? ownerNum : await numberOfJid(sock, msg, sender, true);
+        isOwner = isDev || (!!senderNum && senderNum === ownerNum);
+    }
+
     if (cmdBase === '16' || cmdBase === 'الفرعي') {
+        if (sock.isSubBot && !isOwner) { await reply('❌ هذا القسم لصاحب البوت والمطور فقط.'); return true; }
         if (!(await sendSectionWithButtons(sock, from, SECTION16_TEXT, null, sender))) await reply(SECTION16_TEXT);
         return true;
     }
@@ -221,18 +231,15 @@ async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
     const owner = ownerOf(sock);
     const st = getSettings(owner);
     const entry = subs.get(owner);
-    const senderNum = msg.key?.fromMe ? owner : await numberOfJid(sock, msg, sender, true);
-    const isOwner = !!senderNum && senderNum === owner;
-    const isMod = isOwner || st.mods.includes(senderNum);
 
     if (cmdBase === 'حالة_بوتي') {
-        if (!isMod) { await reply('❌ هذا الأمر لصاحب البوت ومشرفيه فقط.'); return true; }
+        if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت والمطور فقط.'); return true; }
         const up = entry?.connectedAt ? fmtDuration(Date.now() - entry.connectedAt) : 'غير معروف';
         await reply(`📊 *حالة بوتك:*\n\n> 📱 الرقم: ${owner}\n> 🟢 الحالة: يعمل\n> ⏱️ مدة التشغيل: ${up}\n> ${st.mode === 'private' ? '🔒 الوضع: خاص' : '🌐 الوضع: عام'}\n> 👥 عدد المشرفين: ${st.mods.length}`);
         return true;
     }
 
-    if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت فقط.'); return true; }
+    if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت والمطور فقط.'); return true; }
 
     if (cmdBase === 'وضع_خاص') {
         st.mode = 'private'; saveSettings();
