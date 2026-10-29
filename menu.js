@@ -150,6 +150,32 @@ export function protectionButton(settings = {}) {
     };
 }
 
+// معرض صور أفقي (Carousel): كل صورة في بطاقة مستقلة بجانب بعضها، يمرّر العضو يميناً ويساراً
+// cards: [{ image: Buffer, body, footer, url, button }]
+export async function sendImageCarousel(sock, jid, cards, { text = '', footer = '' } = {}) {
+    const built = [];
+    for (const card of cards.slice(0, 10)) {
+        const media = await prepareWAMessageMedia({ image: card.image }, { upload: sock.waUploadToServer });
+        if (!media || !media.imageMessage) continue;
+        const buttons = card.url
+            ? [{ name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: card.button || '🔗 فتح الصورة', url: card.url, merchant_url: card.url }) }]
+            : [{ name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: card.button || '🖼️ صورة', id: '.' }) }];
+        built.push({
+            header: { hasMediaAttachment: true, imageMessage: media.imageMessage },
+            body: { text: card.body || ' ' },
+            footer: { text: card.footer || ' ' },
+            nativeFlowMessage: { buttons }
+        });
+    }
+    if (built.length < 2) throw new Error('CAROUSEL_TOO_FEW_CARDS');
+    await relayInteractive(sock, jid, {
+        header: { hasMediaAttachment: false },
+        body: { text: text || ' ' },
+        footer: { text: footer || ' ' },
+        carouselMessage: { cards: built, messageVersion: 1 }
+    }, { noForward: true });
+}
+
 // يعرض قائمة الأقسام كاملة (زر الأقسام)
 export async function sendSectionsList(sock, jid, mentionJid) {
     await relayInteractive(sock, jid, {
