@@ -11,7 +11,8 @@ import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
 import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel } from './menu.js';
-import { DlError, withSlot, ytVideo, ytAudio, tilawa, parseYtInput, warmupYtdlp, diagnose } from './lib/dl.js';
+import { DlError, warmupYtdlp } from './lib/dl.js';
+import { cmdYtSearch } from './ytsearch.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -37,9 +38,8 @@ const COMMANDS = {
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
     'بدون_خلفية': ['removebg', 'ازالة_الخلفية', 'ازالة_خلفية', 'ازالة', 'حذف_الخلفية'], 'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
-    // التنزيل (القسم فارغ: لا توجد فيه أوامر)
-    'تحميل': [],
-    'يوتيوب': ['yt', 'ytmp4'], 'صوت': ['ytmp3', 'mp3', 'اغنية', 'اغنيه', 'play'], 'تلاوة': ['tilawa'], 'فحص_تنزيل': ['dlcheck'],
+    // التنزيل: أمر واحد فقط (.بحث_يوت) والباقي أزرار تفاعلية
+    'تحميل': [], 'بحث_يوت': [],
     // الذكاء الاصطناعي
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
@@ -53,7 +53,7 @@ CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكا�
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
-const LINK_COMMANDS = new Set(['تلخيص', 'يوتيوب', 'صوت']);
+const LINK_COMMANDS = new Set(['تلخيص', 'بحث_يوت']);
 export function isFeatureLinkCommand(body) {
     const t = String(body || '').trim();
     if (!t.startsWith('.')) return false;
@@ -97,7 +97,7 @@ export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
 
 💡 أوامر التعديل: أرسل الصورة مع الأمر أو رد على صورة به.`;
 
-export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِيـلِ:*\n\n> 🎬 .يوتيوب <رابط أو اسم> ↞ تنزيل فيديو من يوتيوب\n> 🎧 .صوت <رابط أو اسم> ↞ تنزيل صوت (mp3) من يوتيوب\n> 🕌 .تلاوة <سورة> [آية أو 1-7] [قارئ] ↞ تلاوة القرآن بصوت قارئ\n\n💡 أمثلة:\n\`.يوتيوب https://youtu.be/xxxx\`\n\`.صوت سورة الكهف ماهر المعيقلي\`\n\`.تلاوة البقرة 255 السديس\``;
+export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِيـلِ:*\n\n> 🔍 .بحث_يوت <اسم الفيديو> ↞ يبحث لك في يوتيوب وتختار الفيديو ثم الجودة (360p • 480p • 720p • 1080p • صوت MP3)\n\n💡 مثال:\n\`.بحث_يوت إيرين ييغر\`\n\nيمكنك أيضاً وضع رابط يوتيوب مباشرة بدل الاسم.`;
 
 export const AI_SECTION = `🤖 *قِـسْـمُ الـذَّكَـاءِ الاصْـطِـنَـاعِـيِّ:*
 
@@ -1410,62 +1410,19 @@ async function cmdSummarize(c) {
     await c.reply(clip(`📝 *الملخص:*\n\n${out}`));
 }
 
-// ---------------------------------------------------------------- يوتيوب + التلاوات (المنطق في lib/dl.js)
-const YT_USAGE = `📌 *الاستخدام:*\n\`.يوتيوب https://youtu.be/xxxx\`\n\`.يوتيوب اسم الفيديو\`\nأو رد على رسالة فيها رابط يوتيوب.`;
-const YT_AUDIO_USAGE = `📌 *الاستخدام:*\n\`.صوت https://youtu.be/xxxx\`\n\`.صوت اسم الأغنية أو المحاضرة\`\nأو رد على رسالة فيها رابط يوتيوب.`;
+// ---------------------------------------------------------------- يوتيوب: أمر «.بحث_يوت» (المنطق في ytsearch.js و lib/dl.js)
 const dlSafe = (fn) => async (c) => {
     try { await fn(c); } catch (e) {
         if (e instanceof DlError) return c.reply(e.friendly + (c.isSenderDev && e.debug ? `\n\n🔧 للمطور:\n${String(e.debug).slice(0, 700)}` : ''));
         throw e;
     }
 };
-// فحص ذاتي للمطور: يختبر كل مصدر ويعرض أيّها يعمل وأيّها يفشل ولماذا
-async function cmdDlCheck(c) {
-    if (!c.isSenderDev) return c.reply('❌ هذا الأمر للمطور فقط.');
-    await c.reply('🔧 جاري فحص مصادر التنزيل (قد يستغرق دقيقة)...');
-    await c.reply('🔧 *نتيجة الفحص:*\n\n' + await diagnose());
-}
-const ytQuery = (c) => {
-    const a = (c.args || '').trim();
-    if (a) return a;
-    const q = quotedText(c) || '';
-    return parseYtInput(q) ? q : '';
-};
-// يرسل الناتج كوسائط، أو كمستند إذا تجاوز الحجم المناسب للوسائط
-const sendDl = (c, r, kind, caption) => {
-    if (r.asDocument) return c.media({ document: r.buffer, mimetype: r.mime, fileName: r.fileName, caption });
-    return kind === 'video'
-        ? c.media({ video: r.buffer, mimetype: r.mime, caption })
-        : c.media({ audio: r.buffer, mimetype: r.mime, fileName: r.fileName });
-};
-async function cmdYoutube(c) {
-    const q = ytQuery(c);
-    if (!q) return c.reply(YT_USAGE);
-    if (!parseYtInput(q)) await c.reply('🔎 جاري البحث...');
-    const r = await withSlot(() => ytVideo(q, {
-        onInfo: (i, f) => c.reply(`⏳ جاري تنزيل الفيديو...\n🎬 *${i.title}*${i.duration ? ` (${f(i.duration)})` : ''}`)
-    }));
-    await sendDl(c, r, 'video', `🎬 *${r.info.title}*${r.info.channel ? `\n📺 ${r.info.channel}` : ''}\n\n${PACK}`);
-}
-async function cmdYtAudio(c) {
-    const q = ytQuery(c);
-    if (!q) return c.reply(YT_AUDIO_USAGE);
-    if (!parseYtInput(q)) await c.reply('🔎 جاري البحث...');
-    const r = await withSlot(() => ytAudio(q, {
-        onInfo: (i, f) => c.reply(`⏳ جاري تنزيل الصوت...\n🎧 *${i.title}*${i.duration ? ` (${f(i.duration)})` : ''}`)
-    }));
-    await sendDl(c, r, 'audio', `🎧 *${r.info.title}*\n\n${PACK}`);
-}
-async function cmdTilawa(c) {
-    const r = await withSlot(() => tilawa(c.args, { onStart: (m) => c.reply(m) }));
-    await sendDl(c, r, 'audio', r.caption);
-}
 // تجهيز أداة التنزيل مسبقاً حتى لا ينتظر أول مستخدم
 setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجهيز المسبق:', e?.friendly || e?.message || e)); }, 20000).unref?.();
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['يوتيوب', 'صوت', 'تلاوة', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -1479,7 +1436,7 @@ async function sendSection(c, text) {
 }
 
 const HANDLERS = {
-    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'يوتيوب': dlSafe(cmdYoutube), 'صوت': dlSafe(cmdYtAudio), 'تلاوة': dlSafe(cmdTilawa), 'فحص_تنزيل': cmdDlCheck, 'ذكاء': (c) => sendSection(c, AI_SECTION),
+    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'بحث_يوت': dlSafe((c) => cmdYtSearch(c, quotedText(c))), 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
@@ -1508,7 +1465,7 @@ export async function handleFeatureCommand(ctx) {
         media: (content) => sock.sendMessage(from, content, { quoted: msg })
     };
 
-    if (HEAVY.has(name)) {
+    if (HEAVY.has(name) && !(name === 'بحث_يوت' && args.startsWith('~'))) {
         const last = COOLDOWN.get(ctx.sender) || 0;
         if (Date.now() - last < 4000) { await c.reply('⏳ انتظر بضع ثوانٍ قبل الأمر التالي.'); return true; }
         COOLDOWN.set(ctx.sender, Date.now());
