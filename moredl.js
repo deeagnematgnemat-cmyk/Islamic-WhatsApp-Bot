@@ -454,49 +454,132 @@ async function cmdVideoInfo(c, fallbackText) {
 const EDITS_COUNT = 3;
 const EDIT_MAX_MB = 14;                       // أكبر حجم لفيديو داخل بطاقة (البطاقات الثقيلة قد ترفضها واتساب)
 const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const EDIT_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+const absTik = (u, host = 'https://www.tikwm.com') => (String(u || '').startsWith('/') ? host + u : String(u || ''));
+const isMp4 = (b) => !!b && b.length > 20000 && b.subarray(4, 8).toString('latin1') === 'ftyp';
 
-async function tikSearch(keywords) {
-    const j = await getJson('https://www.tikwm.com/api/feed/search?keywords=' + encodeURIComponent(keywords) + '&count=20&cursor=0&hd=0', 30000);
-    return j && j.code === 0 && Array.isArray(j.data?.videos) ? j.data.videos : [];
-}
 async function toEnglish(text) {
     try {
         const j = await getJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text), 15000);
         return String((j?.[0] || []).map((x) => x?.[0] || '').join('')).trim();
     } catch (e) { return ''; }
 }
-const absTik = (u) => (String(u || '').startsWith('/') ? 'https://www.tikwm.com' + u : String(u || ''));
-const isMp4 = (b) => !!b && b.length > 20000 && b.subarray(4, 8).toString('latin1') === 'ftyp';
 
-async function fetchEdits(name) {
+// المصدر 1: بحث tikwm (GET ثم POST، وعلى النطاقين، مع إعادة المحاولة عند حد الطلبات)
+async function tikwmSearch(keywords, notes) {
+    const qs = new URLSearchParams({ keywords, count: '12', cursor: '0', web: '1', hd: '1' }).toString();
+    for (const host of ['https://www.tikwm.com', 'https://tikwm.com']) {
+        for (const method of ['GET', 'POST']) {
+            const tag = `${method} ${host.replace('https://', '')}`;
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const res = await fetch(method === 'GET' ? `${host}/api/feed/search?${qs}` : `${host}/api/feed/search`, {
+                        method, redirect: 'follow', signal: AbortSignal.timeout(25000), body: method === 'POST' ? qs : undefined,
+                        headers: { 'User-Agent': EDIT_UA, Accept: 'application/json, text/plain, */*', Referer: host + '/', Origin: host, ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' } : {}) }
+                    });
+                    const text = await res.text();
+                    let j; try { j = JSON.parse(text); } catch (e) { notes.push(`${tag}: HTTP ${res.status} ليس JSON`); break; }
+                    if (j && j.code === 0 && Array.isArray(j.data?.videos)) {
+                        if (j.data.videos.length) return j.data.videos.map((v) => normTik(v, host));
+                        notes.push(`${tag}: 0 نتائج لـ«${keywords}»`); break;
+                    }
+                    const msg = String(j?.msg || '');
+                    if (/limit|frequen|too many/i.test(msg) && attempt === 0) { await sleepMs(1500); continue; }
+                    notes.push(`${tag}: ${j?.code} ${msg}`.slice(0, 120)); break;
+                } catch (e) { notes.push(`${tag}: ${e?.message || e}`.slice(0, 120)); break; }
+            }
+        }
+    }
+    return [];
+}
+function normTik(v, host) {
+    const uid = String(v.author?.unique_id || '').trim();
+    const id = String(v.video_id || v.id || '');
+    return {
+        id, title: String(v.title || '').trim(), author: uid || String(v.author?.nickname || '').trim(),
+        duration: Number(v.duration || 0), plays: Number(v.play_count || 0),
+        play: absTik(v.play || v.hdplay, host), url: uid && id ? `https://www.tiktok.com/@${uid}/video/${id}` : ''
+    };
+}
+
+// المصدر 2 (احتياط): صفحة الهاشتاق عبر yt-dlp
+async function tagSearch(tag, notes) {
+    try {
+        const r = await ytdlp(['--flat-playlist', '--dump-json', '--playlist-end', '12', '--no-warnings', `https://www.tiktok.com/tag/${encodeURIComponent(tag)}`], { timeout: 50000 });
+        const out = [];
+        for (const line of String(r?.stdout || '').split('\n')) {
+            if (!line.trim().startsWith('{')) continue;
+            try {
+                const j = JSON.parse(line);
+                const url = String(j.webpage_url || j.url || '');
+                if (!/tiktok\.com\/.+\/video\/\d+/.test(url)) continue;
+                out.push({ id: String(j.id || ''), title: String(j.title || j.description || '').trim(), author: String(j.uploader || j.channel || '').trim(),
+                    duration: Number(j.duration || 0), plays: Number(j.view_count || 0), play: '', url });
+            } catch (e) {}
+        }
+        if (!out.length) notes.push(`yt-dlp #${tag}: 0 نتائج`);
+        return out;
+    } catch (e) { notes.push(`yt-dlp #${tag}: ${String(e?.friendly || e?.message || e).slice(0, 90)}`); return []; }
+}
+
+// تنزيل فيديو واحد: رابط مباشر أولاً، وإن فشل نستخدم نفس مسار أمر .تيك (yt-dlp ثم tikwm)
+async function getEditBuf(v, notes) {
+    if (v.play) {
+        try {
+            const buf = await getBuf(v.play, { timeout: 90000, max: EDIT_MAX_MB * MB });
+            if (isMp4(buf)) return buf;
+            notes.push('تنزيل مباشر: الملف ليس mp4');
+        } catch (e) { notes.push('تنزيل مباشر: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
+    }
+    if (v.url) {
+        let res = null;
+        try {
+            res = await fetchMedia(v.url, 'tiktok', false);
+            const file = res.videos[0];
+            if (!file) throw new Error('لا فيديو');
+            const buf = fs.readFileSync(await ensureWhatsAppMp4(file, res.dir));
+            if (buf.length > EDIT_MAX_MB * MB) throw new Error('الحجم كبير');
+            if (buf.length > 20000) return buf;
+        } catch (e) { notes.push('تنزيل عبر .تيك: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
+        finally { if (res?.dir) rmrf(res.dir); }
+    }
+    return null;
+}
+
+async function fetchEdits(name, notes) {
     const hasAr = /[\u0600-\u06FF]/.test(name);
     const en = hasAr ? await toEnglish(name) : '';
     const queries = [...new Set([en && en.toLowerCase() !== name.toLowerCase() ? `${en} edit` : '', `${name} edit`, hasAr ? `${name} ايدت` : `${name} edits`].filter(Boolean))];
     const seen = new Set(), cands = [];
-    for (let i = 0; i < queries.length && cands.length < 9; i++) {
-        if (i) await sleepMs(1200);                                   // tikwm يحدّد طلباً تقريباً كل ثانية
-        let list = [];
-        try { list = await tikSearch(queries[i]); } catch (e) { console.error('[ايدت] فشل البحث:', e?.message || e); }
+    const add = (list) => {
         for (const v of list) {
-            const id = String(v.video_id || v.id || '');
-            const dur = Number(v.duration || 0);
-            if (!id || seen.has(id) || !(v.play || v.hdplay) || dur < 4 || dur > 120) continue;
-            seen.add(id); cands.push(v);
+            const key = v.id || v.url;
+            if (!key || seen.has(key) || !(v.play || v.url)) continue;
+            if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
+            seen.add(key); cands.push(v);
         }
+    };
+    for (let i = 0; i < queries.length && cands.length < 9; i++) {
+        if (i) await sleepMs(1300);                                   // tikwm يحدّد طلباً تقريباً كل ثانية
+        add(await tikwmSearch(queries[i], notes));
     }
-    const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(String(v.title || '')) ? 1 : 0;
-    cands.sort((a, b) => (isEdit(b) - isEdit(a)) || (Number(b.play_count || 0) - Number(a.play_count || 0)));
+    if (cands.length < EDITS_COUNT) {                                  // احتياط: هاشتاق تيك توك عبر yt-dlp
+        const base = (en || name).toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); if (cands.length >= EDITS_COUNT) break; }
+    }
+    const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(v.title) ? 1 : 0;
+    cands.sort((a, b) => (isEdit(b) - isEdit(a)) || (b.plays - a.plays));
     const got = [];
     for (let i = 0; i < cands.length && got.length < EDITS_COUNT; i += EDITS_COUNT) {
-        const batch = cands.slice(i, i + EDITS_COUNT);
-        const results = await Promise.allSettled(batch.map(async (v) => {
-            const buf = await getBuf(absTik(v.play || v.hdplay), { timeout: 90000, max: EDIT_MAX_MB * MB });
-            if (!isMp4(buf)) throw new Error('NOT_MP4');
+        const results = await Promise.allSettled(cands.slice(i, i + EDITS_COUNT).map(async (v) => {
+            const buf = await getEditBuf(v, notes);
+            if (!buf) throw new Error('NO_BUF');
             return { v, buf };
         }));
         for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
     }
+    if (!got.length) notes.push(`مرشّحون=${cands.length}`);
     return got;
 }
 
@@ -504,14 +587,20 @@ async function cmdEdits(c) {
     const name = String(c.args || '').replace(URL_RE, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'ناروتو', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
     await waiting(c, '🎬', 'إيديتات تيك توك', 'تيك توك');
-    const got = await withSlot(() => fetchEdits(name));
-    if (!got.length) throw new DlError(`❌ لم أجد إيديتات لـ «${name}». جرّب اسماً آخر أو اكتبه بالإنجليزية.`);
+    const notes = [];
+    const got = await withSlot(() => fetchEdits(name, notes));
+    if (!got.length) {
+        console.error('[ايدت] لم تُجلب نتائج:', notes.join(' | '));
+        const err = new DlError(`❌ لم أجد إيديتات لـ «${name}». جرّب اسماً آخر أو اكتبه بالإنجليزية.`);
+        err.debug = notes.join('\n');
+        throw err;
+    }
     const cards = got.map(({ v, buf }, i) => ({
         video: buf,
         body: `*🎬 إيديت ${i + 1}*\n\n` + [
             row('📛', 'العنوان', cut(v.title, 70) || '—'),
-            row('👤', 'الحساب', '@' + (cut(v.author?.unique_id || v.author?.nickname, 30) || '—')),
-            row('⏱️', 'المدة', fmtDuration(Number(v.duration || 0)))
+            row('👤', 'الحساب', '@' + (cut(v.author, 30) || '—')),
+            ...(v.duration ? [row('⏱️', 'المدة', fmtDuration(v.duration))] : [])
         ].join('\n'),
         footer: `🤖 ${DEV}`,
         url: EDIT_CHANNEL_URL,
