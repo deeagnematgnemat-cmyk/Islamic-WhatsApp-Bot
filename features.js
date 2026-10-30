@@ -5,7 +5,6 @@ import path from 'path';
 import crypto from 'crypto';
 import pino from 'pino';
 import { execFile, spawn } from 'child_process';
-import { fileURLToPath } from 'url';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
@@ -287,12 +286,12 @@ const MP4_ENCODERS = [
     ['-c:v', 'libopenh264'],
     ['-c:v', 'mpeg4', '-q:v', '3']
 ];
-async function encodeMp4(inputArgs, vf, out, complex = false) {
+async function encodeMp4(inputArgs, vf, out) {
     let lastErr;
     for (const enc of MP4_ENCODERS) {
         try {
             rm(out);
-            await run(FFMPEG, ['-y', '-v', 'error', ...inputArgs, complex ? '-filter_complex' : '-vf', vf, '-pix_fmt', 'yuv420p', ...enc, '-movflags', '+faststart', '-an', out], 180000);
+            await run(FFMPEG, ['-y', '-v', 'error', ...inputArgs, '-vf', vf, '-pix_fmt', 'yuv420p', ...enc, '-movflags', '+faststart', '-an', out], 180000);
             if (fs.existsSync(out) && fs.statSync(out).size > 1000) return;
         } catch (e) { lastErr = e; console.error('[لفيديو] فشل المرمّز', enc[1], String(e?.stderr || e?.message || e).slice(-200)); }
     }
@@ -372,72 +371,27 @@ async function animatedStickerToRaw(buf, sharp, rawFile) {
     } finally { fs.closeSync(fd); }
 }
 
-// الطريقة الأساسية: فك كل إطار بـ ffmpeg ثم تركيب الإطارات برمجياً (بدون sharp) على خلفية سوداء
-async function animatedStickerToRawFF(buf, rawFile) {
-    const anim = parseAnimWebp(buf);
-    if (!anim || anim.frames.length < 2) return null;
-    const { w: W, h: H } = anim.canvas;
-    const list = anim.frames.slice(0, 400);
-    const dir = fs.mkdtempSync(path.join(TMP, 'svf_'));
-    const fd = fs.openSync(rawFile, 'w');
-    try {
-        const canvas = Buffer.alloc(W * H * 3);
-        const inF = path.join(dir, 'f.webp'), outF = path.join(dir, 'f.raw');
-        for (const f of list) {
-            fs.writeFileSync(inF, frameToWebp(f));
-            await run(FFMPEG, ['-y', '-v', 'error', '-i', inF, '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgba', outF], 30000);
-            const px = fs.readFileSync(outF);
-            if (px.length < f.w * f.h * 4) throw new Error('BAD_FRAME_DECODE');
-            const noBlend = !!(f.flags & 2), dispose = !!(f.flags & 1);
-            for (let y = 0; y < f.h; y++) {
-                const cy = y + f.y; if (cy >= H) break;
-                for (let x = 0; x < f.w; x++) {
-                    const cx = x + f.x; if (cx >= W) break;
-                    const s = (y * f.w + x) * 4, d = (cy * W + cx) * 3, a = px[s + 3];
-                    if (a === 255) { canvas[d] = px[s]; canvas[d + 1] = px[s + 1]; canvas[d + 2] = px[s + 2]; }
-                    else if (noBlend) { canvas[d] = (px[s] * a / 255) | 0; canvas[d + 1] = (px[s + 1] * a / 255) | 0; canvas[d + 2] = (px[s + 2] * a / 255) | 0; }
-                    else if (a > 0) { const k = a / 255; canvas[d] = (px[s] * k + canvas[d] * (1 - k)) | 0; canvas[d + 1] = (px[s + 1] * k + canvas[d + 1] * (1 - k)) | 0; canvas[d + 2] = (px[s + 2] * k + canvas[d + 2] * (1 - k)) | 0; }
-                }
-            }
-            fs.writeSync(fd, canvas);
-            if (dispose) {
-                for (let y = 0; y < f.h; y++) { const cy = y + f.y; if (cy >= H) break; const from = (cy * W + f.x) * 3; canvas.fill(0, from, Math.min(from + f.w * 3, (cy + 1) * W * 3)); }
-            }
-        }
-        const d = list.map((f) => f.delay).filter((x) => x > 0);
-        const avg = d.length ? d.reduce((a, b) => a + b, 0) / d.length : 100;
-        return { W, H, fps: Math.min(30, Math.max(5, Math.round(1000 / Math.max(avg, 20)))) };
-    } finally { fs.closeSync(fd); try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* تجاهل */ } }
-}
-
 async function stickerToVideo(c, t) {
     const buf = await download(c, t);
+    const sharp = await getSharp();
+    if (!sharp) return c.reply('❌ هذه الميزة تحتاج مكتبة sharp. أضفها في package.json ثم أعد النشر.');
     const id = uid();
-    const rawFile = path.join(TMP, `sv_${id}.raw`), inFile = path.join(TMP, `sv_${id}.webp`), out = path.join(TMP, `sv_${id}.mp4`);
+    const rawFile = path.join(TMP, `sv_${id}.raw`), imgFile = path.join(TMP, `sv_${id}.png`), out = path.join(TMP, `sv_${id}.mp4`);
     const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';                     // أبعاد زوجية مطلوبة لـ H.264
-    const errs = [];
     try {
         let anim = null;
-        try { anim = await animatedStickerToRawFF(buf, rawFile); } catch (e) { errs.push('ffmpeg: ' + String(e?.stderr || e?.message || e).slice(-200)); logErr('لفيديو-ffmpeg', e); anim = null; }
-        if (!anim) {
-            const sharp = await getSharp();
-            if (sharp) { try { anim = await animatedStickerToRaw(buf, sharp, rawFile); } catch (e) { errs.push('sharp: ' + String(e?.message || e).slice(0, 200)); logErr('لفيديو-إطارات', e); } }
-        }
+        try { anim = await animatedStickerToRaw(buf, sharp, rawFile); } catch (e) { logErr('لفيديو-إطارات', e); }
         if (anim) {
             await encodeMp4(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${anim.W}x${anim.H}`, '-framerate', String(anim.fps), '-i', rawFile], even, out);
         } else {
-            // ملصق ثابت: صورة على خلفية سوداء لمدة 3 ثوانٍ
-            fs.writeFileSync(inFile, buf);
-            await encodeMp4(['-loop', '1', '-framerate', '25', '-t', '3', '-i', inFile], 'format=rgba,split[a][b];[b]drawbox=c=black:t=fill[k];[k][a]overlay=format=auto,' + even, out, true);
+            // ملصق ثابت: نحوّله إلى فيديو قصير (3 ثوانٍ)
+            fs.writeFileSync(imgFile, await sharp(buf, { failOn: 'none' }).flatten({ background: '#000000' }).png().toBuffer());
+            await encodeMp4(['-loop', '1', '-framerate', '25', '-t', '3', '-i', imgFile], even, out);
         }
         const video = fs.readFileSync(out);
         if (video.length < 1000) throw new Error('EMPTY_VIDEO');
         await c.media({ video, mimetype: 'video/mp4', caption: '🎥 تم تحويل الملصق إلى فيديو.' });
-    } catch (e) {
-        const err = new Error('STICKER2VIDEO_FAILED');
-        err.friendly = '❌ تعذر تحويل الملصق إلى فيديو.' + (c.isSenderDev ? `\n\n🔧 للمطور:\n${[...errs, String(e?.stderr || e?.message || e).slice(-300)].join('\n')}` : '');
-        throw err;
-    } finally { rm(rawFile, inFile, out); }
+    } finally { rm(rawFile, imgFile, out); }
 }
 
 async function cmdToVideo(c) {
@@ -496,51 +450,34 @@ async function cmdAnimSticker(c) {
     if ((t.node.seconds || 0) > 10) return c.reply('⚠️ الفيديو أطول من 10 ثوانٍ. اقصّه ثم أعد المحاولة.');
     await c.reply('🎞️ جاري تحويل الفيديو إلى ملصق متحرك...');
     const video = await download(c, t);
+    const sharp = await getSharp();
     const dir = fs.mkdtempSync(path.join(TMP, 'anim_'));
-    const errs = [];
-    const isF = (f) => /^f_\d+\.png$/.test(f), isW = (f) => /^w_\d+\.webp$/.test(f);
-    // ترميز الإطارات: ffmpeg (libwebp) أولاً، ثم sharp إن لم يتوفر
-    const encodeFrames = async (q) => {
-        const pngs = fs.readdirSync(dir).filter(isF).sort();
-        try {
-            for (const f of fs.readdirSync(dir).filter(isW)) rm(path.join(dir, f));
-            await run(FFMPEG, ['-y', '-v', 'error', '-framerate', '1', '-i', path.join(dir, 'f_%04d.png'), '-c:v', 'libwebp', '-q:v', String(q), '-compression_level', '3', '-f', 'image2', path.join(dir, 'w_%04d.webp')], 180000);
-            const ws = fs.readdirSync(dir).filter(isW).sort();
-            if (ws.length === pngs.length && ws.length) return ws.map((w) => fs.readFileSync(path.join(dir, w)));
-            errs.push('ffmpeg-libwebp: عدد الإطارات غير مطابق');
-        } catch (e) { errs.push('ffmpeg-libwebp: ' + String(e?.stderr || e?.message || e).slice(-200)); }
-        const sharp = await getSharp();
-        if (!sharp) throw new Error('NO_WEBP_ENCODER');
-        const out = [];
-        for (const f of pngs) out.push(await sharp(path.join(dir, f), { failOn: 'none' }).webp({ quality: q, effort: 3, alphaQuality: 70 }).toBuffer());
-        return out;
-    };
     try {
         const inFile = path.join(dir, 'in.bin');
         fs.writeFileSync(inFile, video);
         let best = null;
-        try {
-            const LIMIT = 900 * 1024;                                    // حد آمن لحجم الملصق المتحرك في واتساب
-            const tries = [{ fps: 15, q: 55 }, { fps: 12, q: 45 }, { fps: 10, q: 38 }, { fps: 8, q: 30 }, { fps: 6, q: 24 }];
-            const exif = waStickerExif(PACK, AUTHOR);
-            for (const tr of tries) {
-                for (const f of fs.readdirSync(dir).filter(isF)) rm(path.join(dir, f));
-                const vf = `fps=${tr.fps},scale=512:512:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0`;
-                await run(FFMPEG, ['-y', '-v', 'error', '-i', inFile, '-t', '10', '-vf', vf, '-an', path.join(dir, 'f_%04d.png')], 180000);
-                if (!fs.readdirSync(dir).some(isF)) throw new Error('NO_FRAMES');
-                const frames = await encodeFrames(tr.q);
-                const webp = buildAnimatedWebp(frames, 512, 512, Math.round(1000 / tr.fps), exif);
-                best = webp;
-                if (webp.length <= LIMIT) break;
-            }
-        } catch (e) { best = null; errs.push('بناء الملصق: ' + String(e?.stderr || e?.message || e).slice(-250)); logErr('متحرك', e); }
+        if (sharp) {
+            try {
+                const LIMIT = 900 * 1024;                                // حد آمن لحجم الملصق المتحرك في واتساب
+                const tries = [{ fps: 15, q: 55 }, { fps: 12, q: 45 }, { fps: 10, q: 38 }, { fps: 8, q: 30 }, { fps: 6, q: 24 }];
+                const exif = waStickerExif(PACK, AUTHOR);
+                for (const tr of tries) {
+                    for (const f of fs.readdirSync(dir)) if (/^f_\d+\.png$/.test(f)) rm(path.join(dir, f));
+                    const vf = `fps=${tr.fps},scale=512:512:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0`;
+                    await run(FFMPEG, ['-y', '-v', 'error', '-i', inFile, '-t', '10', '-vf', vf, '-an', path.join(dir, 'f_%04d.png')], 180000);
+                    const files = fs.readdirSync(dir).filter((f) => /^f_\d+\.png$/.test(f)).sort();
+                    if (!files.length) throw new Error('NO_FRAMES');
+                    const frames = [];
+                    for (const f of files) frames.push(await sharp(path.join(dir, f), { failOn: 'none' }).webp({ quality: tr.q, effort: 3, alphaQuality: 70 }).toBuffer());
+                    const webp = buildAnimatedWebp(frames, 512, 512, Math.round(1000 / tr.fps), exif);
+                    best = webp;
+                    if (webp.length <= LIMIT) break;
+                }
+            } catch (e) { best = null; logErr('متحرك', e); }
+        }
         if (best) return await c.media({ sticker: best });
-        // احتياط أخير: الطريقة العامة (wa-sticker-formatter)
-        try { return await c.media({ sticker: await makeSticker(video, StickerTypes.FULL) }); }
-        catch (e) { errs.push('wa-sticker-formatter: ' + String(e?.message || e).slice(0, 200)); }
-        const err = new Error('ANIM_STICKER_FAILED');
-        err.friendly = '❌ تعذر تحويل الفيديو إلى ملصق متحرك.' + (c.isSenderDev ? `\n\n🔧 للمطور:\n${errs.join('\n')}` : '');
-        throw err;
+        // احتياط: الطريقة العامة (wa-sticker-formatter)
+        await c.media({ sticker: await makeSticker(video, StickerTypes.FULL) });
     } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* تجاهل */ } }
 }
 
@@ -1342,33 +1279,40 @@ async function cmdCompress(c) {
 }
 async function cmdEnhance(c) {
     const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
     const useHD = /hd|اتش/i.test(c.args);                                   // `.تحسين hd` = 1920، الافتراضي 4K = 3840
-    const asFile = /ملف|file|doc/i.test(c.args);
-    const L = useHD ? 1920 : 3840;
-    const id = uid();
-    const inp = path.join(TMP, `enh_in_${id}.bin`), out = path.join(TMP, `enh_out_${id}.jpg`);
-    fs.writeFileSync(inp, buf);
-    // F = معامل التكبير: حتى ×4 للوصول إلى الدقة المطلوبة، ولا يُكبَّر إن كانت الصورة كبيرة أصلاً
-    const F = `if(lt(${L}/max(iw\\,ih)\\,1.05)\\,1\\,min(4\\,${L}/max(iw\\,ih)))`;
-    const vf = `hqdn3d=2:2:6:6,scale=trunc(iw*${F}/2)*2:trunc(ih*${F}/2)*2:flags=lanczos,unsharp=5:5:1.0:5:5:0.0,eq=saturation=1.1:contrast=1.04`;
-    try {
-        let dims = '';
-        try {
-            await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-frames:v', '1', '-vf', vf, '-q:v', '2', out], 120000);
-        } catch (e) {
-            logErr('تحسين-ffmpeg', e);
-            // احتياط: بدون فلتر التنعيم إن لم يتوفر في ffmpeg
-            await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-frames:v', '1', '-vf', vf.replace('hqdn3d=2:2:6:6,', ''), '-q:v', '2', out], 120000);
-        }
-        const img = fs.readFileSync(out);
-        const sharp = await getSharp();
-        let w0 = 0, h0 = 0, w1 = 0, h1 = 0;
-        if (sharp) { try { const m0 = await sharp(buf, { failOn: 'none' }).metadata(); const m1 = await sharp(img).metadata(); w0 = m0.width; h0 = m0.height; w1 = m1.width; h1 = m1.height; } catch (e) { /* تجاهل */ } }
-        if (w0) dims = `\n📐 الدقة: ${w0}×${h0} ← ${w1}×${h1}`;
-        const cap = `✨ تم تحسين الصورة (${useHD ? 'HD' : '4K'})${dims}\n📦 الحجم: ${fmtSize(img.length)}` + (useHD ? '' : '\n💡 للدقة الأخف اكتب `.تحسين hd`');
-        if (asFile) await c.media({ document: img, mimetype: 'image/jpeg', fileName: `enhanced_${useHD ? 'HD' : '4K'}.jpg`, caption: cap });
-        else await c.media({ image: img, caption: cap });
-    } finally { rm(inp, out); }
+    const target = useHD ? 1920 : 3840;
+    const o = await sharp(buf, { failOn: 'none' }).rotate().toBuffer({ resolveWithObject: true });   // يثبّت اتجاه الصورة ويعطي أبعادها الحقيقية
+    const w = o.info.width, h = o.info.height, long = Math.max(w, h);
+    if (!w || !h) throw new Error('BAD_IMAGE');
+    let f = Math.min(4, target / long);                                     // أقصى تكبير ×4
+    if (f < 1.05) f = 1;
+    const W = Math.round(w * f), H = Math.round(h * f);
+
+    // 1) تنظيف قبل التكبير: تخفيف الحبيبات وبلوكات الضغط في الصور الصغيرة
+    let pre = sharp(o.data, { failOn: 'none' }).flatten({ background: '#ffffff' });
+    if (long < 1000) pre = pre.median(3);
+    // 2) تكبير تدريجي عالي الجودة (lanczos3) مع حدّة خفيفة بين المرحلتين
+    let cur = await pre.raw().toBuffer({ resolveWithObject: true });
+    let cw = cur.info.width, chh = cur.info.height;
+    while (cw < W) {
+        const nw = Math.min(W, cw * 2), nh = Math.min(H, Math.round(chh * (nw / cw)));
+        cur = await sharp(cur.data, { raw: { width: cw, height: chh, channels: cur.info.channels } })
+            .resize(nw, nh, { kernel: 'lanczos3' }).sharpen({ sigma: 0.8, m1: 0.6, m2: 1.8 }).raw().toBuffer({ resolveWithObject: true });
+        cw = cur.info.width; chh = cur.info.height;
+    }
+    // 3) تحسين التباين والألوان ثم حدّة نهائية
+    let p = sharp(cur.data, { raw: { width: cw, height: chh, channels: cur.info.channels } });
+    if (cw !== W || chh !== H) p = p.resize(W, H, { kernel: 'lanczos3' });
+    try { p = p.clahe({ width: Math.max(16, Math.round(W / 8)), height: Math.max(16, Math.round(H / 8)), maxSlope: 2 }); } catch (e) { /* نسخة sharp لا تدعمها */ }
+    const sigma = Math.min(2, 0.9 + 0.25 * f);
+    const out = await p.modulate({ saturation: 1.12, brightness: 1.02 }).sharpen({ sigma, m1: 0.8, m2: 2.5 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
+
+    let cap = `✨ تم تحسين الصورة\n📐 الدقة: ${w}×${h} ← ${W}×${H} (${useHD ? 'HD' : '4K'})\n📦 الحجم: ${fmtSize(out.length)}`;
+    if (f === 1) cap += '\nℹ️ الصورة بدقة عالية أصلاً، فتم تحسين الوضوح والتباين والألوان فقط.';
+    else if (W < target * 0.95 && H < target * 0.95) cap += '\nℹ️ الصورة صغيرة جداً فلم تُكبَّر أكثر من ×4.';
+    cap += '\n📎 أُرسلت كملف حتى لا يضغطها واتساب ويُضيّع الدقة.' + (useHD ? '' : '\n💡 للدقة الأخف اكتب `.تحسين hd`');
+    await c.media({ document: out, mimetype: 'image/jpeg', fileName: `enhanced_${useHD ? 'HD' : '4K'}.jpg`, caption: cap });
 }
 async function cmdFormat(c) {
     const buf = await getInputImage(c); if (!buf) return;
@@ -1418,33 +1362,37 @@ function floodRemoveBg(data, w, h, tol = 42) {
     return removed / (w * h) > 0.02 && removed / (w * h) < 0.97 ? data : null;   // لا شيء حُذف أو حُذف كل شيء = فشل
 }
 let RMBG_QUEUE = Promise.resolve();                                   // نموذج الذكاء الاصطناعي ثقيل: صورة واحدة في كل مرة
-const RMBG_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib', 'rmbg-worker.mjs');
 async function removeBgAI(png) {
     const errs = [];
-    const run1 = async () => {
-        const id = uid(), inF = path.join(TMP, `rmbg_in_${id}.png`), outF = path.join(TMP, `rmbg_out_${id}.png`);
-        fs.writeFileSync(inF, png);
+    const run = async () => {
+        let mod;
+        try { mod = await import('@imgly/background-removal-node'); }   // يعمل داخل السيرفر نفسه بلا مفتاح ولا موقع
+        catch (e) { errs.push('import: ' + String(e?.message || e)); const err = new Error('RMBG_IMPORT'); err.debug = errs.join('\n'); throw err; }
+        const removeBackground = mod.removeBackground || mod.default?.removeBackground || (typeof mod.default === 'function' ? mod.default : null);
+        if (typeof removeBackground !== 'function') { errs.push('import: لا توجد دالة removeBackground في الحزمة'); const err = new Error('RMBG_NO_EXPORT'); err.debug = errs.join('\n'); throw err; }
+        const tmpPng = path.join(TMP, `rmbg_${uid()}.png`);
+        fs.writeFileSync(tmpPng, png);
+        const t0 = Date.now();
+        // نجرب أشكال إدخال ونماذج مختلفة لأن بعض إصدارات الحزمة تتصرف بشكل مختلف مع Blob أو Buffer
+        const attempts = [
+            ['Blob/medium', () => removeBackground(new Blob([png], { type: 'image/png' }), { model: 'medium', output: { format: 'image/png' } })],
+            ['Uint8Array/small', () => removeBackground(new Uint8Array(png), { model: 'small', output: { format: 'image/png' } })],
+            ['file/small', () => removeBackground(new URL('file://' + tmpPng).href, { model: 'small', output: { format: 'image/png' } })]
+        ];
         try {
-            for (const model of ['small', 'medium']) {                // الصغير أخف وأسرع، والمتوسط أدق
+            for (const [label, fn] of attempts) {
+                if (Date.now() - t0 > 240000) break;
                 try {
-                    await new Promise((resolve, reject) => {
-                        execFile(process.execPath, [RMBG_WORKER, inF, outF, model], { timeout: 240000, maxBuffer: 8 * 1024 * 1024 }, (err, so, se) => {
-                            if (err) { err.stderr = String(se || ''); return reject(err); }
-                            resolve();
-                        });
-                    });
-                    const out = fs.existsSync(outF) ? fs.readFileSync(outF) : null;
-                    if (out && out.length > 1000) return out;
-                    errs.push(`${model}: ناتج فارغ`);
-                } catch (e) {
-                    const why = e.killed ? 'انتهت المهلة' : e.signal ? `أُنهيت العملية (${e.signal}) غالباً نفاد الذاكرة` : `رمز الخروج ${e.code}`;
-                    errs.push(`${model}: ${why}\n${String(e.stderr || e.message).slice(0, 500)}`);
-                }
+                    const blob = await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('RMBG_TIMEOUT')), 150000))]);
+                    const out = Buffer.from(await blob.arrayBuffer());
+                    if (out.length > 1000) return out;
+                    errs.push(`${label}: ناتج فارغ`);
+                } catch (e) { errs.push(`${label}: ${String(e?.message || e).slice(0, 300)}`); }
             }
-        } finally { rm(inF, outF); }
+        } finally { rm(tmpPng); }
         const err = new Error('RMBG_ALL_FAILED'); err.debug = errs.join('\n'); throw err;
     };
-    const job = RMBG_QUEUE.then(run1, run1);
+    const job = RMBG_QUEUE.then(run, run);
     RMBG_QUEUE = job.catch(() => {});
     return await job;
 }
