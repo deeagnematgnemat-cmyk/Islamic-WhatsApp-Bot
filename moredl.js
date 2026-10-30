@@ -501,30 +501,40 @@ async function shrinkEdit(buf) {
     return null;
 }
 
-// تنزيل فيديو واحد: مباشرة من رابط tiktok.com الحقيقي عبر yt-dlp فقط (بدون أي موقع وسيط)
+// تنزيل فيديو واحد من رابطه في تيك توك بنفس طريقة أمر .تيك (يعمل مع كل ما يعمل معه الأمر)
 async function getEditBuf(v, notes) {
     if (!v.url || !/^https?:\/\/(www\.|vm\.|vt\.)?tiktok\.com\//i.test(v.url)) return null;
-    const dir = mkjob();
+    let res;
     try {
-        const res = await viaYtdlp(v.url, 'tiktok', false, dir);
+        res = await fetchMedia(v.url, 'tiktok', false);
         const file = res.videos[0];
         if (!file) throw new Error('لا فيديو');
-        // تحقق صارم: يُقبل الفيديو فقط إذا أكّد yt-dlp أنه نزل من مستخرج TikTok ومن نطاق tiktok.com
-        const metaName = fs.readdirSync(res.dir).find((n) => n.endsWith('.info.json'));
-        let okSrc = false;
-        if (metaName) {
-            try {
-                const j = JSON.parse(fs.readFileSync(path.join(res.dir, metaName), 'utf8'));
-                okSrc = /^tiktok/i.test(String(j.extractor_key || j.extractor || '')) && /tiktok\.com/i.test(String(j.webpage_url || ''));
-            } catch (e) {}
-        }
-        if (!okSrc) throw new Error('المصدر ليس تيك توك');
-        console.log('[ايدت] تيك توك ✔', v.url);
+        if (!v.title && res.title) v.title = res.title;
+        if (!v.author && res.author) v.author = res.author;
         const buf = fs.readFileSync(await ensureWhatsAppMp4(file, res.dir));
         if (buf.length > 20000) { const s = await shrinkEdit(buf); if (s) return s; }
-    } catch (e) { notes.push('تنزيل من تيك توك: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
-    finally { rmrf(dir); }
+    } catch (e) { notes.push('تنزيل: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
+    finally { if (res?.dir) rmrf(res.dir); }
     return null;
+}
+
+// بحث تيك توك بالكلمات المفتاحية → روابط tiktok.com للفيديوهات
+async function tiktokSearch(keywords, notes) {
+    const out = [];
+    const cursor = [0, 0, 10, 20][Math.floor(Math.random() * 4)];       // تنويع النتائج في كل مرة
+    try {
+        const j = await getJson(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 25000);
+        const list = j && j.code === 0 ? (j.data?.videos || []) : [];
+        for (const d of list) {
+            const author = String(d.author?.unique_id || '').trim();
+            const id = String(d.video_id || d.aweme_id || '').trim();
+            if (!author || !id) continue;
+            out.push({ id, title: String(d.title || '').trim(), author, duration: Number(d.duration || 0), plays: Number(d.play_count || 0),
+                url: `https://www.tiktok.com/@${author}/video/${id}` });
+        }
+        if (!out.length) notes.push(`بحث تيك توك: 0 نتائج لـ«${keywords}»`);
+    } catch (e) { notes.push(`بحث تيك توك: ${String(e?.message || e).slice(0, 70)}`); }
+    return out;
 }
 
 // بحث ويب عن روابط تيك توك الأصلية (tiktok.com) فقط
@@ -559,23 +569,37 @@ async function webSearchTikTok(query, notes) {
     return list;
 }
 
+const recentEdits = [];                  // آخر الإيديتات المرسلة، حتى لا تتكرر نفس الفيديوهات
+const EDIT_STOP = new Set(['edit', 'edits', 'anime', 'amv', 'fyp', 'ايدت', 'ايديت', 'ايديتات', 'إيديت', 'تصميم', 'تصاميم', 'تصميمات', 'ايدتات']);
+const compact = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+
 async function fetchEdits(name, notes) {
     const hasAr = /[\u0600-\u06FF]/.test(name);
     const en = hasAr ? await toEnglish(name) : '';
-    const queries = [...new Set([en && en.toLowerCase() !== name.toLowerCase() ? `${en} edit` : '', `${name} edit`, hasAr ? `${name} ايدت` : `${name} edits`, en ? `${en} anime edit` : ''].filter(Boolean))];
+    const words = [...new Set(`${name} ${en}`.toLowerCase().split(/\s+/).map(compact).filter((w) => w.length >= 3 && !EDIT_STOP.has(w)))];
+    const joined = [compact(en), compact(name)].filter((w) => w.length >= 4);
+    // الفيديو ذو صلة بالشخصية إذا ذُكر اسمها (أو جزء منه) في عنوانه أو حسابه
+    const relevant = (v) => {
+        const t = compact(`${v.title} ${v.author}`);
+        if (!t) return true;                                   // لا عنوان متاح: نقبله لأنه جاء من بحث الاسم نفسه
+        return words.some((w) => t.includes(w)) || joined.some((w) => t.includes(w));
+    };
+    const core = en && en.toLowerCase() !== name.toLowerCase() ? en : name;
+    const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
     const keyOf = (v) => v.id || v.url;
     const seen = new Set(), pool = [], tried = new Set(), got = [];
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
-            if (!key || seen.has(key) || !v.url) continue;
+            if (!key || seen.has(key) || !v.url || recentEdits.includes(key)) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
+            if (!relevant(v)) continue;
             seen.add(key); pool.push(v);
         }
     };
     const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(v.title) ? 1 : 0;
     const harvest = async () => {
-        const fresh = pool.filter((v) => !tried.has(keyOf(v))).sort((a, b) => (isEdit(b) - isEdit(a)) || (b.plays - a.plays));
+        const fresh = pool.filter((v) => !tried.has(keyOf(v))).sort((a, b) => (isEdit(b) - isEdit(a)) || (Math.random() - 0.5));
         for (let i = 0; i < fresh.length && got.length < EDITS_COUNT;) {
             const part = fresh.slice(i, i + (EDITS_COUNT - got.length));
             i += part.length;
@@ -588,15 +612,21 @@ async function fetchEdits(name, notes) {
             for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
         }
     };
-    // 1) بحث ويب عن روابط tiktok.com الحقيقية
-    for (const q of queries.slice(0, 3)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 9) break; }
+    // 1) البحث في تيك توك عن تصاميم الشخصية ثم تنزيل الروابط
+    for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
     await harvest();
-    // 2) هاشتاق تيك توك عبر yt-dlp (من تيك توك مباشرة)
+    // 2) بحث ويب عن روابط tiktok.com
     if (got.length < EDITS_COUNT) {
-        const base = (en || name).toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const q of queries.slice(0, 2)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 9) break; }
+        await harvest();
+    }
+    // 3) هاشتاق تيك توك
+    if (got.length < EDITS_COUNT) {
+        const base = compact(en || name).replace(/[\u0600-\u06FF]/g, '');
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
         await harvest();
     }
+    for (const g of got) { recentEdits.push(keyOf(g.v)); if (recentEdits.length > 60) recentEdits.shift(); }
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
