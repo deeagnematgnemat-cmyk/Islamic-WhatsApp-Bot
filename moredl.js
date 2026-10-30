@@ -456,7 +456,6 @@ const EDIT_MAX_MB = 14;                       // أكبر حجم لفيديو د
 const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const EDIT_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
-const absTik = (u, host = 'https://www.tikwm.com') => (String(u || '').startsWith('/') ? host + u : String(u || ''));
 const isMp4 = (b) => !!b && b.length > 20000 && b.subarray(4, 8).toString('latin1') === 'ftyp';
 
 async function toEnglish(text) {
@@ -466,7 +465,7 @@ async function toEnglish(text) {
     } catch (e) { return ''; }
 }
 
-// المصدر 2 (احتياط): صفحة الهاشتاق عبر yt-dlp
+// صفحة الهاشتاق في تيك توك عبر yt-dlp
 async function tagSearch(tag, notes) {
     try {
         const r = await ytdlp(['--flat-playlist', '--dump-json', '--playlist-end', '12', '--no-warnings', `https://www.tiktok.com/tag/${encodeURIComponent(tag)}`], { timeout: 50000 });
@@ -478,7 +477,7 @@ async function tagSearch(tag, notes) {
                 const url = String(j.webpage_url || j.url || '');
                 if (!/tiktok\.com\/.+\/video\/\d+/.test(url)) continue;
                 out.push({ id: String(j.id || ''), title: String(j.title || j.description || '').trim(), author: String(j.uploader || j.channel || '').trim(),
-                    duration: Number(j.duration || 0), plays: Number(j.view_count || 0), play: '', url });
+                    duration: Number(j.duration || 0), plays: Number(j.view_count || 0), url });
             } catch (e) {}
         }
         if (!out.length) notes.push(`yt-dlp #${tag}: 0 نتائج`);
@@ -528,7 +527,7 @@ async function getEditBuf(v, notes) {
     return null;
 }
 
-// المصدر 3: محرّك بحث ويب (روابط تيك توك فقط) — مستقل تماماً عن بحث tikwm الذي قد يُحظر على سيرفرات الاستضافة
+// بحث ويب عن روابط تيك توك الأصلية (tiktok.com) فقط
 async function webSearchTikTok(query, notes) {
     const q = `site:tiktok.com ${query}`;
     const urls = [
@@ -553,7 +552,7 @@ async function webSearchTikTok(query, notes) {
         if (found.size >= 8) break;
     }
     if (!found.size) notes.push(`بحث ويب: 0 روابط لـ«${query}»`);
-    const list = [...found].slice(0, 8).map(([id, author]) => ({ id, title: '', author, duration: 0, plays: 0, play: '', url: `https://www.tiktok.com/@${author}/video/${id}` }));
+    const list = [...found].slice(0, 8).map(([id, author]) => ({ id, title: '', author, duration: 0, plays: 0, url: `https://www.tiktok.com/@${author}/video/${id}` }));
     await Promise.allSettled(list.map(async (v) => {                       // العنوان من oEmbed (اختياري)
         try { const j = await getJson('https://www.tiktok.com/oembed?url=' + encodeURIComponent(v.url), 8000); v.title = String(j?.title || '').trim(); } catch (e) {}
     }));
@@ -564,12 +563,12 @@ async function fetchEdits(name, notes) {
     const hasAr = /[\u0600-\u06FF]/.test(name);
     const en = hasAr ? await toEnglish(name) : '';
     const queries = [...new Set([en && en.toLowerCase() !== name.toLowerCase() ? `${en} edit` : '', `${name} edit`, hasAr ? `${name} ايدت` : `${name} edits`, en ? `${en} anime edit` : ''].filter(Boolean))];
-    const keyOf = (v) => (v.yt ? 'yt:' : '') + (v.id || v.url);
+    const keyOf = (v) => v.id || v.url;
     const seen = new Set(), pool = [], tried = new Set(), got = [];
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
-            if (!key || seen.has(key) || !(v.play || v.url || v.yt)) continue;
+            if (!key || seen.has(key) || !v.url) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
             seen.add(key); pool.push(v);
         }
