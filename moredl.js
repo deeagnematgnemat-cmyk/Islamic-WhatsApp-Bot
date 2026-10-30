@@ -450,260 +450,22 @@ async function cmdVideoInfo(c, fallbackText) {
     ]], `🤖 ${DEV}`));
 }
 
-// ---------------------------------------------------------------- ايدت: 3 إيديتات من تيك توك فقط (بطاقات فيديو أفقية)
-// المصدر الوحيد: تيك توك (بحث تيك توك عبر tikwm + صفحة الهاشتاق في tiktok.com عبر yt-dlp). لا Google ولا Pinterest ولا Instagram.
+// ---------------------------------------------------------------- ايدت: 3 إيديتات من تيك توك (بطاقات فيديو أفقية)
 const EDITS_COUNT = 3;
 const EDIT_MAX_MB = 14;                       // أكبر حجم لفيديو داخل بطاقة (البطاقات الثقيلة قد ترفضها واتساب)
-const EDIT_TIMEOUT_MS = 4 * 60 * 1000;        // أقصى مدة كلية للبحث والجلب
 const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const EDIT_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
 const isMp4 = (b) => !!b && b.length > 20000 && b.subarray(4, 8).toString('latin1') === 'ftyp';
-const compact = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
-const normWords = (t) => ' ' + String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ').trim() + ' ';
-const EDIT_STOP = new Set(['edit', 'edits', 'anime', 'amv', 'fyp', 'tiktok', 'ايدت', 'ايديت', 'ايديتات', 'إيديت', 'تصميم', 'تصاميم', 'تصميمات', 'ايدتات']);
-const recentEdits = new Map();                // اسم الشخصية → آخر الإيديتات المرسلة، حتى لا تتكرر نفس الفيديوهات
 
-async function toEnglish(text) {              // ترجمة اسم الشخصية فقط (لتحسين مطابقة الاسم)، وليست مصدر بحث
+async function toEnglish(text) {
     try {
         const j = await getJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text), 15000);
         return String((j?.[0] || []).map((x) => x?.[0] || '').join('')).trim();
     } catch (e) { return ''; }
 }
 
-// ---- حلّ اسم الشخصية (عربي/إنجليزي) إلى صيغ بحث إنجليزية متعددة
-// [الاسم الإنجليزي الأساسي، [كتابات عربية شائعة]، [صيغ إنجليزية بديلة]، [كلمات تدل على العمل الذي تنتمي له]]
-const CHARACTERS = [
-    ['Eren Yeager', ['ايرين ييغر', 'ايرين ييجر', 'ايرين ياجر', 'ايرين جيجر', 'ايرين يجر', 'ايرن ييجر', 'ايرين', 'إيرين'], ['Eren Jaeger', 'Eren AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
-    ['Levi Ackerman', ['ليفاي اكرمان', 'ليفاي أكرمان', 'ليفاي', 'ليفي', 'ليفاى'], ['Levi AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
-    ['Mikasa Ackerman', ['ميكاسا اكرمان', 'ميكاسا'], ['Mikasa AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
-    ['Armin Arlert', ['ارمين ارليرت', 'ارمين'], ['Armin AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
-    ['Toji Fushiguro', ['توجي فوشيغورو', 'توجي فوشيجورو', 'توجي', 'توجى', 'توجي زينين', 'توجي فوشيغورو'], ['Toji', 'Toji JJK', 'Toji Zenin', 'Fushiguro Toji', 'Toji Fushiguro JJK', 'Toji Jujutsu Kaisen'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Satoru Gojo', ['غوجو ساتورو', 'جوجو ساتورو', 'ساتورو غوجو', 'غوجو', 'جوجو', 'قوجو', 'غوغو'], ['Gojo Satoru', 'Gojo', 'Gojo JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Ryomen Sukuna', ['سوكونا', 'سكونا', 'سوكونه'], ['Sukuna', 'Sukuna JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Yuji Itadori', ['يوجي ايتادوري', 'ايتادوري', 'يوجي'], ['Itadori', 'Itadori Yuji'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Megumi Fushiguro', ['ميغومي', 'ميجومي', 'ميغومى'], ['Megumi', 'Megumi JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Suguru Geto', ['غيتو', 'جيتو', 'سوغورو غيتو'], ['Geto', 'Geto Suguru'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Kento Nanami', ['نانامي', 'كينتو نانامي'], ['Nanami', 'Nanami JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Naruto Uzumaki', ['ناروتو اوزوماكي', 'ناروتو', 'ناروتو أوزوماكي'], ['Naruto'], ['naruto', 'shippuden', 'konoha']],
-    ['Sasuke Uchiha', ['ساسكي اوتشيها', 'ساسكي', 'ساسوكي', 'ساسكى'], ['Sasuke'], ['naruto', 'shippuden', 'konoha']],
-    ['Itachi Uchiha', ['ايتاتشي اوتشيها', 'ايتاتشي', 'إيتاتشي', 'اتاشي'], ['Itachi'], ['naruto', 'shippuden', 'konoha']],
-    ['Kakashi Hatake', ['كاكاشي هاتاكي', 'كاكاشي'], ['Kakashi'], ['naruto', 'shippuden', 'konoha']],
-    ['Madara Uchiha', ['مادارا اوتشيها', 'مادارا'], ['Madara'], ['naruto', 'shippuden', 'konoha']],
-    ['Obito Uchiha', ['اوبيتو', 'أوبيتو'], ['Obito'], ['naruto', 'shippuden', 'konoha']],
-    ['Minato Namikaze', ['ميناتو'], ['Minato'], ['naruto', 'shippuden', 'konoha']],
-    ['Monkey D. Luffy', ['لوفي', 'مونكي دي لوفي', 'لوفى'], ['Luffy', 'Luffy One Piece'], ['one piece', 'onepiece', 'gear', 'strawhat']],
-    ['Roronoa Zoro', ['زورو', 'رورونوا زورو', 'زوورو'], ['Zoro', 'Zoro One Piece'], ['one piece', 'onepiece', 'strawhat']],
-    ['Sanji', ['سانجي', 'سانجى'], ['Sanji One Piece'], ['one piece', 'onepiece', 'strawhat']],
-    ['Portgas D. Ace', ['ايس', 'آيس', 'بورتغاس ايس'], ['Ace One Piece', 'Portgas Ace'], ['one piece', 'onepiece']],
-    ['Son Goku', ['غوكو', 'جوكو', 'قوكو', 'سون غوكو'], ['Goku', 'Goku Dragon Ball'], ['dragon ball', 'dragonball', 'dbz', 'dbs', 'saiyan']],
-    ['Vegeta', ['فيجيتا', 'فيغيتا'], ['Vegeta Dragon Ball'], ['dragon ball', 'dragonball', 'dbz', 'dbs', 'saiyan']],
-    ['Tanjiro Kamado', ['تانجيرو كامادو', 'تانجيرو'], ['Tanjiro', 'Tanjiro Demon Slayer'], ['demon slayer', 'kimetsu', 'ds']],
-    ['Zenitsu Agatsuma', ['زينيتسو'], ['Zenitsu'], ['demon slayer', 'kimetsu']],
-    ['Inosuke Hashibira', ['اينوسكي', 'اينوسوكي'], ['Inosuke'], ['demon slayer', 'kimetsu']],
-    ['Nezuko Kamado', ['نيزوكو'], ['Nezuko'], ['demon slayer', 'kimetsu']],
-    ['Kyojuro Rengoku', ['رينغوكو', 'رنجوكو', 'رينجوكو'], ['Rengoku'], ['demon slayer', 'kimetsu']],
-    ['Giyu Tomioka', ['غيو', 'جيو', 'غيو تومايوكا'], ['Giyu'], ['demon slayer', 'kimetsu']],
-    ['Muzan Kibutsuji', ['موزان', 'موزان كيبوتسوجي'], ['Muzan'], ['demon slayer', 'kimetsu']],
-    ['Akaza', ['اكازا', 'أكازا'], ['Akaza Demon Slayer'], ['demon slayer', 'kimetsu']],
-    ['Killua Zoldyck', ['كيلوا زولديك', 'كيلوا', 'كيلوى'], ['Killua', 'Killua HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
-    ['Gon Freecss', ['غون فريكس', 'غون', 'جون فريكس'], ['Gon', 'Gon HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
-    ['Hisoka Morow', ['هيسوكا'], ['Hisoka'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
-    ['Kurapika', ['كورابيكا', 'كوارابيكا'], ['Kurapika HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
-    ['Light Yagami', ['لايت ياغامي', 'لايت ياجامي', 'لايت', 'ياغامي لايت'], ['Light Yagami', 'Light Death Note', 'Kira'], ['death note', 'deathnote', 'kira']],
-    ['Ryuk', ['ريوك'], ['Ryuk Death Note'], ['death note', 'deathnote']],
-    ['Edward Elric', ['ادوارد الريك', 'إدوارد إلريك', 'ادوارد'], ['Edward Elric FMA'], ['fullmetal', 'fma', 'alchemist']],
-    ['Roy Mustang', ['روي موستانغ', 'روي موستانج'], ['Mustang FMA'], ['fullmetal', 'fma', 'alchemist']],
-    ['Izuku Midoriya', ['ديكو', 'ايزوكو ميدوريا', 'ميدوريا'], ['Deku', 'Midoriya', 'Deku MHA'], ['mha', 'my hero', 'bnha', 'boku no hero']],
-    ['Katsuki Bakugo', ['باكوغو', 'باكوجو', 'كاتسوكي باكوغو'], ['Bakugo', 'Bakugo MHA'], ['mha', 'my hero', 'bnha', 'boku no hero']],
-    ['Shoto Todoroki', ['تودوروكي', 'شوتو تودوروكي'], ['Todoroki'], ['mha', 'my hero', 'bnha', 'boku no hero']],
-    ['Thorfinn', ['ثورفين', 'ثورفن', 'تورفين'], ['Thorfinn Vinland Saga'], ['vinland', 'saga']],
-    ['Askeladd', ['اسكيلاد', 'أسكيلاد'], ['Askeladd Vinland Saga'], ['vinland', 'saga']],
-    ['Guts', ['غاتس', 'جاتس', 'قاتس'], ['Guts Berserk'], ['berserk']],
-    ['Griffith', ['غريفيث', 'جريفيث', 'غريفث'], ['Griffith Berserk'], ['berserk']],
-    ['Denji', ['دينجي', 'دنجي'], ['Denji Chainsaw Man'], ['chainsaw', 'csm']],
-    ['Makima', ['ماكيما'], ['Makima Chainsaw Man'], ['chainsaw', 'csm']],
-    ['Saitama', ['سايتاما', 'سايتما'], ['Saitama One Punch Man'], ['one punch', 'opm']],
-    ['Jotaro Kujo', ['جوتارو كوجو', 'جوتارو'], ['Jotaro', 'Jotaro JoJo'], ['jojo', 'bizarre']],
-    ['Dio Brando', ['ديو براندو', 'ديو'], ['Dio', 'DIO JoJo'], ['jojo', 'bizarre']],
-    ['Giorno Giovanna', ['جيورنو', 'جيورنو جيوفانا'], ['Giorno', 'Giorno JoJo'], ['jojo', 'bizarre']],
-    ['Lelouch Lamperouge', ['لولوش', 'ليلوش', 'لولوش لامبيروج'], ['Lelouch', 'Lelouch Code Geass'], ['code geass', 'geass']],
-    ['Spike Spiegel', ['سبايك سبيجل', 'سبايك'], ['Spike Cowboy Bebop'], ['bebop', 'cowboy']],
-    ['Ichigo Kurosaki', ['ايتشيغو', 'ايتشيجو', 'ايتشيغو كوروساكي'], ['Ichigo', 'Ichigo Bleach'], ['bleach']],
-    ['Sosuke Aizen', ['ايزن', 'آيزن', 'ايزين'], ['Aizen', 'Aizen Bleach'], ['bleach']],
-    ['Ken Kaneki', ['كانيكي', 'كانيكى', 'كين كانيكي'], ['Kaneki', 'Kaneki Tokyo Ghoul'], ['tokyo ghoul', 'ghoul']],
-    ['Yuta Okkotsu', ['يوتا اوكوتسو', 'يوتا'], ['Yuta', 'Yuta JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Maki Zenin', ['ماكي زينين', 'ماكي'], ['Maki', 'Maki JJK'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Nobara Kugisaki', ['نوبارا'], ['Nobara'], ['jjk', 'jujutsu', 'kaisen']],
-    ['Choso', ['تشوسو', 'شوسو'], ['Choso JJK'], ['jjk', 'jujutsu', 'kaisen']]
-];
-
-// توحيد الكتابة العربية (حذف التشكيل/المدّ، توحيد الألف والياء والتاء المربوطة، دمج الحروف المتقاربة نطقاً في الأسماء الأجنبية)
-const arNorm = (t) => String(t || '').toLowerCase()
-    .replace(/[\u064B-\u0652\u0640]/g, '')
-    .replace(/[أإآٱ]/g, 'ا').replace(/[ىئ]/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و')
-    .replace(/[غجقكگ]/g, 'ج').replace(/[سصث]/g, 'س').replace(/[طت]/g, 'ت').replace(/[ذزظ]/g, 'ز').replace(/[هح]/g, 'ه')
-    .replace(/(.)\1+/g, '$1').replace(/[^a-z0-9\u0600-\u06FF\s]/g, ' ').replace(/\s+/g, ' ').trim();
-const arSkeleton = (t) => arNorm(t).replace(/[اويء\s]/g, '');     // هيكل الحروف الساكنة فقط: «ايرين ييغر» ≈ «ايرين ييجر» ≈ «ايرن جيجر»
-const lev = (a, b) => {
-    const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
-    let prev = Array.from({ length: n + 1 }, (_, j) => j);
-    for (let i = 1; i <= m; i++) {
-        const cur = [i];
-        for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-        prev = cur;
-    }
-    return prev[n];
-};
-const CHAR_INDEX = CHARACTERS.map((ch) => ({
-    ch,
-    ar: ch[1].map((a) => ({ norm: arNorm(a), skel: arSkeleton(a) })).filter((x) => x.skel),
-    en: [ch[0], ...ch[2]].map((e) => compact(e)).filter(Boolean),
-    enWords: [ch[0], ...ch[2]].flatMap((e) => e.toLowerCase().split(/\s+/)).filter((w) => w.length >= 4)
-}));
-function findCharacter(name) {
-    const hasAr = /[\u0600-\u06FF]/.test(name);
-    if (hasAr) {
-        const n = arNorm(name), sk = arSkeleton(name);
-        if (!sk) return null;
-        let best = null, bestScore = -1;
-        for (const e of CHAR_INDEX) for (const a of e.ar) {
-            let score = -1;
-            if (n === a.norm) score = 100;
-            else if (sk === a.skel) score = 90;
-            else if (sk.length >= 3 && a.skel.length >= 3 && Math.abs(sk.length - a.skel.length) <= 1 && lev(sk, a.skel) <= (Math.max(sk.length, a.skel.length) >= 6 ? 2 : 1)) score = 70 - lev(sk, a.skel) * 5;
-            else if (a.skel.length >= 3 && (sk.startsWith(a.skel) || a.skel.startsWith(sk)) && Math.min(sk.length, a.skel.length) >= 3) score = 50;   // اسم أول فقط أو الاسم مع لقب
-            if (score > bestScore) { bestScore = score; best = e; }
-        }
-        return bestScore >= 50 ? best.ch : null;
-    }
-    const c = compact(name);
-    if (c.length < 3) return null;
-    for (const e of CHAR_INDEX) if (e.en.includes(c)) return e.ch;
-    const words = String(name).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
-    for (const e of CHAR_INDEX) if (words.length && words.every((w) => e.enWords.includes(w) || e.en.some((x) => x.includes(w)))) return e.ch;
-    return null;
-}
-// ترجمة/حروف لاتينية عبر Google (احتياط للأسماء غير الموجودة في القاموس): الترجمة + النقل الصوتي إن وُجد
-async function translitArabic(text) {
-    const out = [];
-    try {
-        const j = await getJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&dt=rm&q=' + encodeURIComponent(text), 15000);
-        const segs = Array.isArray(j?.[0]) ? j[0] : [];
-        out.push(segs.map((x) => x?.[0] || '').join('').trim());
-        out.push(segs.map((x) => x?.[3] || '').join('').trim());
-    } catch (e) {}
-    return out.filter((x) => x && !/[\u0600-\u06FF]/.test(x));
-}
-const titleCase = (s) => String(s || '').replace(/[^A-Za-z0-9\s'.-]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b[a-z]/g, (m) => m.toUpperCase());
-// يرجع كل صيغ الاسم المحتملة: names (إنجليزية للبحث، الأهم أولاً) + series (كلمات تدل على العمل) + known (وُجدت في القاموس)
-async function resolveCharacter(name) {
-    const hasAr = /[\u0600-\u06FF]/.test(name);
-    const found = findCharacter(name);
-    const names = [];
-    let series = [];
-    if (found) { names.push(found[0], ...found[2]); series = found[3]; }
-    if (!hasAr) names.unshift(name);
-    else if (!found) {
-        for (const v of await translitArabic(name)) names.push(titleCase(v));        // اسم غير موجود في القاموس
-        const flat = names.filter(Boolean);
-        if (!flat.length) names.push('');
-    }
-    const uniq = [], seen = new Set();
-    for (const n of names) { const k = compact(n); if (k.length >= 2 && !seen.has(k)) { seen.add(k); uniq.push(n.trim()); } }
-    return { names: uniq.slice(0, 6), series, known: !!found };
-}
-
-// تقليص فيديو ثقيل ليناسب بطاقة الكاروسيل (بدل رفضه)
-async function shrinkEdit(buf) {
-    if (buf.length <= EDIT_MAX_MB * MB) return buf;
-    const dir = mkjob();
-    try {
-        const inp = path.join(dir, 'in.mp4'), out = path.join(dir, 'out.mp4');
-        fs.writeFileSync(inp, buf);
-        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-vf', "scale=-2:'min(480,ih)'", '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30',
-            '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { timeout: 5 * 60 * 1000 });
-        const o = fs.readFileSync(out);
-        if (o.length > 20000 && o.length <= EDIT_MAX_MB * MB) return o;
-    } catch (e) { console.error('[ايدت] فشل تقليص الفيديو:', String(e?.stderr || e?.message || e).slice(-200)); }
-    finally { rmrf(dir); }
-    return null;
-}
-
-// يضمن أن الفيديو H.264/AAC (يقبله واتساب) ثم يقلّص حجمه إن لزم
-async function prepareEdit(buf) {
-    if (!isMp4(buf)) return null;
-    const dir = mkjob();
-    try {
-        const inp = path.join(dir, 'raw.mp4');
-        fs.writeFileSync(inp, buf);
-        let out = buf;
-        try { out = fs.readFileSync(await ensureWhatsAppMp4(inp, dir)); } catch (e) { console.error('[ايدت] تعذر ضبط الترميز:', String(e?.stderr || e?.message || e).slice(-150)); }
-        return await shrinkEdit(out);
-    } finally { rmrf(dir); }
-}
-
-// ---- بحث تيك توك بالكلمات المفتاحية (يعيد روابط tiktok.com + رابط التنزيل المباشر إن وُجد)
-async function tiktokSearch(keywords, notes, cursor = 0) {
-    const abs = (u) => (String(u || '').startsWith('/') ? 'https://www.tikwm.com' + u : String(u || ''));
-    const hosts = ['www.tikwm.com', 'tikwm.com'];
-    for (let attempt = 0; attempt < 4; attempt++) {
-        try {
-            const host = hosts[attempt % hosts.length];
-            const j = await getJson(`https://${host}/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 15000);
-            if (j && j.code === 0) {
-                const out = [];
-                for (const d of (j.data?.videos || [])) {
-                    const author = String(d.author?.unique_id || '').trim();
-                    const id = String(d.video_id || d.aweme_id || '').trim();
-                    if (!author || !id || (Array.isArray(d.images) && d.images.length)) continue;     // نريد فيديو فقط
-                    out.push({ id, title: String(d.title || '').trim(), author, duration: Number(d.duration || 0), plays: Number(d.play_count || 0),
-                        direct: abs(d.play || d.hdplay), alt: d.play && d.hdplay ? abs(d.hdplay) : '', url: `https://www.tiktok.com/@${author}/video/${id}` });
-                }
-                if (!out.length) notes.push(`بحث تيك توك: 0 نتائج لـ«${keywords}»`);
-                return out;
-            }
-            const msg = String(j?.msg || 'رد غير متوقع');
-            if (attempt < 3 && /limit|second|frequen/i.test(msg)) { await sleepMs(1200); continue; }   // الحد: طلب كل ثانية
-            if (attempt < 3) { await sleepMs(900); continue; }
-            notes.push(`بحث تيك توك: ${msg.slice(0, 70)}`);
-            return [];
-        } catch (e) {
-            if (attempt < 3) { await sleepMs(1300); continue; }
-            notes.push(`بحث تيك توك: ${String(e?.message || e).slice(0, 70)}`);
-        }
-    }
-    return [];
-}
-
-// ---- احتياط: محركات البحث (DuckDuckGo / Bing / Yahoo) لاستخراج روابط فيديوهات تيك توك، ثم تنزيلها بنفس طريقة أمر .تيك
-async function webTiktokSearch(q, notes) {
-    const out = [], seen = new Set();
-    const query = `site:tiktok.com ${q}`;
-    const urls = [
-        'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query),
-        'https://lite.duckduckgo.com/lite/?q=' + encodeURIComponent(query),
-        'https://www.bing.com/search?count=30&q=' + encodeURIComponent(query),
-        'https://search.yahoo.com/search?n=30&p=' + encodeURIComponent(query)
-    ];
-    await Promise.all(urls.map(async (u) => {
-        try {
-            let html = (await getBuf(u, { timeout: 12000, max: 6 * MB, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).toString('utf8');
-            try { html = decodeURIComponent(html.replace(/%(?![0-9a-f]{2})/gi, '%25')); } catch (e) {}
-            html = html.replace(/&amp;/g, '&');
-            const re = /tiktok\.com\/@([\w.\-]{2,40})\/video\/(\d{15,25})/g;
-            let m;
-            while ((m = re.exec(html))) {
-                if (seen.has(m[2])) continue;
-                seen.add(m[2]);
-                out.push({ id: m[2], title: '', author: m[1], duration: 0, plays: 0, direct: '', url: `https://www.tiktok.com/@${m[1]}/video/${m[2]}` });
-            }
-        } catch (e) { notes.push('بحث ويب: ' + String(e?.message || e).slice(0, 50)); }
-    }));
-    if (!out.length) notes.push(`بحث ويب: 0 نتائج لـ«${q}»`);
-    return out;
-}
-
-// ---- صفحة الهاشتاق في tiktok.com عبر yt-dlp (احتياط)
+// صفحة الهاشتاق في تيك توك عبر yt-dlp
 async function tagSearch(tag, notes) {
     try {
         const r = await ytdlp(['--flat-playlist', '--dump-json', '--playlist-end', '12', '--no-warnings', `https://www.tiktok.com/tag/${encodeURIComponent(tag)}`], { timeout: 50000 });
@@ -715,7 +477,7 @@ async function tagSearch(tag, notes) {
                 const url = String(j.webpage_url || j.url || '');
                 if (!/tiktok\.com\/.+\/video\/\d+/.test(url)) continue;
                 out.push({ id: String(j.id || ''), title: String(j.title || j.description || '').trim(), author: String(j.uploader || j.channel || '').trim(),
-                    duration: Number(j.duration || 0), plays: Number(j.view_count || 0), direct: '', url });
+                    duration: Number(j.duration || 0), plays: Number(j.view_count || 0), url });
             } catch (e) {}
         }
         if (!out.length) notes.push(`yt-dlp #${tag}: 0 نتائج`);
@@ -723,17 +485,24 @@ async function tagSearch(tag, notes) {
     } catch (e) { notes.push(`yt-dlp #${tag}: ${String(e?.friendly || e?.message || e).slice(0, 90)}`); return []; }
 }
 
-// ---- تنزيل فيديو واحد: الرابط المباشر من نتيجة البحث أولاً، ثم نفس طريقة أمر .تيك (yt-dlp ثم tikwm)
+// تقليص فيديو ثقيل ليناسب بطاقة الكاروسيل (بدل رفضه)
+async function shrinkEdit(buf) {
+    if (buf.length <= EDIT_MAX_MB * MB) return buf;
+    const dir = mkjob();
+    try {
+        const inp = path.join(dir, 'in.mp4'), out = path.join(dir, 'out.mp4');
+        fs.writeFileSync(inp, buf);
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-vf', "scale=-2:'min(480,ih)'", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30',
+            '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { timeout: 5 * 60 * 1000 });
+        const o = fs.readFileSync(out);
+        if (o.length > 20000 && o.length <= EDIT_MAX_MB * MB) return o;
+    } catch (e) { console.error('[ايدت] فشل تقليص الفيديو:', String(e?.stderr || e?.message || e).slice(-200)); }
+    finally { rmrf(dir); }
+    return null;
+}
+
+// تنزيل فيديو واحد من رابطه في تيك توك بنفس طريقة أمر .تيك (يعمل مع كل ما يعمل معه الأمر)
 async function getEditBuf(v, notes) {
-    for (const link of [v.direct, v.alt]) {
-        if (!link) continue;
-        try {
-            const raw = await getBuf(link, { timeout: 45000, max: 60 * MB });
-            const p = await prepareEdit(raw);
-            if (p) return p;
-            notes.push('مباشر: ملف غير صالح');
-        } catch (e) { notes.push('مباشر: ' + String(e?.friendly || e?.message || e).slice(0, 60)); }
-    }
     if (!v.url || !/^https?:\/\/(www\.|vm\.|vt\.)?tiktok\.com\//i.test(v.url)) return null;
     let res;
     try {
@@ -742,97 +511,100 @@ async function getEditBuf(v, notes) {
         if (!file) throw new Error('لا فيديو');
         if (!v.title && res.title) v.title = res.title;
         if (!v.author && res.author) v.author = res.author;
-        const p = await prepareEdit(fs.readFileSync(file));
-        if (p) return p;
+        const buf = fs.readFileSync(await ensureWhatsAppMp4(file, res.dir));
+        if (buf.length > 20000) { const s = await shrinkEdit(buf); if (s) return s; }
     } catch (e) { notes.push('تنزيل: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
     finally { if (res?.dir) rmrf(res.dir); }
     return null;
 }
 
-async function fetchEdits(name, notes, progress) {
-    const deadline = Date.now() + EDIT_TIMEOUT_MS;
-    const hasAr = /[\u0600-\u06FF]/.test(name);
-    const R = await resolveCharacter(name);                  // صيغ الاسم الإنجليزية (من القاموس/الترجمة) — عربي أو إنجليزي
-    if (hasAr && !R.names.length) { const en0 = await toEnglish(name); if (en0 && !/[\u0600-\u06FF]/.test(en0)) R.names.push(titleCase(en0)); }
-    const enNames = R.names.filter(Boolean);
-    const core = enNames[0] || name;
-    const allNames = [...new Set([name, ...enNames].filter(Boolean).map((s) => s.toLowerCase()))];
-    for (const n of enNames) for (const w of n.toLowerCase().split(/\s+/)) { const k = compact(w); if (k.length >= 4 && !EDIT_STOP.has(k) && !allNames.includes(k)) allNames.push(k); }   // الاسم الأول/الأخير كمعرّف مستقل (Toji / Eren / Yeager)
-    const nameSets = allNames
-        .map((s) => s.split(/\s+/).map(compact).filter((w) => w.length >= 2 && !EDIT_STOP.has(w))).filter((a) => a.length);
-    const fulls = [...new Set(allNames.map(compact).filter((w) => w.length >= 3))];
-    const hasWord = (norm, w) => norm.includes(' ' + w);                  // بداية كلمة (يطابق #erenyeager و eren)
-    const seriesRe = R.series.length ? new RegExp(R.series.map((x) => x.replace(/[^a-z0-9 ]/g, '').replace(/ /g, '\\s?')).join('|'), 'i') : null;
-    const animeCtx = /anime|amv|manga|edit|ايدت|ايديت|انمي|أنمي/i;
-    // 0 = الاسم كاملاً مذكور في العنوان/الهاشتاقات/الحساب • 1 = جزء مميّز من الاسم مع دليل أنه الشخصية نفسها • null = غير مرتبط
-    const tierOf = (v) => {
-        const text = `${v.title} ${v.author}`;
-        const norm = normWords(text), ct = compact(text);
-        if (!ct) return null;
-        const multi = nameSets.some((ws) => ws.length > 1 && ws.every((w) => hasWord(norm, w)));          // الاسم الكامل بكلماته
-        const single = nameSets.some((ws) => ws.length === 1 && ws[0].length >= 3 && hasWord(norm, ws[0]) && (ws[0].length >= 4 || (seriesRe && seriesRe.test(text))));  // اسم من كلمة واحدة (Toji / Sukuna)
-        const glued = fulls.some((f) => f.length >= 7 && ct.includes(f));                                   // مدموج: #erenyeager
-        if (multi || glued) return 0;
-        if (single) return (!seriesRe || seriesRe.test(text) || animeCtx.test(text)) ? 0 : 1;
-        // جزء من الاسم (مثل «Eren» فقط): نقبله فقط إن ظهر ما يدل على العمل نفسه، حتى لا نجلب شخصاً آخر بنفس الاسم
-        if (nameSets.some((ws) => ws.some((w) => w.length >= 4 && hasWord(norm, w)))) {
-            if (seriesRe ? seriesRe.test(text) : animeCtx.test(text)) return 1;
+// بحث تيك توك بالكلمات المفتاحية → روابط tiktok.com للفيديوهات
+async function tiktokSearch(keywords, notes) {
+    const out = [];
+    const cursor = [0, 0, 10, 20][Math.floor(Math.random() * 4)];       // تنويع النتائج في كل مرة
+    try {
+        const j = await getJson(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 25000);
+        const list = j && j.code === 0 ? (j.data?.videos || []) : [];
+        for (const d of list) {
+            const author = String(d.author?.unique_id || '').trim();
+            const id = String(d.video_id || d.aweme_id || '').trim();
+            if (!author || !id) continue;
+            out.push({ id, title: String(d.title || '').trim(), author, duration: Number(d.duration || 0), plays: Number(d.play_count || 0),
+                url: `https://www.tiktok.com/@${author}/video/${id}` });
         }
-        return null;
+        if (!out.length) notes.push(`بحث تيك توك: 0 نتائج لـ«${keywords}»`);
+    } catch (e) { notes.push(`بحث تيك توك: ${String(e?.message || e).slice(0, 70)}`); }
+    return out;
+}
+
+// بحث ويب عن روابط تيك توك الأصلية (tiktok.com) فقط
+async function webSearchTikTok(query, notes) {
+    const q = `site:tiktok.com ${query}`;
+    const urls = [
+        `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+        `https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=en&count=30`
+    ];
+    const found = new Map();
+    const grab = (txt) => {
+        const re = /tiktok\.com\/(@[\w.\-]+)\/video\/(\d{8,25})/g;
+        let m; while ((m = re.exec(txt))) if (!found.has(m[2])) found.set(m[2], m[1].slice(1));
+        const re2 = /tiktok\.com\s*(?:›|&rsaquo;|&#8250;)\s*(@[\w.\-]+)\s*(?:›|&rsaquo;|&#8250;)\s*video\s*(?:›|&rsaquo;|&#8250;)\s*(\d{8,25})/g;
+        while ((m = re2.exec(txt))) if (!found.has(m[2])) found.set(m[2], m[1].slice(1));
     };
-    // صيغ البحث بترتيب الأهمية: الاسم الأساسي ثم البدائل (Yeager/Jaeger…) ثم العربية
-    const queries = [];
-    const addQ = (q) => { q = String(q || '').trim(); if (q && !queries.includes(q)) queries.push(q); };
-    const firstName = String(core).split(/\s+/)[0];
-    addQ(`${core} edit`); addQ(`${core} anime edit`);
-    for (const n of enNames.slice(1, 4)) addQ(`${n} edit`);
-    addQ(`${firstName} edit`); addQ(`${core} edits`); addQ(`${core} amv`);
-    if (R.series[0]) addQ(`${firstName} ${R.series[0]} edit`);
-    addQ(`${firstName} anime`); addQ(`${core} fyp`); addQ(`#${compact(core)}`); addQ(`#${compact(firstName)}edit`);
-    if (hasAr) { addQ(`${name} ايدت`); addQ(`${name} انمي`); addQ(name); }
-    queries.length = Math.min(queries.length, 12);
+    for (const u of urls) {
+        try {
+            const html = (await getBuf(u, { timeout: 20000, max: 4 * MB, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).toString('utf8');
+            grab(html);
+            grab(html.replace(/%2F/gi, '/').replace(/%40/g, '@').replace(/%3A/gi, ':'));
+            const re3 = /[?&;]u=a1([A-Za-z0-9_\-]+)/g;                     // روابط بينغ المشفّرة
+            let m; while ((m = re3.exec(html))) { try { grab(Buffer.from(m[1], 'base64url').toString('utf8')); } catch (e) {} }
+        } catch (e) { notes.push(`بحث ويب: ${String(e?.message || e).slice(0, 70)}`); }
+        if (found.size >= 8) break;
+    }
+    if (!found.size) notes.push(`بحث ويب: 0 روابط لـ«${query}»`);
+    const list = [...found].slice(0, 8).map(([id, author]) => ({ id, title: '', author, duration: 0, plays: 0, url: `https://www.tiktok.com/@${author}/video/${id}` }));
+    await Promise.allSettled(list.map(async (v) => {                       // العنوان من oEmbed (اختياري)
+        try { const j = await getJson('https://www.tiktok.com/oembed?url=' + encodeURIComponent(v.url), 8000); v.title = String(j?.title || '').trim(); } catch (e) {}
+    }));
+    return list;
+}
+
+const recentEdits = [];                  // آخر الإيديتات المرسلة، حتى لا تتكرر نفس الفيديوهات
+const EDIT_STOP = new Set(['edit', 'edits', 'anime', 'amv', 'fyp', 'ايدت', 'ايديت', 'ايديتات', 'إيديت', 'تصميم', 'تصاميم', 'تصميمات', 'ايدتات']);
+const compact = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+
+async function fetchEdits(name, notes) {
+    const hasAr = /[\u0600-\u06FF]/.test(name);
+    const en = hasAr ? await toEnglish(name) : '';
+    const words = [...new Set(`${name} ${en}`.toLowerCase().split(/\s+/).map(compact).filter((w) => w.length >= 3 && !EDIT_STOP.has(w)))];
+    const joined = [compact(en), compact(name)].filter((w) => w.length >= 4);
+    // الفيديو ذو صلة بالشخصية إذا ذُكر اسمها (أو جزء منه) في عنوانه أو حسابه
+    const relevant = (v) => {
+        const t = compact(`${v.title} ${v.author}`);
+        if (!t) return true;                                   // لا عنوان متاح: نقبله لأنه جاء من بحث الاسم نفسه
+        return words.some((w) => t.includes(w)) || joined.some((w) => t.includes(w));
+    };
+    const core = en && en.toLowerCase() !== name.toLowerCase() ? en : name;
+    const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
     const keyOf = (v) => v.id || v.url;
-    const tkey = (v) => compact(v.title).slice(0, 30);
-    const rkey = compact(name);
-    const recent = recentEdits.get(rkey) || [];
-    const cands = new Map(), tried = new Set(), got = [];
+    const seen = new Set(), pool = [], tried = new Set(), got = [];
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
-            if (!key || cands.has(key) || !v.url) continue;
+            if (!key || seen.has(key) || !v.url || recentEdits.includes(key)) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
-            let tier = tierOf(v);
-            if (tier === null) tier = 2;                    // احتياط: نتيجة بحث تيك توك عن اسم الشخصية نفسه حتى لو العنوان لا يذكر الاسم
-            cands.set(key, { ...v, tier });
+            if (!relevant(v)) continue;
+            seen.add(key); pool.push(v);
         }
     };
-    const isEdit = (v) => (/edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(v.title) ? 0 : 1);
-    const pickNext = (maxTier, n) => {
-        const ordered = [...cands.values()].filter((v) => v.tier <= maxTier && !tried.has(keyOf(v)))
-            .sort((a, b) => (recent.includes(keyOf(a)) - recent.includes(keyOf(b))) || (a.tier - b.tier) || (isEdit(a) - isEdit(b)) || (b.plays - a.plays));
-        const authors = new Set(got.map((g) => g.v.author.toLowerCase()));
-        const titles = new Set(got.map((g) => tkey(g.v)).filter(Boolean));
-        const picked = [];
-        for (let pass = 0; pass < 2; pass++) {              // المرور الأول: حسابات مختلفة، الثاني: أي حساب (بدون تكرار نفس التصميم)
-            for (const v of ordered) {
-                if (picked.length >= n) break;
-                if (picked.includes(v)) continue;
-                const t = tkey(v);
-                if (t && titles.has(t)) continue;
-                if (pass === 0 && authors.has(v.author.toLowerCase())) continue;
-                picked.push(v); authors.add(v.author.toLowerCase()); if (t) titles.add(t);
-            }
-        }
-        return picked;
-    };
-    let announced = false;
-    const harvest = async (maxTier) => {
-        for (let guard = 0; guard < 6 && got.length < EDITS_COUNT && Date.now() < deadline; guard++) {
-            const batch = pickNext(maxTier, EDITS_COUNT - got.length);
-            if (!batch.length) break;
-            if (!announced) { announced = true; try { await progress?.(); } catch (e) {} }
-            batch.forEach((v) => tried.add(keyOf(v)));
-            const results = await Promise.allSettled(batch.map(async (v) => {      // فشل مقطع واحد لا يوقف الباقي
+    const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(v.title) ? 1 : 0;
+    const harvest = async () => {
+        const fresh = pool.filter((v) => !tried.has(keyOf(v))).sort((a, b) => (isEdit(b) - isEdit(a)) || (Math.random() - 0.5));
+        for (let i = 0; i < fresh.length && got.length < EDITS_COUNT;) {
+            const part = fresh.slice(i, i + (EDITS_COUNT - got.length));
+            i += part.length;
+            part.forEach((v) => tried.add(keyOf(v)));
+            const results = await Promise.allSettled(part.map(async (v) => {
                 const buf = await getEditBuf(v, notes);
                 if (!buf) throw new Error('NO_BUF');
                 return { v, buf };
@@ -840,71 +612,34 @@ async function fetchEdits(name, notes, progress) {
             for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
         }
     };
-    const strictCount = () => [...cands.values()].filter((v) => v.tier === 0).length;
-    // 1) بحث تيك توك: عدّة صيغ للاستعلام، مع تنويع الصفحة
-    const webFirst = webTiktokSearch(queries[0] || core, notes).catch(() => []);     // يعمل بالتوازي ولا يُستعمل إلا عند الحاجة
-    let firstQ = true;
-    for (const q of queries) {
-        if (Date.now() > deadline) break;
-        if (!firstQ) await sleepMs(1100);
-        add(await tiktokSearch(q, notes, 0));
-        if (strictCount() >= 4) break;
-        if (firstQ && strictCount() < 3) { await sleepMs(1100); add(await tiktokSearch(q, notes, 20)); }
-        firstQ = false;
-        if (strictCount() >= 4) break;
+    // 1) البحث في تيك توك عن تصاميم الشخصية ثم تنزيل الروابط
+    for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
+    await harvest();
+    // 2) بحث ويب عن روابط tiktok.com
+    if (got.length < EDITS_COUNT) {
+        for (const q of queries.slice(0, 2)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 9) break; }
+        await harvest();
     }
-    await harvest(0);                                       // الأدق أولاً (الاسم كاملاً)
-    if (got.length < EDITS_COUNT) await harvest(1);         // ثم تطابق جزئي للاسم
-    if (got.length < EDITS_COUNT) await harvest(2);         // ثم أي نتيجة من بحث الاسم
-    // 1.5) لم تكتمل 3 نتائج (مرشحون فشل تنزيلهم أو قلّوا): صفحات أعمق من أفضل صيغتين
-    if (got.length < EDITS_COUNT && Date.now() < deadline) {
-        for (const q of queries.slice(0, 2)) {
-            for (const cur of [40, 60]) {
-                if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
-                await sleepMs(1100);
-                add(await tiktokSearch(q, notes, cur));
-                await harvest(2);
-            }
-        }
+    // 3) هاشتاق تيك توك
+    if (got.length < EDITS_COUNT) {
+        const base = compact(en || name).replace(/[\u0600-\u06FF]/g, '');
+        for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
+        await harvest();
     }
-    // 1.7) احتياط: بحث عبر محركات البحث عن روابط فيديوهات تيك توك
-    if (got.length < EDITS_COUNT && Date.now() < deadline) {
-        add(await webFirst);
-        await harvest(2);
-        if (got.length < EDITS_COUNT && Date.now() < deadline) {
-            const rest = await Promise.all(queries.slice(1, 4).map((q) => webTiktokSearch(q, notes).catch(() => [])));
-            for (const l of rest) add(l);
-            await harvest(2);
-        }
-    }
-    // 2) احتياط: صفحة هاشتاق الشخصية في تيك توك (من كل الصيغ الإنجليزية)
-    if (got.length < EDITS_COUNT && Date.now() < deadline) {
-        const tags = [];
-        for (const n of enNames) { const b = compact(n).replace(/[\u0600-\u06FF]/g, ''); if (b.length >= 3) tags.push(b + 'edit', b, b + 'amv'); }
-        const fb = compact(String(core).split(/\s+/)[0]).replace(/[\u0600-\u06FF]/g, ''); if (fb.length >= 3) tags.unshift(fb + 'edit', fb);
-        for (const tag of [...new Set(tags)].slice(0, 6)) {
-            if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
-            add(await tagSearch(tag, notes));
-            await harvest(2);
-        }
-    }
-    for (const g of got) recent.push(keyOf(g.v));
-    recentEdits.set(rkey, recent.slice(-30));
-    if (recentEdits.size > 80) recentEdits.delete(recentEdits.keys().next().value);
-    if (!got.length) notes.push(`مرشّحون=${cands.size} • مجرَّب=${tried.size}`);
+    for (const g of got) { recentEdits.push(keyOf(g.v)); if (recentEdits.length > 60) recentEdits.shift(); }
+    if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
 
 async function cmdEdits(c) {
     const name = String(c.args || '').replace(URL_RE, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
-    if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'Eren Yeager', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
+    if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'ناروتو', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
     await waiting(c, '🎬', 'إيديتات تيك توك', 'تيك توك');
     const notes = [];
-    const progress = () => c.reply('🔎 وجدت تصاميم مناسبة في تيك توك، جاري تنزيل أفضل 3...');
-    const got = await withSlot(() => fetchEdits(name, notes, progress));
+    const got = await withSlot(() => fetchEdits(name, notes));
     if (!got.length) {
         console.error('[ايدت] لم تُجلب نتائج:', notes.join(' | '));
-        const err = new DlError(`❌ لم أجد إيديتات لـ «${name}» على تيك توك. جرّب اسماً آخر أو اكتبه بالإنجليزية.`);
+        const err = new DlError(`❌ لم أجد إيديتات لـ «${name}». جرّب اسماً آخر أو اكتبه بالإنجليزية.`);
         err.debug = notes.join('\n');
         throw err;
     }
@@ -922,14 +657,12 @@ async function cmdEdits(c) {
     }));
     if (got.length >= 2) {
         try {
-            const head = `🎬 *إيديتات ${cut(name, 40)}*` + (got.length < EDITS_COUNT ? `\n(وجدت ${got.length} فقط من ${EDITS_COUNT})` : '');
-            await sendVideoCarousel(c.sock, c.from, cards, { text: head, footer: '👈 مرّر لرؤية باقي الإيديتات' });
+            await sendVideoCarousel(c.sock, c.from, cards, { text: `🎬 *إيديتات ${cut(name, 40)}*`, footer: '👈 مرّر لرؤية باقي الإيديتات' });
             return;
         } catch (e) { console.error('[ايدت] تعذر الكاروسيل، سيتم الإرسال منفصلاً:', e?.message || e); }
     }
     for (let i = 0; i < got.length; i++) {          // احتياط: كل إيديت في رسالة مستقلة
-        try { await c.media({ video: got[i].buf, mimetype: 'video/mp4', caption: cards[i].body + `\n\n🤖 ${DEV}` }); }
-        catch (e) { console.error('[ايدت] فشل إرسال إيديت', i + 1, e?.message || e); }
+        await c.media({ video: got[i].buf, mimetype: 'video/mp4', caption: cards[i].body + `\n\n🤖 ${DEV}` });
     }
 }
 
