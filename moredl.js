@@ -470,6 +470,149 @@ async function toEnglish(text) {              // ترجمة اسم الشخصي�
     } catch (e) { return ''; }
 }
 
+// ---- حلّ اسم الشخصية (عربي/إنجليزي) إلى صيغ بحث إنجليزية متعددة
+// [الاسم الإنجليزي الأساسي، [كتابات عربية شائعة]، [صيغ إنجليزية بديلة]، [كلمات تدل على العمل الذي تنتمي له]]
+const CHARACTERS = [
+    ['Eren Yeager', ['ايرين ييغر', 'ايرين ييجر', 'ايرين ياجر', 'ايرين جيجر', 'ايرين يجر', 'ايرن ييجر', 'ايرين', 'إيرين'], ['Eren Jaeger', 'Eren AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
+    ['Levi Ackerman', ['ليفاي اكرمان', 'ليفاي أكرمان', 'ليفاي', 'ليفي', 'ليفاى'], ['Levi AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
+    ['Mikasa Ackerman', ['ميكاسا اكرمان', 'ميكاسا'], ['Mikasa AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
+    ['Armin Arlert', ['ارمين ارليرت', 'ارمين'], ['Armin AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
+    ['Toji Fushiguro', ['توجي فوشيغورو', 'توجي فوشيجورو', 'توجي', 'توجى'], ['Toji JJK', 'Toji Zenin'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Satoru Gojo', ['غوجو ساتورو', 'جوجو ساتورو', 'ساتورو غوجو', 'غوجو', 'جوجو', 'قوجو', 'غوغو'], ['Gojo Satoru', 'Gojo', 'Gojo JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Ryomen Sukuna', ['سوكونا', 'سكونا', 'سوكونه'], ['Sukuna', 'Sukuna JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Yuji Itadori', ['يوجي ايتادوري', 'ايتادوري', 'يوجي'], ['Itadori', 'Itadori Yuji'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Megumi Fushiguro', ['ميغومي', 'ميجومي', 'ميغومى'], ['Megumi', 'Megumi JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Suguru Geto', ['غيتو', 'جيتو', 'سوغورو غيتو'], ['Geto', 'Geto Suguru'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Kento Nanami', ['نانامي', 'كينتو نانامي'], ['Nanami', 'Nanami JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Naruto Uzumaki', ['ناروتو اوزوماكي', 'ناروتو', 'ناروتو أوزوماكي'], ['Naruto'], ['naruto', 'shippuden', 'konoha']],
+    ['Sasuke Uchiha', ['ساسكي اوتشيها', 'ساسكي', 'ساسوكي', 'ساسكى'], ['Sasuke'], ['naruto', 'shippuden', 'konoha']],
+    ['Itachi Uchiha', ['ايتاتشي اوتشيها', 'ايتاتشي', 'إيتاتشي', 'اتاشي'], ['Itachi'], ['naruto', 'shippuden', 'konoha']],
+    ['Kakashi Hatake', ['كاكاشي هاتاكي', 'كاكاشي'], ['Kakashi'], ['naruto', 'shippuden', 'konoha']],
+    ['Madara Uchiha', ['مادارا اوتشيها', 'مادارا'], ['Madara'], ['naruto', 'shippuden', 'konoha']],
+    ['Obito Uchiha', ['اوبيتو', 'أوبيتو'], ['Obito'], ['naruto', 'shippuden', 'konoha']],
+    ['Minato Namikaze', ['ميناتو'], ['Minato'], ['naruto', 'shippuden', 'konoha']],
+    ['Monkey D. Luffy', ['لوفي', 'مونكي دي لوفي', 'لوفى'], ['Luffy', 'Luffy One Piece'], ['one piece', 'onepiece', 'gear', 'strawhat']],
+    ['Roronoa Zoro', ['زورو', 'رورونوا زورو', 'زوورو'], ['Zoro', 'Zoro One Piece'], ['one piece', 'onepiece', 'strawhat']],
+    ['Sanji', ['سانجي', 'سانجى'], ['Sanji One Piece'], ['one piece', 'onepiece', 'strawhat']],
+    ['Portgas D. Ace', ['ايس', 'آيس', 'بورتغاس ايس'], ['Ace One Piece', 'Portgas Ace'], ['one piece', 'onepiece']],
+    ['Son Goku', ['غوكو', 'جوكو', 'قوكو', 'سون غوكو'], ['Goku', 'Goku Dragon Ball'], ['dragon ball', 'dragonball', 'dbz', 'dbs', 'saiyan']],
+    ['Vegeta', ['فيجيتا', 'فيغيتا'], ['Vegeta Dragon Ball'], ['dragon ball', 'dragonball', 'dbz', 'dbs', 'saiyan']],
+    ['Tanjiro Kamado', ['تانجيرو كامادو', 'تانجيرو'], ['Tanjiro', 'Tanjiro Demon Slayer'], ['demon slayer', 'kimetsu', 'ds']],
+    ['Zenitsu Agatsuma', ['زينيتسو'], ['Zenitsu'], ['demon slayer', 'kimetsu']],
+    ['Inosuke Hashibira', ['اينوسكي', 'اينوسوكي'], ['Inosuke'], ['demon slayer', 'kimetsu']],
+    ['Nezuko Kamado', ['نيزوكو'], ['Nezuko'], ['demon slayer', 'kimetsu']],
+    ['Kyojuro Rengoku', ['رينغوكو', 'رنجوكو', 'رينجوكو'], ['Rengoku'], ['demon slayer', 'kimetsu']],
+    ['Giyu Tomioka', ['غيو', 'جيو', 'غيو تومايوكا'], ['Giyu'], ['demon slayer', 'kimetsu']],
+    ['Muzan Kibutsuji', ['موزان', 'موزان كيبوتسوجي'], ['Muzan'], ['demon slayer', 'kimetsu']],
+    ['Akaza', ['اكازا', 'أكازا'], ['Akaza Demon Slayer'], ['demon slayer', 'kimetsu']],
+    ['Killua Zoldyck', ['كيلوا زولديك', 'كيلوا', 'كيلوى'], ['Killua', 'Killua HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
+    ['Gon Freecss', ['غون فريكس', 'غون', 'جون فريكس'], ['Gon', 'Gon HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
+    ['Hisoka Morow', ['هيسوكا'], ['Hisoka'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
+    ['Kurapika', ['كورابيكا', 'كوارابيكا'], ['Kurapika HxH'], ['hxh', 'hunter x hunter', 'hunterxhunter']],
+    ['Light Yagami', ['لايت ياغامي', 'لايت ياجامي', 'لايت', 'ياغامي لايت'], ['Light Yagami', 'Light Death Note', 'Kira'], ['death note', 'deathnote', 'kira']],
+    ['Ryuk', ['ريوك'], ['Ryuk Death Note'], ['death note', 'deathnote']],
+    ['Edward Elric', ['ادوارد الريك', 'إدوارد إلريك', 'ادوارد'], ['Edward Elric FMA'], ['fullmetal', 'fma', 'alchemist']],
+    ['Roy Mustang', ['روي موستانغ', 'روي موستانج'], ['Mustang FMA'], ['fullmetal', 'fma', 'alchemist']],
+    ['Izuku Midoriya', ['ديكو', 'ايزوكو ميدوريا', 'ميدوريا'], ['Deku', 'Midoriya', 'Deku MHA'], ['mha', 'my hero', 'bnha', 'boku no hero']],
+    ['Katsuki Bakugo', ['باكوغو', 'باكوجو', 'كاتسوكي باكوغو'], ['Bakugo', 'Bakugo MHA'], ['mha', 'my hero', 'bnha', 'boku no hero']],
+    ['Shoto Todoroki', ['تودوروكي', 'شوتو تودوروكي'], ['Todoroki'], ['mha', 'my hero', 'bnha', 'boku no hero']],
+    ['Thorfinn', ['ثورفين', 'ثورفن', 'تورفين'], ['Thorfinn Vinland Saga'], ['vinland', 'saga']],
+    ['Askeladd', ['اسكيلاد', 'أسكيلاد'], ['Askeladd Vinland Saga'], ['vinland', 'saga']],
+    ['Guts', ['غاتس', 'جاتس', 'قاتس'], ['Guts Berserk'], ['berserk']],
+    ['Griffith', ['غريفيث', 'جريفيث', 'غريفث'], ['Griffith Berserk'], ['berserk']],
+    ['Denji', ['دينجي', 'دنجي'], ['Denji Chainsaw Man'], ['chainsaw', 'csm']],
+    ['Makima', ['ماكيما'], ['Makima Chainsaw Man'], ['chainsaw', 'csm']],
+    ['Saitama', ['سايتاما', 'سايتما'], ['Saitama One Punch Man'], ['one punch', 'opm']],
+    ['Jotaro Kujo', ['جوتارو كوجو', 'جوتارو'], ['Jotaro', 'Jotaro JoJo'], ['jojo', 'bizarre']],
+    ['Dio Brando', ['ديو براندو', 'ديو'], ['Dio', 'DIO JoJo'], ['jojo', 'bizarre']],
+    ['Giorno Giovanna', ['جيورنو', 'جيورنو جيوفانا'], ['Giorno', 'Giorno JoJo'], ['jojo', 'bizarre']],
+    ['Lelouch Lamperouge', ['لولوش', 'ليلوش', 'لولوش لامبيروج'], ['Lelouch', 'Lelouch Code Geass'], ['code geass', 'geass']],
+    ['Spike Spiegel', ['سبايك سبيجل', 'سبايك'], ['Spike Cowboy Bebop'], ['bebop', 'cowboy']],
+    ['Ichigo Kurosaki', ['ايتشيغو', 'ايتشيجو', 'ايتشيغو كوروساكي'], ['Ichigo', 'Ichigo Bleach'], ['bleach']],
+    ['Sosuke Aizen', ['ايزن', 'آيزن', 'ايزين'], ['Aizen', 'Aizen Bleach'], ['bleach']],
+    ['Ken Kaneki', ['كانيكي', 'كانيكى', 'كين كانيكي'], ['Kaneki', 'Kaneki Tokyo Ghoul'], ['tokyo ghoul', 'ghoul']],
+    ['Yuta Okkotsu', ['يوتا اوكوتسو', 'يوتا'], ['Yuta', 'Yuta JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Maki Zenin', ['ماكي زينين', 'ماكي'], ['Maki', 'Maki JJK'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Nobara Kugisaki', ['نوبارا'], ['Nobara'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Choso', ['تشوسو', 'شوسو'], ['Choso JJK'], ['jjk', 'jujutsu', 'kaisen']]
+];
+
+// توحيد الكتابة العربية (حذف التشكيل/المدّ، توحيد الألف والياء والتاء المربوطة، دمج الحروف المتقاربة نطقاً في الأسماء الأجنبية)
+const arNorm = (t) => String(t || '').toLowerCase()
+    .replace(/[\u064B-\u0652\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/[ىئ]/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و')
+    .replace(/[غجقكگ]/g, 'ج').replace(/[سصث]/g, 'س').replace(/[طت]/g, 'ت').replace(/[ذزظ]/g, 'ز').replace(/[هح]/g, 'ه')
+    .replace(/(.)\1+/g, '$1').replace(/[^a-z0-9\u0600-\u06FF\s]/g, ' ').replace(/\s+/g, ' ').trim();
+const arSkeleton = (t) => arNorm(t).replace(/[اويء\s]/g, '');     // هيكل الحروف الساكنة فقط: «ايرين ييغر» ≈ «ايرين ييجر» ≈ «ايرن جيجر»
+const lev = (a, b) => {
+    const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        prev = cur;
+    }
+    return prev[n];
+};
+const CHAR_INDEX = CHARACTERS.map((ch) => ({
+    ch,
+    ar: ch[1].map((a) => ({ norm: arNorm(a), skel: arSkeleton(a) })).filter((x) => x.skel),
+    en: [ch[0], ...ch[2]].map((e) => compact(e)).filter(Boolean),
+    enWords: [ch[0], ...ch[2]].flatMap((e) => e.toLowerCase().split(/\s+/)).filter((w) => w.length >= 4)
+}));
+function findCharacter(name) {
+    const hasAr = /[\u0600-\u06FF]/.test(name);
+    if (hasAr) {
+        const n = arNorm(name), sk = arSkeleton(name);
+        if (!sk) return null;
+        let best = null, bestScore = -1;
+        for (const e of CHAR_INDEX) for (const a of e.ar) {
+            let score = -1;
+            if (n === a.norm) score = 100;
+            else if (sk === a.skel) score = 90;
+            else if (sk.length >= 3 && a.skel.length >= 3 && Math.abs(sk.length - a.skel.length) <= 1 && lev(sk, a.skel) <= (Math.max(sk.length, a.skel.length) >= 6 ? 2 : 1)) score = 70 - lev(sk, a.skel) * 5;
+            else if (a.skel.length >= 3 && (sk.startsWith(a.skel) || a.skel.startsWith(sk)) && Math.min(sk.length, a.skel.length) >= 3) score = 50;   // اسم أول فقط أو الاسم مع لقب
+            if (score > bestScore) { bestScore = score; best = e; }
+        }
+        return bestScore >= 50 ? best.ch : null;
+    }
+    const c = compact(name);
+    if (c.length < 3) return null;
+    for (const e of CHAR_INDEX) if (e.en.includes(c)) return e.ch;
+    const words = String(name).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    for (const e of CHAR_INDEX) if (words.length && words.every((w) => e.enWords.includes(w) || e.en.some((x) => x.includes(w)))) return e.ch;
+    return null;
+}
+// ترجمة/حروف لاتينية عبر Google (احتياط للأسماء غير الموجودة في القاموس): الترجمة + النقل الصوتي إن وُجد
+async function translitArabic(text) {
+    const out = [];
+    try {
+        const j = await getJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&dt=rm&q=' + encodeURIComponent(text), 15000);
+        const segs = Array.isArray(j?.[0]) ? j[0] : [];
+        out.push(segs.map((x) => x?.[0] || '').join('').trim());
+        out.push(segs.map((x) => x?.[3] || '').join('').trim());
+    } catch (e) {}
+    return out.filter((x) => x && !/[\u0600-\u06FF]/.test(x));
+}
+const titleCase = (s) => String(s || '').replace(/[^A-Za-z0-9\s'.-]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b[a-z]/g, (m) => m.toUpperCase());
+// يرجع كل صيغ الاسم المحتملة: names (إنجليزية للبحث، الأهم أولاً) + series (كلمات تدل على العمل) + known (وُجدت في القاموس)
+async function resolveCharacter(name) {
+    const hasAr = /[\u0600-\u06FF]/.test(name);
+    const found = findCharacter(name);
+    const names = [];
+    let series = [];
+    if (found) { names.push(found[0], ...found[2]); series = found[3]; }
+    if (!hasAr) names.unshift(name);
+    else if (!found) {
+        for (const v of await translitArabic(name)) names.push(titleCase(v));        // اسم غير موجود في القاموس
+        const flat = names.filter(Boolean);
+        if (!flat.length) names.push('');
+    }
+    const uniq = [], seen = new Set();
+    for (const n of names) { const k = compact(n); if (k.length >= 2 && !seen.has(k)) { seen.add(k); uniq.push(n.trim()); } }
+    return { names: uniq.slice(0, 6), series, known: !!found };
+}
+
 // تقليص فيديو ثقيل ليناسب بطاقة الكاروسيل (بدل رفضه)
 async function shrinkEdit(buf) {
     if (buf.length <= EDIT_MAX_MB * MB) return buf;
@@ -577,22 +720,41 @@ async function getEditBuf(v, notes) {
 async function fetchEdits(name, notes, progress) {
     const deadline = Date.now() + EDIT_TIMEOUT_MS;
     const hasAr = /[\u0600-\u06FF]/.test(name);
-    const en = hasAr ? await toEnglish(name) : '';
-    const core = en && en.toLowerCase() !== name.toLowerCase() ? en : name;
-    const nameSets = [...new Set([name, en].filter(Boolean).map((s) => s.toLowerCase()))]
+    const R = await resolveCharacter(name);                  // صيغ الاسم الإنجليزية (من القاموس/الترجمة) — عربي أو إنجليزي
+    if (hasAr && !R.names.length) { const en0 = await toEnglish(name); if (en0 && !/[\u0600-\u06FF]/.test(en0)) R.names.push(titleCase(en0)); }
+    const enNames = R.names.filter(Boolean);
+    const core = enNames[0] || name;
+    const allNames = [...new Set([name, ...enNames].filter(Boolean).map((s) => s.toLowerCase()))];
+    const nameSets = allNames
         .map((s) => s.split(/\s+/).map(compact).filter((w) => w.length >= 2 && !EDIT_STOP.has(w))).filter((a) => a.length);
-    const fulls = [...new Set([name, en].map(compact).filter((w) => w.length >= 3))];
+    const fulls = [...new Set(allNames.map(compact).filter((w) => w.length >= 3))];
     const hasWord = (norm, w) => norm.includes(' ' + w);                  // بداية كلمة (يطابق #erenyeager و eren)
-    // 0 = الاسم كاملاً مذكور في العنوان/الهاشتاقات/الحساب • 1 = جزء مميّز من الاسم • null = غير مرتبط
+    const seriesRe = R.series.length ? new RegExp(R.series.map((x) => x.replace(/[^a-z0-9 ]/g, '').replace(/ /g, '\\s?')).join('|'), 'i') : null;
+    const animeCtx = /anime|amv|manga|edit|ايدت|ايديت|انمي|أنمي/i;
+    // 0 = الاسم كاملاً مذكور في العنوان/الهاشتاقات/الحساب • 1 = جزء مميّز من الاسم مع دليل أنه الشخصية نفسها • null = غير مرتبط
     const tierOf = (v) => {
         const text = `${v.title} ${v.author}`;
         const norm = normWords(text), ct = compact(text);
         if (!ct) return null;
-        if (fulls.some((f) => ct.includes(f)) || nameSets.some((ws) => ws.every((w) => hasWord(norm, w)))) return 0;
-        if (nameSets.some((ws) => ws.some((w) => w.length >= 4 && hasWord(norm, w)))) return 1;
+        const multi = nameSets.some((ws) => ws.length > 1 && ws.every((w) => hasWord(norm, w)));          // الاسم الكامل بكلماته
+        const single = nameSets.some((ws) => ws.length === 1 && ws[0].length >= 3 && hasWord(norm, ws[0]) && (ws[0].length >= 4 || (seriesRe && seriesRe.test(text))));  // اسم من كلمة واحدة (Toji / Sukuna)
+        const glued = fulls.some((f) => f.length >= 7 && ct.includes(f));                                   // مدموج: #erenyeager
+        if (multi || glued) return 0;
+        if (single) return (!seriesRe || seriesRe.test(text) || animeCtx.test(text)) ? 0 : 1;
+        // جزء من الاسم (مثل «Eren» فقط): نقبله فقط إن ظهر ما يدل على العمل نفسه، حتى لا نجلب شخصاً آخر بنفس الاسم
+        if (nameSets.some((ws) => ws.some((w) => w.length >= 4 && hasWord(norm, w)))) {
+            if (seriesRe ? seriesRe.test(text) : animeCtx.test(text)) return 1;
+        }
         return null;
     };
-    const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
+    // صيغ البحث بترتيب الأهمية: الاسم الأساسي ثم البدائل (Yeager/Jaeger…) ثم العربية
+    const queries = [];
+    const addQ = (q) => { q = String(q || '').trim(); if (q && !queries.includes(q)) queries.push(q); };
+    addQ(`${core} edit`); addQ(`${core} anime edit`);
+    for (const n of enNames.slice(1, 4)) addQ(`${n} edit`);
+    addQ(`${core} edits`); addQ(`${core} amv`);
+    if (hasAr) addQ(`${name} ايدت`);
+    queries.length = Math.min(queries.length, 8);
     const keyOf = (v) => v.id || v.url;
     const tkey = (v) => compact(v.title).slice(0, 30);
     const rkey = compact(name);
@@ -644,20 +806,38 @@ async function fetchEdits(name, notes, progress) {
     };
     const strictCount = () => [...cands.values()].filter((v) => v.tier === 0).length;
     // 1) بحث تيك توك: عدّة صيغ للاستعلام، مع تنويع الصفحة
-    for (const [i, q] of queries.entries()) {
+    let firstQ = true;
+    for (const q of queries) {
         if (Date.now() > deadline) break;
-        if (i) await sleepMs(1100);
+        if (!firstQ) await sleepMs(1100);
         add(await tiktokSearch(q, notes, 0));
         if (strictCount() >= 6) break;
-        if (i === 0 && strictCount() < 3) { await sleepMs(1100); add(await tiktokSearch(q, notes, 20)); }
+        if (firstQ && strictCount() < 3) { await sleepMs(1100); add(await tiktokSearch(q, notes, 20)); }
+        firstQ = false;
+        if (strictCount() >= 6) break;
     }
     await harvest(0);                                       // الأدق أولاً (الاسم كاملاً)
     if (got.length < EDITS_COUNT) await harvest(1);         // ثم تطابق جزئي للاسم
-    // 2) احتياط: صفحة هاشتاق الشخصية في تيك توك
+    // 1.5) لم تكتمل 3 نتائج (مرشحون فشل تنزيلهم أو قلّوا): صفحات أعمق من أفضل صيغتين
     if (got.length < EDITS_COUNT && Date.now() < deadline) {
-        const base = compact(en || name).replace(/[\u0600-\u06FF]/g, '');
-        for (const tag of base.length >= 3 ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
-        await harvest(1);
+        for (const q of queries.slice(0, 2)) {
+            for (const cur of [40, 60]) {
+                if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
+                await sleepMs(1100);
+                add(await tiktokSearch(q, notes, cur));
+                await harvest(1);
+            }
+        }
+    }
+    // 2) احتياط: صفحة هاشتاق الشخصية في تيك توك (من كل الصيغ الإنجليزية)
+    if (got.length < EDITS_COUNT && Date.now() < deadline) {
+        const tags = [];
+        for (const n of enNames) { const b = compact(n).replace(/[\u0600-\u06FF]/g, ''); if (b.length >= 3) tags.push(b + 'edit', b); }
+        for (const tag of [...new Set(tags)].slice(0, 4)) {
+            if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
+            add(await tagSearch(tag, notes));
+            await harvest(1);
+        }
     }
     for (const g of got) recent.push(keyOf(g.v));
     recentEdits.set(rkey, recent.slice(-30));
