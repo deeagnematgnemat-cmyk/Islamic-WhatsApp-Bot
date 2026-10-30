@@ -34,7 +34,7 @@ const norm = (s) => s.replace(/[أإآا]/g, 'ا');
 const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'دائري': ['round'], 'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'ايموجي': ['emoji'],
-    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'متحرك': ['animated'], 'ملصقات': [],
+    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
     // الصور
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
     'بدون_خلفية': ['removebg', 'ازالة_الخلفية', 'ازالة_خلفية', 'ازالة', 'حذف_الخلفية'], 'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
@@ -74,7 +74,6 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > 🖼️ .لصورة ↞ ملصق إلى صورة
 > ⭕ .دائري ↞ ملصق دائري
 > 🎥 .لفيديو ↞ ملصق متحرك إلى فيديو
-> 🎞️ .متحرك ↞ فيديو إلى ملصق متحرك
 > 🗂️ .باك [اسم] ↞ صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
 > 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
 
@@ -126,6 +125,8 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🕌 .اذان [مكة|المدينة|الأقصى|مصر] ↞ صوت الأذان
 
 🛠️ *أدوات:*
+> ✂️ .قص <من> <إلى> ↞ قص فيديو أو صوت (رد عليه)
+> 📝 .ترجمة_فيديو <رابط> [لغة] ↞ ملف ترجمة SRT ليوتيوب
 > 🖼️ .غلاف <رابط> ↞ صورة غلاف فيديو يوتيوب
 > 📋 .معلومات_فيديو <رابط> ↞ العنوان والمدة والمشاهدات
 
@@ -280,113 +281,41 @@ async function cmdToImage(c) {
     await c.media({ image: png, caption: t.node.isAnimated ? '🖼️ تم أخذ أول إطار من الملصق المتحرك.' : '🖼️ تم التحويل إلى صورة.' });
 }
 
-// ---- ترميز mp4 متوافق مع واتساب (H.264)، مع بدائل إن لم يتوفر libx264 في ffmpeg
-const MP4_ENCODERS = [
-    ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'main'],
-    ['-c:v', 'libopenh264'],
-    ['-c:v', 'mpeg4', '-q:v', '3']
-];
-async function encodeMp4(inputArgs, vf, out) {
-    let lastErr;
-    for (const enc of MP4_ENCODERS) {
-        try {
-            rm(out);
-            await run(FFMPEG, ['-y', '-v', 'error', ...inputArgs, '-vf', vf, '-pix_fmt', 'yuv420p', ...enc, '-movflags', '+faststart', '-an', out], 180000);
-            if (fs.existsSync(out) && fs.statSync(out).size > 1000) return;
-        } catch (e) { lastErr = e; console.error('[لفيديو] فشل المرمّز', enc[1], String(e?.stderr || e?.message || e).slice(-200)); }
-    }
-    throw lastErr || new Error('ENCODE_FAILED');
-}
-
-// ---- قراءة ملف WebP متحرك يدوياً (RIFF/ANMF) دون الاعتماد على فك sharp للملصقات المتحركة
-function parseAnimWebp(buf) {
-    if (buf.length < 20 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return null;
-    let pos = 12, canvas = null;
-    const frames = [];
-    while (pos + 8 <= buf.length) {
-        const id = buf.toString('ascii', pos, pos + 4), size = buf.readUInt32LE(pos + 4), body = pos + 8;
-        if (id === 'VP8X') canvas = { w: buf.readUIntLE(body + 4, 3) + 1, h: buf.readUIntLE(body + 7, 3) + 1 };
-        else if (id === 'ANMF') frames.push({
-            x: buf.readUIntLE(body, 3) * 2, y: buf.readUIntLE(body + 3, 3) * 2,
-            w: buf.readUIntLE(body + 6, 3) + 1, h: buf.readUIntLE(body + 9, 3) + 1,
-            delay: buf.readUIntLE(body + 12, 3), flags: buf[body + 15], data: buf.subarray(body + 16, body + size)
-        });
-        pos = body + size + (size & 1);
-    }
-    return canvas && frames.length ? { canvas, frames } : null;
-}
-function frameToWebp(f) {
-    const vp8x = Buffer.alloc(18);
-    vp8x.write('VP8X', 0, 'ascii'); vp8x.writeUInt32LE(10, 4); vp8x[8] = 0x10;
-    vp8x.writeUIntLE(f.w - 1, 12, 3); vp8x.writeUIntLE(f.h - 1, 15, 3);
-    const body = Buffer.concat([Buffer.from('WEBP', 'ascii'), vp8x, f.data]);
-    const head = Buffer.alloc(8); head.write('RIFF', 0, 'ascii'); head.writeUInt32LE(body.length, 4);
-    return Buffer.concat([head, body]);
-}
-// يحوّل الملصق المتحرك إلى إطارات RGB خام (على خلفية سوداء) في rawFile. يعيد { W, H, fps } أو null إن لم يكن متحركاً.
-async function animatedStickerToRaw(buf, sharp, rawFile) {
-    const MAX_FRAMES = 400;
-    const fpsOf = (delays) => {
-        const d = delays.filter((x) => x > 0);
-        const avg = d.length ? d.reduce((a, b) => a + b, 0) / d.length : 100;
-        return Math.min(30, Math.max(5, Math.round(1000 / Math.max(avg, 20))));
-    };
-    // الطريقة 1: sharp مباشرة
-    try {
-        const meta = await sharp(buf, { animated: true, failOn: 'none' }).metadata();
-        if ((meta.pages || 1) > 1) {
-            const W = meta.width, H = meta.pageHeight || Math.round(meta.height / meta.pages);
-            const r = await sharp(buf, { animated: true, failOn: 'none' }).flatten({ background: '#000000' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-            const ch = r.info.channels || 3;
-            const frames = Math.floor(r.data.length / (W * H * ch));
-            if (ch === 3 && frames > 1) {
-                fs.writeFileSync(rawFile, r.data.subarray(0, Math.min(frames, MAX_FRAMES) * W * H * ch));
-                return { W, H, fps: fpsOf(meta.delay || []) };
-            }
-        }
-    } catch (e) { logErr('لفيديو-sharp', e); }
-    // الطريقة 2: تفكيك الإطارات يدوياً ثم تركيبها على لوحة (يدعم الإزاحة والدمج والمسح)
-    const anim = parseAnimWebp(buf);
-    if (!anim || anim.frames.length < 2) return null;
-    const { w: W, h: H } = anim.canvas;
-    let prev = Buffer.alloc(W * H * 4);                                  // لوحة شفافة
-    const fd = fs.openSync(rawFile, 'w');
-    try {
-        const list = anim.frames.slice(0, MAX_FRAMES);
-        for (const f of list) {
-            const fr = await sharp(frameToWebp(f), { failOn: 'none' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-            const noBlend = !!(f.flags & 2), dispose = !!(f.flags & 1);
-            const cur = await sharp(prev, { raw: { width: W, height: H, channels: 4 } })
-                .composite([{ input: fr.data, raw: { width: fr.info.width, height: fr.info.height, channels: 4 }, left: f.x, top: f.y, blend: noBlend ? 'source' : 'over' }])
-                .raw().toBuffer();
-            const rgb = await sharp(cur, { raw: { width: W, height: H, channels: 4 } }).flatten({ background: '#000000' }).removeAlpha().raw().toBuffer();
-            fs.writeSync(fd, rgb);
-            if (dispose) {
-                const clear = await sharp({ create: { width: f.w, height: f.h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).raw().toBuffer();
-                prev = await sharp(cur, { raw: { width: W, height: H, channels: 4 } })
-                    .composite([{ input: clear, raw: { width: f.w, height: f.h, channels: 4 }, left: f.x, top: f.y, blend: 'source' }]).raw().toBuffer();
-            } else prev = cur;
-        }
-        return { W, H, fps: fpsOf(list.map((f) => f.delay)) };
-    } finally { fs.closeSync(fd); }
-}
-
 async function stickerToVideo(c, t) {
     const buf = await download(c, t);
     const sharp = await getSharp();
     if (!sharp) return c.reply('❌ هذه الميزة تحتاج مكتبة sharp. أضفها في package.json ثم أعد النشر.');
     const id = uid();
     const rawFile = path.join(TMP, `sv_${id}.raw`), imgFile = path.join(TMP, `sv_${id}.png`), out = path.join(TMP, `sv_${id}.mp4`);
-    const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';                     // أبعاد زوجية مطلوبة لـ H.264
+    // ترميز H.264 متوافق مع واتساب (أبعاد زوجية + yuv420p + faststart)
+    const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
+    const encOut = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'main', '-movflags', '+faststart', '-an', out];
     try {
-        let anim = null;
-        try { anim = await animatedStickerToRaw(buf, sharp, rawFile); } catch (e) { logErr('لفيديو-إطارات', e); }
-        if (anim) {
-            await encodeMp4(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${anim.W}x${anim.H}`, '-framerate', String(anim.fps), '-i', rawFile], even, out);
+        const meta = await sharp(buf, { animated: true }).metadata();
+        if ((meta.pages || 1) > 1) {
+            // ملصق متحرك: نفكّ إطاراته الحقيقية (على خلفية سوداء بدل الشفافية) ونركّبها فيديو بنفس سرعة الملصق
+            const W = meta.width, H = meta.pageHeight || Math.round(meta.height / meta.pages);
+            const delays = (meta.delay || []).filter((d) => d > 0);
+            const avg = delays.length ? delays.reduce((a, b) => a + b, 0) / delays.length : 100;
+            const fps = Math.min(30, Math.max(5, Math.round(1000 / Math.max(avg, 20))));
+            let data, ch;
+            try {
+                const r = await sharp(buf, { animated: true }).flatten({ background: '#000000' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+                data = r.data; ch = r.info.channels || 3;
+            } catch (e) {
+                const r = await sharp(buf, { animated: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+                data = r.data; ch = r.info.channels || 4;
+            }
+            const frames = Math.floor(data.length / (W * H * ch));
+            if (!frames) throw new Error('NO_FRAMES');
+            fs.writeFileSync(rawFile, data.subarray(0, frames * W * H * ch));
+            const input = ['-f', 'rawvideo', '-pix_fmt', ch === 4 ? 'rgba' : 'rgb24', '-s', `${W}x${H}`, '-framerate', String(fps), '-i', rawFile];
+            if (ch === 4) await run(FFMPEG, ['-y', '-v', 'error', ...input, '-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}`, '-filter_complex', `[1:v][0:v]overlay=shortest=1,${even},format=yuv420p`, ...encOut], 120000);
+            else await run(FFMPEG, ['-y', '-v', 'error', ...input, '-vf', even, '-pix_fmt', 'yuv420p', ...encOut], 120000);
         } else {
             // ملصق ثابت: نحوّله إلى فيديو قصير (3 ثوانٍ)
-            fs.writeFileSync(imgFile, await sharp(buf, { failOn: 'none' }).flatten({ background: '#000000' }).png().toBuffer());
-            await encodeMp4(['-loop', '1', '-framerate', '25', '-t', '3', '-i', imgFile], even, out);
+            fs.writeFileSync(imgFile, await sharp(buf).flatten({ background: '#000000' }).png().toBuffer());
+            await run(FFMPEG, ['-y', '-v', 'error', '-loop', '1', '-framerate', '25', '-i', imgFile, '-t', '3', '-vf', even, '-pix_fmt', 'yuv420p', ...encOut], 120000);
         }
         const video = fs.readFileSync(out);
         if (video.length < 1000) throw new Error('EMPTY_VIDEO');
@@ -398,87 +327,6 @@ async function cmdToVideo(c) {
     const t = getTarget(c, ['stickerMessage']);
     if (!t) return c.reply('📌 رد على ملصق بالأمر `.لفيديو`');
     await stickerToVideo(c, t);
-}
-
-// ----- .متحرك : فيديو -> ملصق متحرك حقيقي (WebP متحرك) بدون الاعتماد على libwebp في ffmpeg
-const wChunk = (id, data) => {
-    const h = Buffer.alloc(8); h.write(id, 0, 'ascii'); h.writeUInt32LE(data.length, 4);
-    return Buffer.concat([h, data, data.length & 1 ? Buffer.alloc(1) : Buffer.alloc(0)]);
-};
-function webpChunkMap(buf) {
-    const map = {}; let pos = 12;
-    while (pos + 8 <= buf.length) {
-        const id = buf.toString('ascii', pos, pos + 4), size = buf.readUInt32LE(pos + 4);
-        if (!map[id]) map[id] = buf.subarray(pos + 8, pos + 8 + size);
-        pos += 8 + size + (size & 1);
-    }
-    return map;
-}
-function waStickerExif(pack, author) {
-    const json = { 'sticker-pack-id': crypto.randomBytes(16).toString('hex'), 'sticker-pack-name': pack, 'sticker-pack-publisher': author, emojis: [''] };
-    const attr = Buffer.from([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00]);
-    const jb = Buffer.from(JSON.stringify(json), 'utf8');
-    const exif = Buffer.concat([attr, jb]); exif.writeUInt32LE(jb.length, 14);
-    return exif;
-}
-// frameWebps: مصفوفة صور WebP ثابتة بنفس الأبعاد W×H
-function buildAnimatedWebp(frameWebps, W, H, delayMs, exif) {
-    const anmf = frameWebps.map((b) => {
-        const m = webpChunkMap(b), parts = [];
-        if (m['ALPH']) parts.push(wChunk('ALPH', m['ALPH']));
-        if (m['VP8 ']) parts.push(wChunk('VP8 ', m['VP8 ']));
-        else if (m['VP8L']) parts.push(wChunk('VP8L', m['VP8L']));
-        else throw new Error('BAD_FRAME');
-        const h = Buffer.alloc(16);
-        h.writeUIntLE(0, 0, 3); h.writeUIntLE(0, 3, 3); h.writeUIntLE(W - 1, 6, 3); h.writeUIntLE(H - 1, 9, 3); h.writeUIntLE(delayMs, 12, 3);
-        h[15] = 0x03;                                                    // كل إطار يستبدل اللوحة بالكامل (بلا دمج ولا بقايا)
-        return wChunk('ANMF', Buffer.concat([h, ...parts]));
-    });
-    const vp8x = Buffer.alloc(10);
-    vp8x[0] = 0x02 | 0x10 | (exif ? 0x08 : 0);                           // متحرك + شفافية + exif
-    vp8x.writeUIntLE(W - 1, 4, 3); vp8x.writeUIntLE(H - 1, 7, 3);
-    const anim = Buffer.alloc(6);                                        // لون الخلفية شفاف + تكرار لا نهائي
-    const body = Buffer.concat([Buffer.from('WEBP', 'ascii'), wChunk('VP8X', vp8x), wChunk('ANIM', anim), ...anmf, ...(exif ? [wChunk('EXIF', exif)] : [])]);
-    const head = Buffer.alloc(8); head.write('RIFF', 0, 'ascii'); head.writeUInt32LE(body.length, 4);
-    return Buffer.concat([head, body]);
-}
-
-async function cmdAnimSticker(c) {
-    let t = getTarget(c, ['videoMessage', 'documentMessage']);
-    if (t && t.kind === 'documentMessage' && !/^video\//.test(t.node.mimetype || '')) t = null;
-    if (!t) return c.reply('📌 أرسل فيديو مع الأمر `.متحرك` أو رد على فيديو به لتحويله إلى ملصق متحرك.');
-    if ((t.node.seconds || 0) > 10) return c.reply('⚠️ الفيديو أطول من 10 ثوانٍ. اقصّه ثم أعد المحاولة.');
-    await c.reply('🎞️ جاري تحويل الفيديو إلى ملصق متحرك...');
-    const video = await download(c, t);
-    const sharp = await getSharp();
-    const dir = fs.mkdtempSync(path.join(TMP, 'anim_'));
-    try {
-        const inFile = path.join(dir, 'in.bin');
-        fs.writeFileSync(inFile, video);
-        let best = null;
-        if (sharp) {
-            try {
-                const LIMIT = 900 * 1024;                                // حد آمن لحجم الملصق المتحرك في واتساب
-                const tries = [{ fps: 15, q: 55 }, { fps: 12, q: 45 }, { fps: 10, q: 38 }, { fps: 8, q: 30 }, { fps: 6, q: 24 }];
-                const exif = waStickerExif(PACK, AUTHOR);
-                for (const tr of tries) {
-                    for (const f of fs.readdirSync(dir)) if (/^f_\d+\.png$/.test(f)) rm(path.join(dir, f));
-                    const vf = `fps=${tr.fps},scale=512:512:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0`;
-                    await run(FFMPEG, ['-y', '-v', 'error', '-i', inFile, '-t', '10', '-vf', vf, '-an', path.join(dir, 'f_%04d.png')], 180000);
-                    const files = fs.readdirSync(dir).filter((f) => /^f_\d+\.png$/.test(f)).sort();
-                    if (!files.length) throw new Error('NO_FRAMES');
-                    const frames = [];
-                    for (const f of files) frames.push(await sharp(path.join(dir, f), { failOn: 'none' }).webp({ quality: tr.q, effort: 3, alphaQuality: 70 }).toBuffer());
-                    const webp = buildAnimatedWebp(frames, 512, 512, Math.round(1000 / tr.fps), exif);
-                    best = webp;
-                    if (webp.length <= LIMIT) break;
-                }
-            } catch (e) { best = null; logErr('متحرك', e); }
-        }
-        if (best) return await c.media({ sticker: best });
-        // احتياط: الطريقة العامة (wa-sticker-formatter)
-        await c.media({ sticker: await makeSticker(video, StickerTypes.FULL) });
-    } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* تجاهل */ } }
 }
 
 // ----- إيموجي
@@ -1280,39 +1128,21 @@ async function cmdCompress(c) {
 async function cmdEnhance(c) {
     const buf = await getInputImage(c); if (!buf) return;
     const sharp = await sharpOrFail();
-    const useHD = /hd|اتش/i.test(c.args);                                   // `.تحسين hd` = 1920، الافتراضي 4K = 3840
-    const target = useHD ? 1920 : 3840;
+    const asFile = /ملف|file|doc/i.test(c.args);
     const o = await sharp(buf, { failOn: 'none' }).rotate().toBuffer({ resolveWithObject: true });   // يثبّت اتجاه الصورة ويعطي أبعادها الحقيقية
     const w = o.info.width, h = o.info.height, long = Math.max(w, h);
     if (!w || !h) throw new Error('BAD_IMAGE');
-    let f = Math.min(4, target / long);                                     // أقصى تكبير ×4
+    let f = long < 1000 ? Math.min(3, 2048 / long) : Math.min(2, 2560 / long);   // الصور الصغيرة تُكبَّر أكثر
     if (f < 1.05) f = 1;
     const W = Math.round(w * f), H = Math.round(h * f);
-
-    // 1) تنظيف قبل التكبير: تخفيف الحبيبات وبلوكات الضغط في الصور الصغيرة
-    let pre = sharp(o.data, { failOn: 'none' }).flatten({ background: '#ffffff' });
-    if (long < 1000) pre = pre.median(3);
-    // 2) تكبير تدريجي عالي الجودة (lanczos3) مع حدّة خفيفة بين المرحلتين
-    let cur = await pre.raw().toBuffer({ resolveWithObject: true });
-    let cw = cur.info.width, chh = cur.info.height;
-    while (cw < W) {
-        const nw = Math.min(W, cw * 2), nh = Math.min(H, Math.round(chh * (nw / cw)));
-        cur = await sharp(cur.data, { raw: { width: cw, height: chh, channels: cur.info.channels } })
-            .resize(nw, nh, { kernel: 'lanczos3' }).sharpen({ sigma: 0.8, m1: 0.6, m2: 1.8 }).raw().toBuffer({ resolveWithObject: true });
-        cw = cur.info.width; chh = cur.info.height;
-    }
-    // 3) تحسين التباين والألوان ثم حدّة نهائية
-    let p = sharp(cur.data, { raw: { width: cw, height: chh, channels: cur.info.channels } });
-    if (cw !== W || chh !== H) p = p.resize(W, H, { kernel: 'lanczos3' });
+    let p = sharp(o.data, { failOn: 'none' }).flatten({ background: '#ffffff' });
+    if (long < 900) p = p.median(3);                                  // تخفيف التشويش والحبيبات في الصور الصغيرة
+    p = p.resize(W, H, { kernel: 'lanczos3' });                        // تكبير عالي الجودة
     try { p = p.clahe({ width: Math.max(16, Math.round(W / 8)), height: Math.max(16, Math.round(H / 8)), maxSlope: 2 }); } catch (e) { /* نسخة sharp لا تدعمها */ }
-    const sigma = Math.min(2, 0.9 + 0.25 * f);
-    const out = await p.modulate({ saturation: 1.12, brightness: 1.02 }).sharpen({ sigma, m1: 0.8, m2: 2.5 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
-
-    let cap = `✨ تم تحسين الصورة\n📐 الدقة: ${w}×${h} ← ${W}×${H} (${useHD ? 'HD' : '4K'})\n📦 الحجم: ${fmtSize(out.length)}`;
-    if (f === 1) cap += '\nℹ️ الصورة بدقة عالية أصلاً، فتم تحسين الوضوح والتباين والألوان فقط.';
-    else if (W < target * 0.95 && H < target * 0.95) cap += '\nℹ️ الصورة صغيرة جداً فلم تُكبَّر أكثر من ×4.';
-    cap += '\n📎 أُرسلت كملف حتى لا يضغطها واتساب ويُضيّع الدقة.' + (useHD ? '' : '\n💡 للدقة الأخف اكتب `.تحسين hd`');
-    await c.media({ document: out, mimetype: 'image/jpeg', fileName: `enhanced_${useHD ? 'HD' : '4K'}.jpg`, caption: cap });
+    const out = await p.modulate({ saturation: 1.12, brightness: 1.02 }).sharpen({ sigma: 1.3, m1: 0.8, m2: 2.5 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
+    const cap = `✨ تم تحسين الصورة (${w}×${h} ← ${W}×${H}).`;
+    if (asFile) await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'enhanced.jpg', caption: cap });
+    else await c.media({ image: out, caption: cap + '\n💡 للحصول على الملف بأعلى دقة اكتب `.تحسين ملف`' });
 }
 async function cmdFormat(c) {
     const buf = await getInputImage(c); if (!buf) return;
@@ -1363,34 +1193,13 @@ function floodRemoveBg(data, w, h, tol = 42) {
 }
 let RMBG_QUEUE = Promise.resolve();                                   // نموذج الذكاء الاصطناعي ثقيل: صورة واحدة في كل مرة
 async function removeBgAI(png) {
-    const errs = [];
     const run = async () => {
-        let mod;
-        try { mod = await import('@imgly/background-removal-node'); }   // يعمل داخل السيرفر نفسه بلا مفتاح ولا موقع
-        catch (e) { errs.push('import: ' + String(e?.message || e)); const err = new Error('RMBG_IMPORT'); err.debug = errs.join('\n'); throw err; }
-        const removeBackground = mod.removeBackground || mod.default?.removeBackground || (typeof mod.default === 'function' ? mod.default : null);
-        if (typeof removeBackground !== 'function') { errs.push('import: لا توجد دالة removeBackground في الحزمة'); const err = new Error('RMBG_NO_EXPORT'); err.debug = errs.join('\n'); throw err; }
-        const tmpPng = path.join(TMP, `rmbg_${uid()}.png`);
-        fs.writeFileSync(tmpPng, png);
-        const t0 = Date.now();
-        // نجرب أشكال إدخال ونماذج مختلفة لأن بعض إصدارات الحزمة تتصرف بشكل مختلف مع Blob أو Buffer
-        const attempts = [
-            ['Blob/medium', () => removeBackground(new Blob([png], { type: 'image/png' }), { model: 'medium', output: { format: 'image/png' } })],
-            ['Uint8Array/small', () => removeBackground(new Uint8Array(png), { model: 'small', output: { format: 'image/png' } })],
-            ['file/small', () => removeBackground(new URL('file://' + tmpPng).href, { model: 'small', output: { format: 'image/png' } })]
-        ];
-        try {
-            for (const [label, fn] of attempts) {
-                if (Date.now() - t0 > 240000) break;
-                try {
-                    const blob = await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('RMBG_TIMEOUT')), 150000))]);
-                    const out = Buffer.from(await blob.arrayBuffer());
-                    if (out.length > 1000) return out;
-                    errs.push(`${label}: ناتج فارغ`);
-                } catch (e) { errs.push(`${label}: ${String(e?.message || e).slice(0, 300)}`); }
-            }
-        } finally { rm(tmpPng); }
-        const err = new Error('RMBG_ALL_FAILED'); err.debug = errs.join('\n'); throw err;
+        const mod = await import('@imgly/background-removal-node');   // يعمل داخل السيرفر نفسه بلا مفتاح ولا موقع
+        const blob = await Promise.race([
+            mod.removeBackground(new Blob([png], { type: 'image/png' }), { output: { format: 'image/png' } }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('RMBG_TIMEOUT')), 180000))
+        ]);
+        return Buffer.from(await blob.arrayBuffer());
     };
     const job = RMBG_QUEUE.then(run, run);
     RMBG_QUEUE = job.catch(() => {});
@@ -1401,7 +1210,7 @@ async function cmdRemoveBg(c) {
     const sharp = await sharpOrFail();
     await c.reply('✂️ جاري إزالة الخلفية... (أول مرة قد تستغرق دقيقة لتحميل النموذج)');
     const png0 = await sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
-    let png = null, how = '', aiDebug = '';
+    let png = null, how = '';
     if (process.env.REMOVEBG_API_KEY) {                                // 1) remove.bg (أدق نتيجة، يحتاج مفتاحاً)
         try {
             const form = new FormData();
@@ -1413,10 +1222,7 @@ async function cmdRemoveBg(c) {
         } catch (e) { logErr('صور-removebg', e); }
     }
     if (!png) {                                                        // 2) نموذج ذكاء اصطناعي محلي يعمل لأي صورة
-        try { png = await removeBgAI(png0); how = 'AI'; } catch (e) {
-            aiDebug = e?.debug || String(e?.message || e);
-            console.error('[صور] إزالة الخلفية (AI) فشلت:\n' + aiDebug.slice(0, 1500));
-        }
+        try { png = await removeBgAI(png0); how = 'AI'; } catch (e) { logErr('صور-removebg-ai', e); }
     }
     if (!png) {                                                        // 3) احتياط: خلفية موحدة اللون فقط
         const { data, info } = await sharp(png0, { failOn: 'none' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -1426,8 +1232,7 @@ async function cmdRemoveBg(c) {
     console.error(`[صور] إزالة الخلفية: ${how || 'فشلت كل الطرق'}`);
     if (!png) {
         const e = new Error('RMBG_FAILED');
-        e.friendly = '❌ تعذرت إزالة الخلفية. تأكد أن حزمة `@imgly/background-removal-node` مثبّتة (npm install) أو أضف مفتاح `REMOVEBG_API_KEY`.'
-            + (c.isSenderDev && aiDebug ? `\n\n🔧 للمطور (سبب الفشل):\n${aiDebug.slice(0, 700)}` : '');
+        e.friendly = '❌ تعذرت إزالة الخلفية. تأكد أن حزمة `@imgly/background-removal-node` مثبّتة (npm install) أو أضف مفتاح `REMOVEBG_API_KEY`.';
         throw e;
     }
     await c.media({ document: png, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (PNG شفاف، أُرسل كملف للحفاظ على الشفافية).' });
@@ -1652,7 +1457,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['بحث_يوت', 'متحرك', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
@@ -1673,7 +1478,7 @@ const HANDLERS = {
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
     'انمي': cmdAnimeImg, 'بدون_خلفية': cmdRemoveBg, 'تحسين': cmdEnhance, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
     'قراءة': cmdOCR, 'ترجمة_صورة': cmdOCRTranslate, 'صورتي': cmdMyAvatar, 'صورته': cmdAvatar,
-    'لفيديو': cmdToVideo, 'متحرك': cmdAnimSticker,
+    'لفيديو': cmdToVideo,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
