@@ -1,6 +1,6 @@
 // ============ moredl.js : أوامر قسم التنزيل الإضافية (نفس أسلوب «.بحث_يوت») ============
 // تيك توك • إنستا • فيسبوك • تويتر • سناب • ساوند • بنتريست • ميديافاير • حمل (عام)
-// اغنية • سورة • قارئ • محاضرة • اذان • غلاف • معلومات_فيديو
+// اغنية • سورة • قارئ • محاضرة • اذان • قص • ترجمة_فيديو • غلاف • معلومات_فيديو
 // يعتمد على نفس محرّك lib/dl.js (yt-dlp + ffmpeg) ونفس متغيرات البيئة (الكوكيز/البروكسي/الحدود).
 import fs from 'fs';
 import path from 'path';
@@ -449,6 +449,74 @@ async function cmdVideoInfo(c, fallbackText) {
     ]], `🤖 ${DEV}`));
 }
 
+const LANG_RE = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
+async function cmdSubtitles(c, fallbackText) {
+    const id = ytIdFrom(c, fallbackText);
+    if (!id) return c.reply(usage('.ترجمة_فيديو', '<رابط يوتيوب> [ar|en|fr...]', 'https://youtu.be/... ar') + '\n📝 يرسل لك ملف الترجمة النصية (SRT).');
+    const lang = String(c.args || '').replace(URL_RE, ' ').trim().split(/\s+/).find((w) => LANG_RE.test(w.toLowerCase()))?.toLowerCase();
+    const langs = lang ? [lang] : ['ar', 'en'];
+    await waiting(c, '📝', 'ملف ترجمة SRT', 'يوتيوب');
+    const info = await getVideoInfo(id).catch(() => null);
+    const result = await withSlot(async () => {
+        for (const l of langs) {
+            const dir = mkjob();
+            try {
+                await ytdlp(['--skip-download', '--write-subs', '--write-auto-subs', '--sub-langs', `${l}.*,${l}`, '--sub-format', 'srt/vtt/best', '--convert-subs', 'srt',
+                    '-o', path.join(dir, 'sub.%(ext)s'), 'https://www.youtube.com/watch?v=' + id], { timeout: 3 * 60 * 1000 });
+                const f = fs.readdirSync(dir).find((n) => /\.(srt|vtt)$/i.test(n));
+                if (f) return { buf: fs.readFileSync(path.join(dir, f)), lang: l, ext: path.extname(f).toLowerCase() };
+            } catch (e) { if (!e?.soft) throw e; } finally { rmrf(dir); }
+        }
+        return null;
+    });
+    if (!result) throw new DlError(`❌ لا توجد ترجمة نصية متاحة لهذا الفيديو${lang ? ' بلغة ' + lang : ''}.`);
+    await c.media({ document: result.buf, mimetype: 'application/x-subrip', fileName: safeName(info?.title || id) + `.${result.lang}${result.ext}`,
+        caption: frame('✅ *تَـمَّ الـتَّـحْـمِـيـلُ:*', [[row('📝', 'اللغة', result.lang), row('📦', 'الحجم', fmtSize(result.buf.length))]], `🤖 ${DEV}`) });
+}
+
+// ---------------------------------------------------------------- قص مقطع
+export function parseTime(s) {
+    const t = String(s || '').trim().replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace('،', '.');
+    if (!/^\d+(\.\d+)?(:\d{1,2}(\.\d+)?){0,2}$/.test(t)) return null;
+    const p = t.split(':').map(Number);
+    return p.reduce((a, v) => a * 60 + v, 0);
+}
+const MAX_CUT = 10 * 60;
+async function cmdCut(c, { getTarget, download }) {
+    const parts = String(c.args || '').trim().split(/\s+/).filter(Boolean);
+    const helpMsg = usage('.قص', '<من> <إلى>', '0:10 0:40', false) + '\n🎬 أرسل فيديو/صوت مع الأمر أو رد عليه.\n⏱️ الحد الأقصى للمقطع 10 دقائق.';
+    if (!parts.length) return c.reply(helpMsg);
+    let start = 0, end;
+    if (parts.length === 1) end = parseTime(parts[0]);
+    else { start = parseTime(parts[0]); end = parseTime(parts[1]); }
+    if (start === null || end === null || !(end > start)) return c.reply('❌ الوقت غير صحيح. مثال: `.قص 0:10 0:40` (البداية ثم النهاية).');
+    if (end - start > MAX_CUT) return c.reply('❌ الحد الأقصى للمقطع 10 دقائق.');
+    const t = getTarget(c, ['videoMessage', 'audioMessage', 'documentMessage']);
+    if (!t) return c.reply('📌 أرسل فيديو أو صوتاً مع الأمر، أو رد على واحد منهما.');
+    await waiting(c, '✂️', 'قص مقطع', '');
+    const input = await download(c, t);
+    const isAudio = t.kind === 'audioMessage';
+    const dir = mkjob();
+    try {
+        const inFile = path.join(dir, 'in.bin');
+        fs.writeFileSync(inFile, input);
+        const out = path.join(dir, isAudio ? 'cut.mp3' : 'cut.mp4');
+        const args = ['-y', '-v', 'error', '-ss', String(start), '-i', inFile, '-t', String(end - start)];
+        if (isAudio) args.push('-vn', '-c:a', 'libmp3lame', '-b:a', '128k', out);
+        else args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out);
+        await run(FFMPEG, args, { timeout: 10 * 60 * 1000 });
+        if (!fs.existsSync(out) || fs.statSync(out).size < 1000) throw new DlError('❌ تعذر قص المقطع، تأكد من أن الوقت داخل مدة الملف.');
+        const buf = finishFile(out);
+        const cap = frame('✅ *تَـمَّ الـقَـصُّ:*', [[row('✂️', 'من', fmtDuration(start)), row('✂️', 'إلى', fmtDuration(end)), row('📦', 'الحجم', fmtSize(buf.length))]], `🤖 ${DEV}`);
+        if (isAudio) { await c.media({ audio: buf, mimetype: 'audio/mpeg' }); await c.reply(cap); }
+        else await c.media({ video: buf, mimetype: 'video/mp4', caption: cap });
+    } catch (e) {
+        if (e instanceof DlError) throw e;
+        console.error('[قص]', String(e?.stderr || e?.message || e).slice(-300));
+        throw new DlError('❌ تعذر قص المقطع، تأكد من أن الملف سليم والوقت داخل مدته.');
+    } finally { rmrf(dir); }
+}
+
 // ---------------------------------------------------------------- الموزّع (يستدعيه features.js)
 // يرجع دالة معالجة لكل اسم أمر أساسي؛ fq = دالة تقرأ نص الرسالة المردود عليها
 export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
@@ -468,6 +536,8 @@ export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
         'قارئ': cmdReciters,
         'محاضرة': cmdLecture,
         'اذان': cmdAdhan,
+        'قص': (c) => cmdCut(c, { getTarget, download }),
+        'ترجمة_فيديو': (c) => cmdSubtitles(c, fq(c)),
         'غلاف': (c) => cmdCover(c, fq(c)),
         'معلومات_فيديو': (c) => cmdVideoInfo(c, fq(c))
     };
@@ -479,10 +549,10 @@ export const MORE_COMMANDS = {
     'تويتر': ['tw', 'twitter', 'اكس'], 'سناب': ['snap', 'سنابشات', 'سناب_شات'], 'ساوند': ['soundcloud', 'ساوند_كلاود'],
     'بنتريست_تنزيل': ['pinterest_dl', 'بنتريست_رابط'], 'ميديافاير': ['mediafire', 'ميديا_فاير'], 'حمل': ['dl', 'download'],
     'اغنية': ['song', 'اغاني', 'أغنية'], 'سورة': ['surah', 'سوره'], 'قارئ': ['القراء', 'قراء', 'reciters'],
-    'محاضرة': ['lecture', 'محاضره'], 'اذان': ['adhan', 'azan', 'أذان'],
-    'غلاف': ['cover', 'thumb', 'ثمنيل'], 'معلومات_فيديو': ['vinfo', 'معلومات_يوتيوب']
+    'محاضرة': ['lecture', 'محاضره'], 'اذان': ['adhan', 'azan', 'أذان'], 'قص': ['cut', 'trim'],
+    'ترجمة_فيديو': ['subs', 'ترجمة_مقطع', 'سبتايتل'], 'غلاف': ['cover', 'thumb', 'ثمنيل'], 'معلومات_فيديو': ['vinfo', 'معلومات_يوتيوب']
 };
-export const MORE_LINK_COMMANDS = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'غلاف', 'معلومات_فيديو'];
-export const MORE_HEAVY = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'اغنية', 'سورة', 'محاضرة', 'اذان', 'غلاف', 'معلومات_فيديو'];
+export const MORE_LINK_COMMANDS = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'ترجمة_فيديو', 'غلاف', 'معلومات_فيديو'];
+export const MORE_HEAVY = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'اغنية', 'سورة', 'محاضرة', 'اذان', 'قص', 'ترجمة_فيديو', 'غلاف', 'معلومات_فيديو'];
 
 export const _internalMore = { PLATFORMS, SURAHS, RECITERS };
