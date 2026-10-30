@@ -598,15 +598,6 @@ async function webSearchTikTok(query, notes) {
     return list;
 }
 
-// المصدر 5 (آخر حل): مقاطع قصيرة من يوتيوب عبر نفس محرّك .بحث_يوت
-async function ytShortsSearch(query, notes) {
-    try {
-        const items = await searchVideos(`${query} edit shorts`, 10);
-        return items.filter((i) => i.duration >= 5 && i.duration <= 90 && !i.live)
-            .map((i) => ({ id: i.id, title: i.title, author: i.channel, duration: i.duration, plays: i.views || 0, play: '', url: '', yt: true }));
-    } catch (e) { notes.push('يوتيوب: ' + String(e?.friendly || e?.message || e).slice(0, 80)); return []; }
-}
-
 async function fetchEdits(name, notes) {
     const hasAr = /[\u0600-\u06FF]/.test(name);
     const en = hasAr ? await toEnglish(name) : '';
@@ -653,11 +644,6 @@ async function fetchEdits(name, notes) {
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
         await harvest();
     }
-    // 4) آخر حل: مقاطع قصيرة من يوتيوب
-    if (got.length < EDITS_COUNT) {
-        add(await ytShortsSearch(en || name, notes));
-        await harvest();
-    }
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
@@ -680,7 +666,7 @@ async function cmdEdits(c) {
             row('📛', 'العنوان', cut(v.title, 70) || '—'),
             row('👤', 'الحساب', '@' + (cut(v.author, 30) || '—')),
             ...(v.duration ? [row('⏱️', 'المدة', fmtDuration(v.duration))] : []),
-            ...(v.yt ? [row('📱', 'المصدر', 'يوتيوب شورتس')] : [])
+            row('📱', 'المصدر', 'تيك توك')
         ].join('\n'),
         footer: `🤖 ${DEV}`,
         url: EDIT_CHANNEL_URL,
