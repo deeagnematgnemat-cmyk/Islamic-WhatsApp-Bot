@@ -12,6 +12,7 @@ import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
 import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel } from './menu.js';
 import { DlError, warmupYtdlp } from './lib/dl.js';
+import { buildMoreDownloadHandlers, MORE_COMMANDS, MORE_LINK_COMMANDS, MORE_HEAVY } from './moredl.js';
 import { cmdYtSearch } from './ytsearch.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
@@ -44,6 +45,7 @@ const COMMANDS = {
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
 };
+Object.assign(COMMANDS, MORE_COMMANDS);   // أوامر قسم التنزيل الإضافية (moredl.js)
 const CANON = {};   // الاسم (أو الاختصار) المُطبَّع -> الاسم الأساسي
 for (const [name, aliases] of Object.entries(COMMANDS)) {
     CANON[norm(name)] = name;
@@ -53,7 +55,7 @@ CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكا�
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
-const LINK_COMMANDS = new Set(['تلخيص', 'بحث_يوت']);
+const LINK_COMMANDS = new Set(['تلخيص', 'بحث_يوت', ...MORE_LINK_COMMANDS]);
 export function isFeatureLinkCommand(body) {
     const t = String(body || '').trim();
     if (!t.startsWith('.')) return false;
@@ -104,8 +106,33 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🎥 الجودات ↞ 360p • 480p • 720p • 1080p (مقطع جاهز في واتساب)
 > 🎧 صوت MP3 ↞ تحميل الصوت فقط
 
-💡 مثال: \`.بحث_يوت إيرين ييغر\`
-📌 يمكنك أيضاً الرد على رسالة فيها رابط بالأمر.`;
+🌐 *مواقع التواصل:*
+> 🎵 .تيك <رابط> ↞ تيك توك بدون علامة مائية
+> 📸 .انستا <رابط> ↞ ريلز وفيديوهات إنستغرام
+> 📘 .فيس <رابط> ↞ فيديوهات فيسبوك
+> 🐦 .تويتر <رابط> ↞ فيديوهات تويتر (X)
+> 👻 .سناب <رابط> ↞ سبوتلايت سناب شات
+> 📌 .بنتريست_تنزيل <رابط> ↞ فيديو أو صورة من بنتريست
+> 🎶 .ساوند <رابط> ↞ صوت من ساوند كلاود
+> 📁 .ميديافاير <رابط> ↞ تحميل ملف من ميديافاير
+> 🔗 .حمل <رابط> ↞ يكتشف الموقع تلقائياً
+
+🎧 *الصوتيات:*
+> 🎵 .اغنية <اسم> ↞ بحث وإرسال الأغنية MP3 مباشرة
+> 🎙️ .محاضرة <اسم> ↞ محاضرة أو خطبة (صوت)
+> 📖 .سورة <اسم أو رقم> [القارئ] ↞ تلاوة سورة كاملة
+> 🎙️ .قارئ ↞ قائمة القرّاء المتاحين
+> 🕌 .اذان [مكة|المدينة|الأقصى|مصر] ↞ صوت الأذان
+
+🛠️ *أدوات:*
+> ✂️ .قص <من> <إلى> ↞ قص فيديو أو صوت (رد عليه)
+> 📝 .ترجمة_فيديو <رابط> [لغة] ↞ ملف ترجمة SRT ليوتيوب
+> 🖼️ .غلاف <رابط> ↞ صورة غلاف فيديو يوتيوب
+> 📋 .معلومات_فيديو <رابط> ↞ العنوان والمدة والمشاهدات
+
+💡 مثال: \`.بحث_يوت إيرين ييغر\` • \`.تيك https://...\` • \`.سورة الكهف ماهر\`
+📌 يمكنك أيضاً الرد على رسالة فيها رابط بالأمر.
+🎧 أضف كلمة \`صوت\` بعد الرابط لتحميل الصوت فقط من أي موقع.`;
 
 export const AI_SECTION = `🤖 *قِـسْـمُ الـذَّكَـاءِ الاصْـطِـنَـاعِـيِّ:*
 
@@ -1431,6 +1458,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
 const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -1458,6 +1486,8 @@ const HANDLERS = {
     'كود': (c) => cmdSimpleAI(c, SYSTEM + ' أنت مبرمج خبير. أجب بكود صحيح داخل كتل مع شرح مختصر.', '📌 مثال: `.كود دالة جافاسكربت لعكس نص`'),
     'نسيان': async (c) => { memory.delete(c.sender); await c.reply('🧹 تم مسح ذاكرة محادثتك مع الذكاء الاصطناعي.'); }
 };
+
+for (const [k, fn] of Object.entries(buildMoreDownloadHandlers({ quotedText, getTarget, download }))) HANDLERS[k] = dlSafe(fn);
 
 export async function handleFeatureCommand(ctx) {
     const name = CANON[ctx.cmdBase];
