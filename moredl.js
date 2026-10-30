@@ -477,7 +477,7 @@ const CHARACTERS = [
     ['Levi Ackerman', ['ليفاي اكرمان', 'ليفاي أكرمان', 'ليفاي', 'ليفي', 'ليفاى'], ['Levi AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
     ['Mikasa Ackerman', ['ميكاسا اكرمان', 'ميكاسا'], ['Mikasa AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
     ['Armin Arlert', ['ارمين ارليرت', 'ارمين'], ['Armin AOT'], ['aot', 'snk', 'attack on titan', 'shingeki', 'titan']],
-    ['Toji Fushiguro', ['توجي فوشيغورو', 'توجي فوشيجورو', 'توجي', 'توجى'], ['Toji JJK', 'Toji Zenin'], ['jjk', 'jujutsu', 'kaisen']],
+    ['Toji Fushiguro', ['توجي فوشيغورو', 'توجي فوشيجورو', 'توجي', 'توجى', 'توجي زينين', 'توجي فوشيغورو'], ['Toji', 'Toji JJK', 'Toji Zenin', 'Fushiguro Toji', 'Toji Fushiguro JJK', 'Toji Jujutsu Kaisen'], ['jjk', 'jujutsu', 'kaisen']],
     ['Satoru Gojo', ['غوجو ساتورو', 'جوجو ساتورو', 'ساتورو غوجو', 'غوجو', 'جوجو', 'قوجو', 'غوغو'], ['Gojo Satoru', 'Gojo', 'Gojo JJK'], ['jjk', 'jujutsu', 'kaisen']],
     ['Ryomen Sukuna', ['سوكونا', 'سكونا', 'سوكونه'], ['Sukuna', 'Sukuna JJK'], ['jjk', 'jujutsu', 'kaisen']],
     ['Yuji Itadori', ['يوجي ايتادوري', 'ايتادوري', 'يوجي'], ['Itadori', 'Itadori Yuji'], ['jjk', 'jujutsu', 'kaisen']],
@@ -725,6 +725,7 @@ async function fetchEdits(name, notes, progress) {
     const enNames = R.names.filter(Boolean);
     const core = enNames[0] || name;
     const allNames = [...new Set([name, ...enNames].filter(Boolean).map((s) => s.toLowerCase()))];
+    for (const n of enNames) for (const w of n.toLowerCase().split(/\s+/)) { const k = compact(w); if (k.length >= 4 && !EDIT_STOP.has(k) && !allNames.includes(k)) allNames.push(k); }   // الاسم الأول/الأخير كمعرّف مستقل (Toji / Eren / Yeager)
     const nameSets = allNames
         .map((s) => s.split(/\s+/).map(compact).filter((w) => w.length >= 2 && !EDIT_STOP.has(w))).filter((a) => a.length);
     const fulls = [...new Set(allNames.map(compact).filter((w) => w.length >= 3))];
@@ -750,11 +751,14 @@ async function fetchEdits(name, notes, progress) {
     // صيغ البحث بترتيب الأهمية: الاسم الأساسي ثم البدائل (Yeager/Jaeger…) ثم العربية
     const queries = [];
     const addQ = (q) => { q = String(q || '').trim(); if (q && !queries.includes(q)) queries.push(q); };
+    const firstName = String(core).split(/\s+/)[0];
     addQ(`${core} edit`); addQ(`${core} anime edit`);
     for (const n of enNames.slice(1, 4)) addQ(`${n} edit`);
-    addQ(`${core} edits`); addQ(`${core} amv`);
-    if (hasAr) addQ(`${name} ايدت`);
-    queries.length = Math.min(queries.length, 8);
+    addQ(`${firstName} edit`); addQ(`${core} edits`); addQ(`${core} amv`);
+    if (R.series[0]) addQ(`${firstName} ${R.series[0]} edit`);
+    addQ(`${firstName} anime`); addQ(`${core} fyp`); addQ(`#${compact(core)}`); addQ(`#${compact(firstName)}edit`);
+    if (hasAr) { addQ(`${name} ايدت`); addQ(`${name} انمي`); addQ(name); }
+    queries.length = Math.min(queries.length, 12);
     const keyOf = (v) => v.id || v.url;
     const tkey = (v) => compact(v.title).slice(0, 30);
     const rkey = compact(name);
@@ -765,8 +769,8 @@ async function fetchEdits(name, notes, progress) {
             const key = keyOf(v);
             if (!key || cands.has(key) || !v.url) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
-            const tier = tierOf(v);
-            if (tier === null) continue;
+            let tier = tierOf(v);
+            if (tier === null) tier = 2;                    // احتياط: نتيجة بحث تيك توك عن اسم الشخصية نفسه حتى لو العنوان لا يذكر الاسم
             cands.set(key, { ...v, tier });
         }
     };
@@ -818,6 +822,7 @@ async function fetchEdits(name, notes, progress) {
     }
     await harvest(0);                                       // الأدق أولاً (الاسم كاملاً)
     if (got.length < EDITS_COUNT) await harvest(1);         // ثم تطابق جزئي للاسم
+    if (got.length < EDITS_COUNT) await harvest(2);         // ثم أي نتيجة من بحث الاسم
     // 1.5) لم تكتمل 3 نتائج (مرشحون فشل تنزيلهم أو قلّوا): صفحات أعمق من أفضل صيغتين
     if (got.length < EDITS_COUNT && Date.now() < deadline) {
         for (const q of queries.slice(0, 2)) {
@@ -825,18 +830,19 @@ async function fetchEdits(name, notes, progress) {
                 if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
                 await sleepMs(1100);
                 add(await tiktokSearch(q, notes, cur));
-                await harvest(1);
+                await harvest(2);
             }
         }
     }
     // 2) احتياط: صفحة هاشتاق الشخصية في تيك توك (من كل الصيغ الإنجليزية)
     if (got.length < EDITS_COUNT && Date.now() < deadline) {
         const tags = [];
-        for (const n of enNames) { const b = compact(n).replace(/[\u0600-\u06FF]/g, ''); if (b.length >= 3) tags.push(b + 'edit', b); }
-        for (const tag of [...new Set(tags)].slice(0, 4)) {
+        for (const n of enNames) { const b = compact(n).replace(/[\u0600-\u06FF]/g, ''); if (b.length >= 3) tags.push(b + 'edit', b, b + 'amv'); }
+        const fb = compact(String(core).split(/\s+/)[0]).replace(/[\u0600-\u06FF]/g, ''); if (fb.length >= 3) tags.unshift(fb + 'edit', fb);
+        for (const tag of [...new Set(tags)].slice(0, 6)) {
             if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
             add(await tagSearch(tag, notes));
-            await harvest(1);
+            await harvest(2);
         }
     }
     for (const g of got) recent.push(keyOf(g.v));
