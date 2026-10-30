@@ -30,7 +30,7 @@ const SECTIONS = [
             row('👑 10. الألقاب', 'أوامر الألقاب', 10),
             row('🎨 11. الملصقات', 'ملصقات وتعديل الصور', 11),
             row('📲 12. التنصيب', 'ربط بوت خاص بك', 12),
-            row('📥 13. التنزيل', 'تنزيل من الروابط', 13),
+            row('📥 13. التنزيل', 'بحث وتنزيل من يوتيوب', 13),
             row('🤖 14. الذكاء الاصطناعي', 'أسئلة وصور وترجمة', 14),
             row('🖼️ 15. الصور', 'جلب وتعديل الصور', 15),
             row('🔧 16. الفرعي', 'التحكم ببوتك المنصّب', 16)
@@ -126,6 +126,35 @@ export async function sendSectionWithButtons(sock, jid, text, imageUrl, mentionJ
         return false;
     }
 }
+
+// ===== بطاقة بصورة وعنوان مع زر «قائمة الأقسام» ثم أزرار إضافية تحته مباشرة =====
+// image: Buffer أو رابط | title/subtitle: عنوان تحت الصورة | extraButtons: أزرار native_flow تُوضع بعد «قائمة الأقسام»
+// ترجع true عند النجاح، وfalse عند الفشل (ليرسل المستدعي نسخة نصية بديلة)
+export async function sendCardWithButtons(sock, jid, { title = '', subtitle = '', image = null, text = '', footer = '', mentionJid = null, extraButtons = [] } = {}) {
+    try {
+        let header = { ...(title ? { title } : {}), ...(subtitle ? { subtitle } : {}), hasMediaAttachment: false };
+        if (image) {
+            try {
+                const media = await prepareWAMessageMedia({ image: Buffer.isBuffer(image) ? image : { url: image } }, { upload: sock.waUploadToServer });
+                if (media && media.imageMessage) header = { ...header, hasMediaAttachment: true, imageMessage: media.imageMessage };
+            } catch (e) { console.error('تعذر رفع صورة البطاقة:', e?.message || e); }
+        }
+        await relayInteractive(sock, jid, {
+            header,
+            body: { text },
+            ...(footer ? { footer: { text: footer } } : {}),
+            ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+            nativeFlowMessage: { buttons: [...SECTION_NAV_BUTTONS(), ...extraButtons] }
+        });
+        return true;
+    } catch (e) {
+        console.error('تعذر إرسال البطاقة مع الأزرار:', e?.message || e);
+        return false;
+    }
+}
+
+// زر قائمة منسدلة (single_select) جاهز للاستخدام في extraButtons
+export const selectButton = (title, sections) => ({ name: 'single_select', buttonParamsJson: JSON.stringify({ title, sections }) });
 
 // زر «الحماية» تحت قائمة الأقسام: لكل حماية صفّان (تفعيل / تعطيل) وضغطه ينفّذ الأمر مباشرة
 export function protectionButton(settings = {}) {
