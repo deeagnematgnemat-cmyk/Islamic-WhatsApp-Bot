@@ -649,7 +649,7 @@ async function tiktokSearch(keywords, notes, cursor = 0) {
     for (let attempt = 0; attempt < 4; attempt++) {
         try {
             const host = hosts[attempt % hosts.length];
-            const j = await getJson(`https://${host}/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 25000);
+            const j = await getJson(`https://${host}/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 15000);
             if (j && j.code === 0) {
                 const out = [];
                 for (const d of (j.data?.videos || [])) {
@@ -663,7 +663,7 @@ async function tiktokSearch(keywords, notes, cursor = 0) {
                 return out;
             }
             const msg = String(j?.msg || 'رد غير متوقع');
-            if (attempt < 3 && /limit|second|frequen/i.test(msg)) { await sleepMs(1600); continue; }   // الحد: طلب كل ثانية
+            if (attempt < 3 && /limit|second|frequen/i.test(msg)) { await sleepMs(1200); continue; }   // الحد: طلب كل ثانية
             if (attempt < 3) { await sleepMs(900); continue; }
             notes.push(`بحث تيك توك: ${msg.slice(0, 70)}`);
             return [];
@@ -685,9 +685,9 @@ async function webTiktokSearch(q, notes) {
         'https://www.bing.com/search?count=30&q=' + encodeURIComponent(query),
         'https://search.yahoo.com/search?n=30&p=' + encodeURIComponent(query)
     ];
-    for (const u of urls) {
+    await Promise.all(urls.map(async (u) => {
         try {
-            let html = (await getBuf(u, { timeout: 20000, max: 6 * MB, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).toString('utf8');
+            let html = (await getBuf(u, { timeout: 12000, max: 6 * MB, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).toString('utf8');
             try { html = decodeURIComponent(html.replace(/%(?![0-9a-f]{2})/gi, '%25')); } catch (e) {}
             html = html.replace(/&amp;/g, '&');
             const re = /tiktok\.com\/@([\w.\-]{2,40})\/video\/(\d{15,25})/g;
@@ -697,9 +697,8 @@ async function webTiktokSearch(q, notes) {
                 seen.add(m[2]);
                 out.push({ id: m[2], title: '', author: m[1], duration: 0, plays: 0, direct: '', url: `https://www.tiktok.com/@${m[1]}/video/${m[2]}` });
             }
-            if (out.length >= 8) break;
         } catch (e) { notes.push('بحث ويب: ' + String(e?.message || e).slice(0, 50)); }
-    }
+    }));
     if (!out.length) notes.push(`بحث ويب: 0 نتائج لـ«${q}»`);
     return out;
 }
@@ -842,15 +841,16 @@ async function fetchEdits(name, notes, progress) {
     };
     const strictCount = () => [...cands.values()].filter((v) => v.tier === 0).length;
     // 1) بحث تيك توك: عدّة صيغ للاستعلام، مع تنويع الصفحة
+    const webFirst = webTiktokSearch(queries[0] || core, notes).catch(() => []);     // يعمل بالتوازي ولا يُستعمل إلا عند الحاجة
     let firstQ = true;
     for (const q of queries) {
         if (Date.now() > deadline) break;
         if (!firstQ) await sleepMs(1100);
         add(await tiktokSearch(q, notes, 0));
-        if (strictCount() >= 6) break;
+        if (strictCount() >= 4) break;
         if (firstQ && strictCount() < 3) { await sleepMs(1100); add(await tiktokSearch(q, notes, 20)); }
         firstQ = false;
-        if (strictCount() >= 6) break;
+        if (strictCount() >= 4) break;
     }
     await harvest(0);                                       // الأدق أولاً (الاسم كاملاً)
     if (got.length < EDITS_COUNT) await harvest(1);         // ثم تطابق جزئي للاسم
@@ -868,9 +868,11 @@ async function fetchEdits(name, notes, progress) {
     }
     // 1.7) احتياط: بحث عبر محركات البحث عن روابط فيديوهات تيك توك
     if (got.length < EDITS_COUNT && Date.now() < deadline) {
-        for (const q of queries.slice(0, 4)) {
-            if (got.length >= EDITS_COUNT || Date.now() > deadline) break;
-            add(await webTiktokSearch(q, notes));
+        add(await webFirst);
+        await harvest(2);
+        if (got.length < EDITS_COUNT && Date.now() < deadline) {
+            const rest = await Promise.all(queries.slice(1, 4).map((q) => webTiktokSearch(q, notes).catch(() => [])));
+            for (const l of rest) add(l);
             await harvest(2);
         }
     }
