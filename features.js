@@ -11,7 +11,7 @@ import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
 import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel } from './menu.js';
-import { DlError, withSlot, ytVideo, ytAudio, tilawa, parseYtInput, warmupYtdlp } from './lib/dl.js';
+import { DlError, withSlot, ytVideo, ytAudio, tilawa, parseYtInput, warmupYtdlp, diagnose } from './lib/dl.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -39,7 +39,7 @@ const COMMANDS = {
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل (القسم فارغ: لا توجد فيه أوامر)
     'تحميل': [],
-    'يوتيوب': ['yt', 'ytmp4'], 'صوت': ['ytmp3', 'mp3', 'اغنية', 'اغنيه', 'play'], 'تلاوة': ['tilawa'],
+    'يوتيوب': ['yt', 'ytmp4'], 'صوت': ['ytmp3', 'mp3', 'اغنية', 'اغنيه', 'play'], 'تلاوة': ['tilawa'], 'فحص_تنزيل': ['dlcheck'],
     // الذكاء الاصطناعي
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
@@ -1414,8 +1414,17 @@ async function cmdSummarize(c) {
 const YT_USAGE = `📌 *الاستخدام:*\n\`.يوتيوب https://youtu.be/xxxx\`\n\`.يوتيوب اسم الفيديو\`\nأو رد على رسالة فيها رابط يوتيوب.`;
 const YT_AUDIO_USAGE = `📌 *الاستخدام:*\n\`.صوت https://youtu.be/xxxx\`\n\`.صوت اسم الأغنية أو المحاضرة\`\nأو رد على رسالة فيها رابط يوتيوب.`;
 const dlSafe = (fn) => async (c) => {
-    try { await fn(c); } catch (e) { if (e instanceof DlError) return c.reply(e.friendly); throw e; }
+    try { await fn(c); } catch (e) {
+        if (e instanceof DlError) return c.reply(e.friendly + (c.isSenderDev && e.debug ? `\n\n🔧 للمطور:\n${String(e.debug).slice(0, 700)}` : ''));
+        throw e;
+    }
 };
+// فحص ذاتي للمطور: يختبر كل مصدر ويعرض أيّها يعمل وأيّها يفشل ولماذا
+async function cmdDlCheck(c) {
+    if (!c.isSenderDev) return c.reply('❌ هذا الأمر للمطور فقط.');
+    await c.reply('🔧 جاري فحص مصادر التنزيل (قد يستغرق دقيقة)...');
+    await c.reply('🔧 *نتيجة الفحص:*\n\n' + await diagnose());
+}
 const ytQuery = (c) => {
     const a = (c.args || '').trim();
     if (a) return a;
@@ -1470,7 +1479,7 @@ async function sendSection(c, text) {
 }
 
 const HANDLERS = {
-    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'يوتيوب': dlSafe(cmdYoutube), 'صوت': dlSafe(cmdYtAudio), 'تلاوة': dlSafe(cmdTilawa), 'ذكاء': (c) => sendSection(c, AI_SECTION),
+    'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'يوتيوب': dlSafe(cmdYoutube), 'صوت': dlSafe(cmdYtAudio), 'تلاوة': dlSafe(cmdTilawa), 'فحص_تنزيل': cmdDlCheck, 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
