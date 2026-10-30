@@ -466,43 +466,6 @@ async function toEnglish(text) {
     } catch (e) { return ''; }
 }
 
-// المصدر 1: بحث tikwm (GET ثم POST، وعلى النطاقين، مع إعادة المحاولة عند حد الطلبات)
-async function tikwmSearch(keywords, notes) {
-    const qs = new URLSearchParams({ keywords, count: '12', cursor: '0', web: '1', hd: '1' }).toString();
-    for (const host of ['https://www.tikwm.com', 'https://tikwm.com']) {
-        for (const method of ['GET', 'POST']) {
-            const tag = `${method} ${host.replace('https://', '')}`;
-            for (let attempt = 0; attempt < 2; attempt++) {
-                try {
-                    const res = await fetch(method === 'GET' ? `${host}/api/feed/search?${qs}` : `${host}/api/feed/search`, {
-                        method, redirect: 'follow', signal: AbortSignal.timeout(25000), body: method === 'POST' ? qs : undefined,
-                        headers: { 'User-Agent': EDIT_UA, Accept: 'application/json, text/plain, */*', Referer: host + '/', Origin: host, ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' } : {}) }
-                    });
-                    const text = await res.text();
-                    let j; try { j = JSON.parse(text); } catch (e) { notes.push(`${tag}: HTTP ${res.status} ليس JSON`); break; }
-                    if (j && j.code === 0 && Array.isArray(j.data?.videos)) {
-                        if (j.data.videos.length) return j.data.videos.map((v) => normTik(v, host));
-                        notes.push(`${tag}: 0 نتائج لـ«${keywords}»`); break;
-                    }
-                    const msg = String(j?.msg || '');
-                    if (/limit|frequen|too many/i.test(msg) && attempt === 0) { await sleepMs(1500); continue; }
-                    notes.push(`${tag}: ${j?.code} ${msg}`.slice(0, 120)); break;
-                } catch (e) { notes.push(`${tag}: ${e?.message || e}`.slice(0, 120)); break; }
-            }
-        }
-    }
-    return [];
-}
-function normTik(v, host) {
-    const uid = String(v.author?.unique_id || '').trim();
-    const id = String(v.video_id || v.id || '');
-    return {
-        id, title: String(v.title || '').trim(), author: uid || String(v.author?.nickname || '').trim(),
-        duration: Number(v.duration || 0), plays: Number(v.play_count || 0),
-        play: absTik(v.play || v.hdplay, host), url: uid && id ? `https://www.tiktok.com/@${uid}/video/${id}` : ''
-    };
-}
-
 // المصدر 2 (احتياط): صفحة الهاشتاق عبر yt-dlp
 async function tagSearch(tag, notes) {
     try {
@@ -539,30 +502,29 @@ async function shrinkEdit(buf) {
     return null;
 }
 
-// تنزيل فيديو واحد: رابط مباشر أولاً، ثم نفس مسار أمر .تيك (yt-dlp ثم tikwm)، وللمرشّحين من يوتيوب مسار يوتيوب
+// تنزيل فيديو واحد: مباشرة من رابط tiktok.com الحقيقي عبر yt-dlp فقط (بدون أي موقع وسيط)
 async function getEditBuf(v, notes) {
-    if (v.yt) {
-        try { const r = await downloadYt(v.id, '360'); return await shrinkEdit(r.buffer); }
-        catch (e) { notes.push('تنزيل يوتيوب: ' + String(e?.friendly || e?.message || e).slice(0, 80)); return null; }
-    }
-    if (v.play) {
-        try {
-            const buf = await getBuf(v.play, { timeout: 90000, max: 60 * MB });
-            if (isMp4(buf)) { const s = await shrinkEdit(buf); if (s) return s; }
-            else notes.push('تنزيل مباشر: الملف ليس mp4');
-        } catch (e) { notes.push('تنزيل مباشر: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
-    }
-    if (v.url) {
-        let res = null;
-        try {
-            res = await fetchMedia(v.url, 'tiktok', false);
-            const file = res.videos[0];
-            if (!file) throw new Error('لا فيديو');
-            const buf = fs.readFileSync(await ensureWhatsAppMp4(file, res.dir));
-            if (buf.length > 20000) { const s = await shrinkEdit(buf); if (s) return s; }
-        } catch (e) { notes.push('تنزيل عبر .تيك: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
-        finally { if (res?.dir) rmrf(res.dir); }
-    }
+    if (!v.url || !/^https?:\/\/(www\.|vm\.|vt\.)?tiktok\.com\//i.test(v.url)) return null;
+    const dir = mkjob();
+    try {
+        const res = await viaYtdlp(v.url, 'tiktok', false, dir);
+        const file = res.videos[0];
+        if (!file) throw new Error('لا فيديو');
+        // تحقق صارم: يُقبل الفيديو فقط إذا أكّد yt-dlp أنه نزل من مستخرج TikTok ومن نطاق tiktok.com
+        const metaName = fs.readdirSync(res.dir).find((n) => n.endsWith('.info.json'));
+        let okSrc = false;
+        if (metaName) {
+            try {
+                const j = JSON.parse(fs.readFileSync(path.join(res.dir, metaName), 'utf8'));
+                okSrc = /^tiktok/i.test(String(j.extractor_key || j.extractor || '')) && /tiktok\.com/i.test(String(j.webpage_url || ''));
+            } catch (e) {}
+        }
+        if (!okSrc) throw new Error('المصدر ليس تيك توك');
+        console.log('[ايدت] تيك توك ✔', v.url);
+        const buf = fs.readFileSync(await ensureWhatsAppMp4(file, res.dir));
+        if (buf.length > 20000) { const s = await shrinkEdit(buf); if (s) return s; }
+    } catch (e) { notes.push('تنزيل من تيك توك: ' + String(e?.friendly || e?.message || e).slice(0, 80)); }
+    finally { rmrf(dir); }
     return null;
 }
 
@@ -627,18 +589,10 @@ async function fetchEdits(name, notes) {
             for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
         }
     };
-    // 1) بحث tikwm
-    for (let i = 0; i < queries.length && pool.length < 9; i++) {
-        if (i) await sleepMs(1300);                                   // tikwm يحدّد طلباً تقريباً كل ثانية
-        add(await tikwmSearch(queries[i], notes));
-    }
+    // 1) بحث ويب عن روابط tiktok.com الحقيقية
+    for (const q of queries.slice(0, 3)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 9) break; }
     await harvest();
-    // 2) بحث ويب عن روابط تيك توك
-    if (got.length < EDITS_COUNT) {
-        for (const q of queries.slice(0, 2)) { add(await webSearchTikTok(q, notes)); if (pool.length - tried.size >= 6) break; }
-        await harvest();
-    }
-    // 3) هاشتاق تيك توك عبر yt-dlp
+    // 2) هاشتاق تيك توك عبر yt-dlp (من تيك توك مباشرة)
     if (got.length < EDITS_COUNT) {
         const base = (en || name).toLowerCase().replace(/[^a-z0-9]/g, '');
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
