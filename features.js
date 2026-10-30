@@ -34,10 +34,10 @@ const norm = (s) => s.replace(/[أإآا]/g, 'ا');
 const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'دائري': ['round'], 'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'ايموجي': ['emoji'],
-    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'لفيديو': ['tovideo'], 'ملصقات': [],
+    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'ملصقات': [],
     // الصور
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
-    'بدون_خلفية': ['removebg', 'ازالة_الخلفية', 'ازالة_خلفية', 'ازالة', 'حذف_الخلفية'], 'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
+    'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل: أمر واحد فقط (.بحث_يوت) والباقي أزرار تفاعلية
     'تحميل': [], 'بحث_يوت': [],
@@ -73,7 +73,6 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > ✍️ .كتابة <نص> ↞ ملصق نصي
 > 🖼️ .لصورة ↞ ملصق إلى صورة
 > ⭕ .دائري ↞ ملصق دائري
-> 🎥 .لفيديو ↞ ملصق متحرك إلى فيديو
 > 🗂️ .باك [اسم] ↞ صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
 > 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
 
@@ -86,7 +85,6 @@ export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
 > 📱 .خلفية [عدد] <بحث> ↞ خلفيات جوال عالية الجودة
 > 🧑‍🎤 .بروفايل [عدد] <اسم> ↞ صور شخصية (pfp)
 > 🎌 .انمي [اسم] ↞ صورة أنمي عشوائية أو باسم
-> ✂️ .ازالة_الخلفية ↞ إزالة خلفية الصورة (PNG شفاف)
 > ✨ .تحسين ↞ رفع وضوح الصورة وجودتها
 > 🌫️ .تغبيش [1-60] ↞ تغبيش الصورة
 > ⚫ .ابيض_اسود ↞ تحويل الصورة لأبيض وأسود
@@ -125,8 +123,6 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🕌 .اذان [مكة|المدينة|الأقصى|مصر] ↞ صوت الأذان
 
 🛠️ *أدوات:*
-> ✂️ .قص <من> <إلى> ↞ قص فيديو أو صوت (رد عليه)
-> 📝 .ترجمة_فيديو <رابط> [لغة] ↞ ملف ترجمة SRT ليوتيوب
 > 🖼️ .غلاف <رابط> ↞ صورة غلاف فيديو يوتيوب
 > 📋 .معلومات_فيديو <رابط> ↞ العنوان والمدة والمشاهدات
 
@@ -279,54 +275,6 @@ async function cmdToImage(c) {
     if (sharp) png = await sharp(buf).png().toBuffer();
     else png = await ffImage(buf, 'null');
     await c.media({ image: png, caption: t.node.isAnimated ? '🖼️ تم أخذ أول إطار من الملصق المتحرك.' : '🖼️ تم التحويل إلى صورة.' });
-}
-
-async function stickerToVideo(c, t) {
-    const buf = await download(c, t);
-    const sharp = await getSharp();
-    if (!sharp) return c.reply('❌ هذه الميزة تحتاج مكتبة sharp. أضفها في package.json ثم أعد النشر.');
-    const id = uid();
-    const rawFile = path.join(TMP, `sv_${id}.raw`), imgFile = path.join(TMP, `sv_${id}.png`), out = path.join(TMP, `sv_${id}.mp4`);
-    // ترميز H.264 متوافق مع واتساب (أبعاد زوجية + yuv420p + faststart)
-    const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
-    const encOut = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'main', '-movflags', '+faststart', '-an', out];
-    try {
-        const meta = await sharp(buf, { animated: true }).metadata();
-        if ((meta.pages || 1) > 1) {
-            // ملصق متحرك: نفكّ إطاراته الحقيقية (على خلفية سوداء بدل الشفافية) ونركّبها فيديو بنفس سرعة الملصق
-            const W = meta.width, H = meta.pageHeight || Math.round(meta.height / meta.pages);
-            const delays = (meta.delay || []).filter((d) => d > 0);
-            const avg = delays.length ? delays.reduce((a, b) => a + b, 0) / delays.length : 100;
-            const fps = Math.min(30, Math.max(5, Math.round(1000 / Math.max(avg, 20))));
-            let data, ch;
-            try {
-                const r = await sharp(buf, { animated: true }).flatten({ background: '#000000' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-                data = r.data; ch = r.info.channels || 3;
-            } catch (e) {
-                const r = await sharp(buf, { animated: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-                data = r.data; ch = r.info.channels || 4;
-            }
-            const frames = Math.floor(data.length / (W * H * ch));
-            if (!frames) throw new Error('NO_FRAMES');
-            fs.writeFileSync(rawFile, data.subarray(0, frames * W * H * ch));
-            const input = ['-f', 'rawvideo', '-pix_fmt', ch === 4 ? 'rgba' : 'rgb24', '-s', `${W}x${H}`, '-framerate', String(fps), '-i', rawFile];
-            if (ch === 4) await run(FFMPEG, ['-y', '-v', 'error', ...input, '-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${fps}`, '-filter_complex', `[1:v][0:v]overlay=shortest=1,${even},format=yuv420p`, ...encOut], 120000);
-            else await run(FFMPEG, ['-y', '-v', 'error', ...input, '-vf', even, '-pix_fmt', 'yuv420p', ...encOut], 120000);
-        } else {
-            // ملصق ثابت: نحوّله إلى فيديو قصير (3 ثوانٍ)
-            fs.writeFileSync(imgFile, await sharp(buf).flatten({ background: '#000000' }).png().toBuffer());
-            await run(FFMPEG, ['-y', '-v', 'error', '-loop', '1', '-framerate', '25', '-i', imgFile, '-t', '3', '-vf', even, '-pix_fmt', 'yuv420p', ...encOut], 120000);
-        }
-        const video = fs.readFileSync(out);
-        if (video.length < 1000) throw new Error('EMPTY_VIDEO');
-        await c.media({ video, mimetype: 'video/mp4', caption: '🎥 تم تحويل الملصق إلى فيديو.' });
-    } finally { rm(rawFile, imgFile, out); }
-}
-
-async function cmdToVideo(c) {
-    const t = getTarget(c, ['stickerMessage']);
-    if (!t) return c.reply('📌 رد على ملصق بالأمر `.لفيديو`');
-    await stickerToVideo(c, t);
 }
 
 // ----- إيموجي
@@ -1159,85 +1107,6 @@ async function cmdFormat(c) {
     await c.media({ document: out, mimetype: fmt === 'jpg' ? 'image/jpeg' : `image/${fmt}`, fileName: `image.${fmt}`, caption: `🔄 تم التحويل إلى ${fmt.toUpperCase()} (${fmtSize(out.length)}).` });
 }
 
-// ---- إزالة الخلفية: remove.bg إن وُجد REMOVEBG_API_KEY، وإلا طريقة محلية تنجح مع الخلفيات الموحدة
-// تملأ من الأطراف كل ما يشبه لون الخلفية وتجعله شفافاً. data: RGBA خام. تعيد null إذا لم تكن الخلفية موحدة.
-function floodRemoveBg(data, w, h, tol = 42) {
-    const idx = (x, y) => (y * w + x) * 4;
-    const border = [];
-    for (let x = 0; x < w; x++) { border.push([x, 0], [x, h - 1]); }
-    for (let y = 1; y < h - 1; y++) { border.push([0, y], [w - 1, y]); }
-    let r = 0, g = 0, b = 0;
-    for (const [x, y] of border) { const i = idx(x, y); r += data[i]; g += data[i + 1]; b += data[i + 2]; }
-    r /= border.length; g /= border.length; b /= border.length;
-    const near = (i) => Math.hypot(data[i] - r, data[i + 1] - g, data[i + 2] - b) <= tol;
-    const similar = border.filter(([x, y]) => near(idx(x, y))).length;
-    if (similar / border.length < 0.7) return null;                  // الخلفية غير موحدة
-    const seen = new Uint8Array(w * h), stack = [];
-    for (const [x, y] of border) if (near(idx(x, y)) && !seen[y * w + x]) { seen[y * w + x] = 1; stack.push(y * w + x); }
-    while (stack.length) {
-        const p = stack.pop(), x = p % w, y = (p - (p % w)) / w;
-        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
-            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-            const q = ny * w + nx;
-            if (!seen[q] && near(q * 4)) { seen[q] = 1; stack.push(q); }
-        }
-    }
-    let removed = 0;
-    for (let p = 0; p < w * h; p++) if (seen[p]) { data[p * 4 + 3] = 0; removed++; }
-    // تنعيم الحواف: البكسلات المجاورة للمحذوف تصبح نصف شفافة
-    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
-        const p = y * w + x;
-        if (!seen[p] && (seen[p - 1] || seen[p + 1] || seen[p - w] || seen[p + w])) data[p * 4 + 3] = 140;
-    }
-    return removed / (w * h) > 0.02 && removed / (w * h) < 0.97 ? data : null;   // لا شيء حُذف أو حُذف كل شيء = فشل
-}
-let RMBG_QUEUE = Promise.resolve();                                   // نموذج الذكاء الاصطناعي ثقيل: صورة واحدة في كل مرة
-async function removeBgAI(png) {
-    const run = async () => {
-        const mod = await import('@imgly/background-removal-node');   // يعمل داخل السيرفر نفسه بلا مفتاح ولا موقع
-        const blob = await Promise.race([
-            mod.removeBackground(new Blob([png], { type: 'image/png' }), { output: { format: 'image/png' } }),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('RMBG_TIMEOUT')), 180000))
-        ]);
-        return Buffer.from(await blob.arrayBuffer());
-    };
-    const job = RMBG_QUEUE.then(run, run);
-    RMBG_QUEUE = job.catch(() => {});
-    return await job;
-}
-async function cmdRemoveBg(c) {
-    const buf = await getInputImage(c); if (!buf) return;
-    const sharp = await sharpOrFail();
-    await c.reply('✂️ جاري إزالة الخلفية... (أول مرة قد تستغرق دقيقة لتحميل النموذج)');
-    const png0 = await sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
-    let png = null, how = '';
-    if (process.env.REMOVEBG_API_KEY) {                                // 1) remove.bg (أدق نتيجة، يحتاج مفتاحاً)
-        try {
-            const form = new FormData();
-            form.append('image_file', new Blob([await toJpeg(buf, { maxSide: 2500, quality: 92 })], { type: 'image/jpeg' }), 'image.jpg');
-            form.append('size', 'auto');
-            const res = await fetch('https://api.remove.bg/v1.0/removebg', { method: 'POST', headers: { 'X-Api-Key': process.env.REMOVEBG_API_KEY }, body: form, signal: AbortSignal.timeout(90000) });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            png = Buffer.from(await res.arrayBuffer()); how = 'remove.bg';
-        } catch (e) { logErr('صور-removebg', e); }
-    }
-    if (!png) {                                                        // 2) نموذج ذكاء اصطناعي محلي يعمل لأي صورة
-        try { png = await removeBgAI(png0); how = 'AI'; } catch (e) { logErr('صور-removebg-ai', e); }
-    }
-    if (!png) {                                                        // 3) احتياط: خلفية موحدة اللون فقط
-        const { data, info } = await sharp(png0, { failOn: 'none' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-        const res = floodRemoveBg(data, info.width, info.height);
-        if (res) { png = await sharp(res, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(); how = 'محلي'; }
-    }
-    console.error(`[صور] إزالة الخلفية: ${how || 'فشلت كل الطرق'}`);
-    if (!png) {
-        const e = new Error('RMBG_FAILED');
-        e.friendly = '❌ تعذرت إزالة الخلفية. تأكد أن حزمة `@imgly/background-removal-node` مثبّتة (npm install) أو أضف مفتاح `REMOVEBG_API_KEY`.';
-        throw e;
-    }
-    await c.media({ document: png, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (PNG شفاف، أُرسل كملف للحفاظ على الشفافية).' });
-}
-
 // ---- قراءة النص من الصورة (OCR) عبر ocr.space (مفتاح مجاني اختياري OCR_API_KEY)
 const OCR_LANGS = { 'عربي': 'ara', 'العربية': 'ara', 'انجليزي': 'eng', 'إنجليزي': 'eng', 'فرنسي': 'fre', 'الماني': 'ger', 'ألماني': 'ger', 'اسباني': 'spa', 'إسباني': 'spa', 'تركي': 'tur', 'روسي': 'rus', 'ياباني': 'jpn', 'كوري': 'kor', 'صيني': 'chs', 'ايطالي': 'ita', 'إيطالي': 'ita' };
 async function ocrCall(buf, lang, engine) {
@@ -1457,7 +1326,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'بدون_خلفية', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
@@ -1476,9 +1345,8 @@ const HANDLERS = {
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
-    'انمي': cmdAnimeImg, 'بدون_خلفية': cmdRemoveBg, 'تحسين': cmdEnhance, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
+    'انمي': cmdAnimeImg, 'تحسين': cmdEnhance, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
     'قراءة': cmdOCR, 'ترجمة_صورة': cmdOCRTranslate, 'صورتي': cmdMyAvatar, 'صورته': cmdAvatar,
-    'لفيديو': cmdToVideo,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
