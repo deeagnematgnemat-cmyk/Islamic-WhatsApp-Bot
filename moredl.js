@@ -620,7 +620,7 @@ async function shrinkEdit(buf) {
     try {
         const inp = path.join(dir, 'in.mp4'), out = path.join(dir, 'out.mp4');
         fs.writeFileSync(inp, buf);
-        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-vf', "scale=-2:'min(480,ih)'", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30',
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-vf', "scale=-2:'min(480,ih)'", '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30',
             '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', out], { timeout: 5 * 60 * 1000 });
         const o = fs.readFileSync(out);
         if (o.length > 20000 && o.length <= EDIT_MAX_MB * MB) return o;
@@ -657,7 +657,7 @@ async function tiktokSearch(keywords, notes, cursor = 0) {
                     const id = String(d.video_id || d.aweme_id || '').trim();
                     if (!author || !id || (Array.isArray(d.images) && d.images.length)) continue;     // نريد فيديو فقط
                     out.push({ id, title: String(d.title || '').trim(), author, duration: Number(d.duration || 0), plays: Number(d.play_count || 0),
-                        direct: abs(d.hdplay || d.play), url: `https://www.tiktok.com/@${author}/video/${id}` });
+                        direct: abs(d.play || d.hdplay), alt: d.play && d.hdplay ? abs(d.hdplay) : '', url: `https://www.tiktok.com/@${author}/video/${id}` });
                 }
                 if (!out.length) notes.push(`بحث تيك توك: 0 نتائج لـ«${keywords}»`);
                 return out;
@@ -725,9 +725,10 @@ async function tagSearch(tag, notes) {
 
 // ---- تنزيل فيديو واحد: الرابط المباشر من نتيجة البحث أولاً، ثم نفس طريقة أمر .تيك (yt-dlp ثم tikwm)
 async function getEditBuf(v, notes) {
-    if (v.direct) {
+    for (const link of [v.direct, v.alt]) {
+        if (!link) continue;
         try {
-            const raw = await getBuf(v.direct, { timeout: 90000, max: 60 * MB });
+            const raw = await getBuf(link, { timeout: 45000, max: 60 * MB });
             const p = await prepareEdit(raw);
             if (p) return p;
             notes.push('مباشر: ملف غير صالح');
