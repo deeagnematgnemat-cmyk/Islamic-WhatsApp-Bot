@@ -10,18 +10,15 @@ import {
 } from './lib/dl.js';
 
 // ---------------------------------------------------------------- الهوية (غيّرها من هنا فقط)
-const BRAND = 'EREN BOT';
 const DEV = 'Eren';
 const CMD = '.بحث_يوت';
 const RESULTS = 6;
 
-// ---------------------------------------------------------------- الإطار والصفوف (نفس تصميم الصور)
-const LINE = '◈─═────═╋⊰❄️⊱╋═────═─◈';
-const row = (emoji, text) => `┃│= ${emoji} ⁝ ${text}`;
-const BLANK = '┃│';
-const brandLine = () => `┃ _*${BRAND}*_`;
-const byLine = () => `┃ \`\`\`BY ¦ ${DEV}\`\`\``;
-const frame = (lines) => [LINE, ...lines, brandLine(), LINE, byLine()].join('\n');
+// ---------------------------------------------------------------- التصميم (نفس أسلوب باقي الأقسام: عنوان + سطور > ↞)
+const NUM = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const row = (emoji, label, value) => `> ${emoji} ${label} ↞ ${value}`;
+// title: عنوان القسم | blocks: مجموعات سطور تُفصل بسطر فارغ | note: ملاحظة أخيرة
+const frame = (title, blocks, note) => [title, '', ...blocks.map((b) => b.join('\n') + '\n'), ...(note ? [note] : [])].join('\n').trim();
 
 // يمنع رموز تنسيق واتساب داخل عناوين الفيديوهات ويقصّ الطويل
 const clean = (s) => String(s || '').replace(/[*_~`\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -41,32 +38,28 @@ const QUALITY_ROWS = [
 // ---------------------------------------------------------------- الخطوة 1: نتائج البحث
 async function stepSearch(c, query) {
     const items = await searchVideos(query, RESULTS);
-    const lines = [
-        row('🔍', 'نتائج البحث'),
-        row('🔎', cut(query, 60)),
-        row('📊', `${items.length} فيديو`),
-        BLANK
-    ];
-    items.forEach((v, i) => {
-        lines.push(`┃│= ${i + 1} ⁝ ${cut(v.title, 40)}`);
-        lines.push(`┃│  ⏱️ ${fmtDuration(v.duration)} · 👁️ ${v.views === null ? '—' : fmtViews(v.views)}`);
-    });
-    lines.push('', row('📌', 'اضغط الزر واختر فيديو'));
-    const text = frame(lines);
+    const list = items.map((v, i) => [
+        `> ${NUM[i] || (i + 1)} ${cut(v.title, 42)}`,
+        `> ⏱️ ${fmtDuration(v.duration)}  •  👁️ ${v.views === null ? '—' : fmtViews(v.views)}`
+    ]);
+    const text = frame('🔍 *نَـتَـائِـجُ الـبَـحْـثِ:*', [
+        [row('🔎', 'البحث', cut(query, 60)), row('📊', 'النتائج', `${items.length} فيديو`)],
+        ...list
+    ], '💡 اضغط زر «اختر فيديو» بالأسفل.');
 
     const button = selectButton('🔍 اختر فيديو', [{
         title: '🎬 النتائج',
-        rows: items.map((v) => ({
+        rows: items.map((v, i) => ({
             header: '',
-            title: `🎬 〘 ${cut(v.title, 18)} 〙`,
-            description: `${fmtDuration(v.duration)} · ${v.views === null ? '—' : fmtViews(v.views)}`,
+            title: `${NUM[i] || (i + 1)} ${cut(v.title, 22)}`,
+            description: `⏱️ ${fmtDuration(v.duration)} • 👁️ ${v.views === null ? '—' : fmtViews(v.views)}`,
             id: `${CMD} ~v ${v.id}`
         }))
     }]);
 
     const image = await fetchThumb(items[0].id);
     const ok = await sendCardWithButtons(c.sock, c.from, {
-        title: '🔍 بحث يوتيوب', subtitle: '🔍 بحث يوتيوب', image, text, footer: DEV,
+        title: '', subtitle: '', image, text, footer: DEV,
         mentionJid: c.sender, extraButtons: [button]
     });
     if (!ok) {
@@ -79,55 +72,56 @@ async function stepSearch(c, query) {
 async function stepQuality(c, id) {
     if (!isYtId(id)) return c.reply(USAGE);
     const info = await getVideoInfo(id);
-    const text = frame([
-        row('🎬', 'اختر الجودة'),
-        row('📛', cut(info.title, 50)),
-        row('📌', 'اضغط واختر الجودة')
-    ]);
+    const meta = [row('📛', 'العنوان', cut(info.title, 50))];
+    if (info.channel) meta.push(row('📺', 'القناة', cut(info.channel, 30)));
+    if (info.duration) meta.push(row('⏱️', 'المدة', fmtDuration(info.duration)));
+    const text = frame('🎥 *اخْـتَـرْ الـجَـوْدَةَ:*', [
+        meta,
+        QUALITY_ROWS.map((r) => row(r.emoji, r.label, r.desc))
+    ], '💡 اضغط زر «اختر الجودة» بالأسفل.\n📲 الفيديو يصلك مقطعاً جاهزاً للتشغيل في واتساب.');
     const button = selectButton('🎥 اختر الجودة', [{
         title: 'الجودة',
         rows: QUALITY_ROWS.map((r) => ({
             header: '',
-            title: `${r.emoji} 〘 ${r.label} 〙`,
+            title: `${r.emoji} ${r.label}`,
             description: r.desc,
             id: `${CMD} ~q ${id} ${r.q}`
         }))
     }]);
     const image = await fetchThumb(id);
     const ok = await sendCardWithButtons(c.sock, c.from, {
-        title: '🎥 جودة التحميل', subtitle: '🎥 جودة التحميل', image, text, footer: DEV,
+        title: '', subtitle: '', image, text, footer: DEV,
         mentionJid: c.sender, extraButtons: [button]
     });
     if (!ok) await c.reply(`${text}\n\n⚠️ تعذر عرض الأزرار، حاول مرة أخرى.`);
 }
 
 // ---------------------------------------------------------------- الخطوة 3: التنزيل والإرسال
+const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+
 async function stepDownload(c, id, quality) {
     if (!isYtId(id) || !isQuality(quality)) return c.reply(USAGE);
     const audio = quality === 'mp3';
 
-    await c.reply(frame([
-        row('⏳', 'جاري التحميل...'),
-        row(audio ? '🎧' : '🎥', audio ? 'صوت MP3' : `جودة ${quality}p`),
-        row('⚡', 'أسرع مصدر')
-    ]));
+    await c.reply(frame('⏳ *جَـارِي الـتَّـحْـمِـيـلِ...*', [[
+        row(audio ? '🎧' : '🎥', 'النوع', audio ? 'صوت MP3' : `فيديو ${quality}p`),
+        row('⚡', 'الحالة', 'يتم التجهيز، لحظات من فضلك')
+    ]]));
 
     const r = await withSlot(() => downloadYt(id, quality));
 
-    const done = frame([
-        row('🎬', 'تم التحميل'),
-        row('📛', audio ? 'audio' : 'video'),
-        row('🔷', audio ? 'MP3' : `${quality}p`),
-        row('⚡', 'YouTube')
-    ]);
+    const done = frame('✅ *تَـمَّ الـتَّـحْـمِـيـلُ:*', [[
+        row('📛', 'العنوان', cut(r.info.title, 50)),
+        row(audio ? '🎧' : '🎥', 'الصيغة', audio ? (r.mime === 'audio/mpeg' ? 'MP3' : 'M4A') : `${quality}p`),
+        row('📦', 'الحجم', fmtSize(r.buffer.length))
+    ]], `🤖 ${DEV}`);
 
-    if (r.asDocument) {
-        await c.media({ document: r.buffer, mimetype: r.mime, fileName: r.fileName, caption: done });
-    } else if (audio) {
+    if (audio) {
         await c.media({ audio: r.buffer, mimetype: r.mime, fileName: r.fileName });
         await c.reply(done);
     } else {
-        await c.media({ video: r.buffer, mimetype: r.mime, caption: done });
+        // دائماً كفيديو جاهز للتشغيل في واتساب (بدون إرساله كملف)
+        await c.media({ video: r.buffer, mimetype: 'video/mp4', caption: done });
     }
 }
 
