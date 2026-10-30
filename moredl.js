@@ -1,10 +1,11 @@
 // ============ moredl.js : أوامر قسم التنزيل الإضافية (نفس أسلوب «.بحث_يوت») ============
 // تيك توك • إنستا • فيسبوك • تويتر • سناب • ساوند • بنتريست • ميديافاير • حمل (عام)
-// اغنية • سورة • قارئ • محاضرة • اذان • غلاف • معلومات_فيديو
+// اغنية • سورة • قارئ • محاضرة • اذان • غلاف • معلومات_فيديو • ايدت
 // يعتمد على نفس محرّك lib/dl.js (yt-dlp + ffmpeg) ونفس متغيرات البيئة (الكوكيز/البروكسي/الحدود).
 import fs from 'fs';
 import path from 'path';
 import { cmdYtSearch, _internal as YT } from './ytsearch.js';
+import { sendVideoCarousel } from './menu.js';
 import {
     DlError, withSlot, searchVideos, getVideoInfo, downloadYt, fetchThumb,
     parseYtInput, isYtId, fmtDuration, fmtViews, _ext
@@ -449,6 +450,84 @@ async function cmdVideoInfo(c, fallbackText) {
     ]], `🤖 ${DEV}`));
 }
 
+// ---------------------------------------------------------------- ايدت: 3 إيديتات من تيك توك (بطاقات فيديو أفقية)
+const EDITS_COUNT = 3;
+const EDIT_MAX_MB = 14;                       // أكبر حجم لفيديو داخل بطاقة (البطاقات الثقيلة قد ترفضها واتساب)
+const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function tikSearch(keywords) {
+    const j = await getJson('https://www.tikwm.com/api/feed/search?keywords=' + encodeURIComponent(keywords) + '&count=20&cursor=0&hd=0', 30000);
+    return j && j.code === 0 && Array.isArray(j.data?.videos) ? j.data.videos : [];
+}
+async function toEnglish(text) {
+    try {
+        const j = await getJson('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(text), 15000);
+        return String((j?.[0] || []).map((x) => x?.[0] || '').join('')).trim();
+    } catch (e) { return ''; }
+}
+const absTik = (u) => (String(u || '').startsWith('/') ? 'https://www.tikwm.com' + u : String(u || ''));
+const isMp4 = (b) => !!b && b.length > 20000 && b.subarray(4, 8).toString('latin1') === 'ftyp';
+
+async function fetchEdits(name) {
+    const hasAr = /[\u0600-\u06FF]/.test(name);
+    const en = hasAr ? await toEnglish(name) : '';
+    const queries = [...new Set([en && en.toLowerCase() !== name.toLowerCase() ? `${en} edit` : '', `${name} edit`, hasAr ? `${name} ايدت` : `${name} edits`].filter(Boolean))];
+    const seen = new Set(), cands = [];
+    for (let i = 0; i < queries.length && cands.length < 9; i++) {
+        if (i) await sleepMs(1200);                                   // tikwm يحدّد طلباً تقريباً كل ثانية
+        let list = [];
+        try { list = await tikSearch(queries[i]); } catch (e) { console.error('[ايدت] فشل البحث:', e?.message || e); }
+        for (const v of list) {
+            const id = String(v.video_id || v.id || '');
+            const dur = Number(v.duration || 0);
+            if (!id || seen.has(id) || !(v.play || v.hdplay) || dur < 4 || dur > 120) continue;
+            seen.add(id); cands.push(v);
+        }
+    }
+    const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(String(v.title || '')) ? 1 : 0;
+    cands.sort((a, b) => (isEdit(b) - isEdit(a)) || (Number(b.play_count || 0) - Number(a.play_count || 0)));
+    const got = [];
+    for (let i = 0; i < cands.length && got.length < EDITS_COUNT; i += EDITS_COUNT) {
+        const batch = cands.slice(i, i + EDITS_COUNT);
+        const results = await Promise.allSettled(batch.map(async (v) => {
+            const buf = await getBuf(absTik(v.play || v.hdplay), { timeout: 90000, max: EDIT_MAX_MB * MB });
+            if (!isMp4(buf)) throw new Error('NOT_MP4');
+            return { v, buf };
+        }));
+        for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
+    }
+    return got;
+}
+
+async function cmdEdits(c) {
+    const name = String(c.args || '').replace(URL_RE, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'ناروتو', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
+    await waiting(c, '🎬', 'إيديتات تيك توك', 'تيك توك');
+    const got = await withSlot(() => fetchEdits(name));
+    if (!got.length) throw new DlError(`❌ لم أجد إيديتات لـ «${name}». جرّب اسماً آخر أو اكتبه بالإنجليزية.`);
+    const cards = got.map(({ v, buf }, i) => ({
+        video: buf,
+        body: `*🎬 إيديت ${i + 1}*\n\n` + [
+            row('📛', 'العنوان', cut(v.title, 70) || '—'),
+            row('👤', 'الحساب', '@' + (cut(v.author?.unique_id || v.author?.nickname, 30) || '—')),
+            row('⏱️', 'المدة', fmtDuration(Number(v.duration || 0)))
+        ].join('\n'),
+        footer: `🤖 ${DEV}`,
+        url: EDIT_CHANNEL_URL,
+        button: '📢 انضمام للقناة'
+    }));
+    if (got.length >= 2) {
+        try {
+            await sendVideoCarousel(c.sock, c.from, cards, { text: `🎬 *إيديتات ${cut(name, 40)}*`, footer: '👈 مرّر لرؤية باقي الإيديتات' });
+            return;
+        } catch (e) { console.error('[ايدت] تعذر الكاروسيل، سيتم الإرسال منفصلاً:', e?.message || e); }
+    }
+    for (let i = 0; i < got.length; i++) {          // احتياط: كل إيديت في رسالة مستقلة
+        await c.media({ video: got[i].buf, mimetype: 'video/mp4', caption: cards[i].body + `\n\n🤖 ${DEV}` });
+    }
+}
+
 // ---------------------------------------------------------------- الموزّع (يستدعيه features.js)
 // يرجع دالة معالجة لكل اسم أمر أساسي؛ fq = دالة تقرأ نص الرسالة المردود عليها
 export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
@@ -469,7 +548,8 @@ export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
         'محاضرة': cmdLecture,
         'اذان': cmdAdhan,
         'غلاف': (c) => cmdCover(c, fq(c)),
-        'معلومات_فيديو': (c) => cmdVideoInfo(c, fq(c))
+        'معلومات_فيديو': (c) => cmdVideoInfo(c, fq(c)),
+        'ايدت': cmdEdits
     };
 }
 
@@ -480,9 +560,10 @@ export const MORE_COMMANDS = {
     'بنتريست_تنزيل': ['pinterest_dl', 'بنتريست_رابط'], 'ميديافاير': ['mediafire', 'ميديا_فاير'], 'حمل': ['dl', 'download'],
     'اغنية': ['song', 'اغاني', 'أغنية'], 'سورة': ['surah', 'سوره'], 'قارئ': ['القراء', 'قراء', 'reciters'],
     'محاضرة': ['lecture', 'محاضره'], 'اذان': ['adhan', 'azan', 'أذان'],
-    'غلاف': ['cover', 'thumb', 'ثمنيل'], 'معلومات_فيديو': ['vinfo', 'معلومات_يوتيوب']
+    'غلاف': ['cover', 'thumb', 'ثمنيل'], 'معلومات_فيديو': ['vinfo', 'معلومات_يوتيوب'],
+    'ايدت': ['edit', 'edits', 'ايديت', 'ايديتات', 'إيديت', 'ايدتات']
 };
 export const MORE_LINK_COMMANDS = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'غلاف', 'معلومات_فيديو'];
-export const MORE_HEAVY = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'اغنية', 'سورة', 'محاضرة', 'اذان', 'غلاف', 'معلومات_فيديو'];
+export const MORE_HEAVY = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'اغنية', 'سورة', 'محاضرة', 'اذان', 'غلاف', 'معلومات_فيديو', 'ايدت'];
 
 export const _internalMore = { PLATFORMS, SURAHS, RECITERS };
