@@ -645,10 +645,19 @@ async function fetchEdits(name, notes) {
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
         await harvest();
     }
-    if (!got.length) {                                          // لم يبقَ شيء جديد: أعد استخدام ما أُرسل سابقاً بدل الفشل
+    notes.push(`المراحل 1-3: مرشّحون=${pool.length} ناجح=${got.length}`);
+    if (got.length < EDITS_COUNT) {                             // لم يكتمل العدد: استكمل بالبحث من جديد مع السماح بإعادة ما أُرسل سابقاً
         allowRecent = true; looseMatch = true;
-        for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
-        await harvest();
+        for (const q of queries) {
+            if (got.length >= EDITS_COUNT) break;
+            add(await tiktokSearch(q, notes));
+            await harvest();
+        }
+        if (got.length < EDITS_COUNT) {
+            add(await webSearchTikTok(queries[0], notes));
+            await harvest();
+        }
+        notes.push(`بعد الاستكمال: مرشّحون=${pool.length} ناجح=${got.length}`);
     }
     for (const g of got) { recentEdits.push(keyOf(g.v)); if (recentEdits.length > 60) recentEdits.shift(); }
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
