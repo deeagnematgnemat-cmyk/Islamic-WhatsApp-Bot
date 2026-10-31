@@ -9,7 +9,7 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
-import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
+import { sendFormWithButtons, sendDeveloperForm, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 
 const PORT = process.env.PORT || 8080;
@@ -155,6 +155,7 @@ return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
 const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
+const DEVELOPER_INFO_VIDEO_URL = 'https://videotourl.com/videos/1793411909499-fceac088-929e-4d67-890d-f9a40165767e.mp4';
 // الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
 function getBotCommandsVideo() {
     try { if (fs.existsSync(BOT_VIDEO_FILE) && fs.statSync(BOT_VIDEO_FILE).size > 0) return BOT_VIDEO_FILE; } catch (e) {}
@@ -1848,15 +1849,16 @@ if (cmdBase === 'معلومات_المطور') {
 
 *❐═━━━═╊⊰👑⊱╉═━━━═❐*
 
-> «┃ 👑︙صَـانِـعُ هَـذَا الـعَـمَـلِ وَمُـطَـوِّرُهُ،
-> ┃ ✦︙بَـنَـى كُـلَّ تَـفْـصِـيـلَـةٍ بِـشَـغَـفٍ وَإِتْـقَـان،
-> ┃ 🍷︙لِـيَـكُـونَ حُـضُـورُ الـبُـوتِ مُـخْـتَـلِـفاً وَأَثَـرُهُ بَـاقِـيـاً.»
+> «┃ 👑︙عَـقْـلٌ يَـصْـنَـعُ الـمُـسْـتَـحِـيـلَ بِـالـكَـوْد،
+> ┃ ✦︙يَـنْـسُـجُ مِـنَ الأَسْـطُـرِ عَـوَالِـمَ نَـابِـضَـةً بِـالـحَـيَـاة،
+> ┃ 🔥︙وَيَـصُـوغُ مِـنَ الأَفْـكَـارِ أَنْـظِـمَـةً لا تَـعْـرِفُ الـمُـسْـتَـحِـيـل.»
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 > 👤 *الاسم ⇠* 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-> 📱 *رقم المطور ⇠* +${DEVELOPER_NUMBER}
-> 🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}
+> 🛡️ *الـرُّتْـبَـة ⇠* مُـطَـوِّرٌ أَسَـاسِـيٌّ وَمُـؤَسِّـسُ الـبُـوت
+> ⚙️ *الـتَّـخَـصُّـص ⇠* بَـرْمَـجَـةُ بُـوتَـاتِ وَاتْـسَـاب مُـتَـكَـامِـلَـة
+> 🚀 *الـرُّؤْيَـة ⇠* صِـنَـاعَـةُ تَـجْـرِبَـةٍ فَـخْـمَـةٍ لا تُـشْـبِـهُ أَحَـداً
 
 *❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
@@ -1865,13 +1867,23 @@ if (cmdBase === 'معلومات_المطور') {
 > ✦ لِـلاسْـتِـفْـسَـارِ أَوِ الـدَّعْـمِ الـفَـنِّـي
 > ✦ لِلاقْـتِـرَاحَـاتِ وَالـمُـلَاحَـظَـات
 
-> تَـوَاصَـلْ مَـعَـهُ مُـبَـاشَـرَةً عَـلَى الـرَّقَـمِ أَعْـلَاهُ ✨
+> 👇 *لِلتَّـوَاصُـلِ مَـعَ الـمُـطَـوِّر اضْـغَـطِ الـزِّرَّ بِـالأَسْـفَـل* ✨
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
+    // 1) الفيديو يشتغل تلقائياً أول ما تظهر الرسالة (بدون ضغط أو تحميل)
     try {
-        return await sendBotMessage(sock, from, { video: { url: getBotCommandsVideo() }, gifPlayback: true, mimetype: 'video/mp4', caption: devInfoText });
+        await sendBotMessage(sock, from, { video: { url: DEVELOPER_INFO_VIDEO_URL }, gifPlayback: true, mimetype: 'video/mp4' });
     } catch (e) {
-        return sendBotMessage(sock, from, { text: devInfoText });
+        console.error('تعذر إرسال فيديو المطور:', e?.message || e);
+    }
+    // 2) الاستمارة تحته مباشرة + زر التواصل مع المطور
+    try {
+        return await sendDeveloperForm(sock, from, devInfoText, `https://wa.me/${DEVELOPER_NUMBER}`, sender);
+    } catch (e) {
+        console.error('تعذر إرسال استمارة المطور:', e?.message || e);
+        return sendBotMessage(sock, from, { text: devInfoText + `\n\n🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}` });
     }
 }
 
