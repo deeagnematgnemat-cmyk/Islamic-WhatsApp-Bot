@@ -14,6 +14,7 @@ import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarou
 import { DlError, warmupYtdlp } from './lib/dl.js';
 import { buildMoreDownloadHandlers, MORE_COMMANDS, MORE_LINK_COMMANDS, MORE_HEAVY } from './moredl.js';
 import { cmdYtSearch } from './ytsearch.js';
+import { TOOLS_COMMANDS, TOOLS_LINK_COMMANDS, TOOLS_HEAVY, TOOLS_SECTION, buildToolsHandlers } from './tools.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const AUTHOR = 'Eren Bot';
@@ -46,16 +47,17 @@ const COMMANDS = {
     'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
 };
 Object.assign(COMMANDS, MORE_COMMANDS);   // أوامر قسم التنزيل الإضافية (moredl.js)
+Object.assign(COMMANDS, TOOLS_COMMANDS);   // أوامر قسم الأدوات (tools.js)
 const CANON = {};   // الاسم (أو الاختصار) المُطبَّع -> الاسم الأساسي
 for (const [name, aliases] of Object.entries(COMMANDS)) {
     CANON[norm(name)] = name;
     for (const a of aliases) CANON[norm(a)] = name;
 }
-CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء'; CANON['15'] = 'صور';
+CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء'; CANON['15'] = 'صور'; CANON['17'] = 'ادوات';
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
-const LINK_COMMANDS = new Set(['تلخيص', 'بحث_يوت', ...MORE_LINK_COMMANDS]);
+const LINK_COMMANDS = new Set(['تلخيص', 'بحث_يوت', ...MORE_LINK_COMMANDS, ...TOOLS_LINK_COMMANDS]);
 export function isFeatureLinkCommand(body) {
     const t = String(body || '').trim();
     if (!t.startsWith('.')) return false;
@@ -1329,6 +1331,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 const COOLDOWN = new Map();
 const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
+for (const n of TOOLS_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
 const PROGRESS = new Set(['تخيل']);
@@ -1357,6 +1360,7 @@ const HANDLERS = {
 };
 
 for (const [k, fn] of Object.entries(buildMoreDownloadHandlers({ quotedText, getTarget, download }))) HANDLERS[k] = dlSafe(fn);
+Object.assign(HANDLERS, buildToolsHandlers({ quotedText, askAI, SYSTEM, clip, http, httpJson, httpBuffer, cmdTranslate, sendSection }));
 
 export async function handleFeatureCommand(ctx) {
     const name = CANON[ctx.cmdBase];
