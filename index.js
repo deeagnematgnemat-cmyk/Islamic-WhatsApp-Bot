@@ -11,6 +11,7 @@ import http from 'http';
 import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
 import { sendFormWithButtons, sendDeveloperForm, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
+import { handleDetectorCommand, detectorCommandNames, cacheIncoming, handleRevoke, handleMessagesUpdate } from './detector.js';
 
 console.log('🧪 نسخة الملف: BUILD-2026-10-31-A | الجلسة:', process.env.SESSION_DIR || 'arem_new_session');
 const PORT = process.env.PORT || 8080;
@@ -270,6 +271,7 @@ const validCommands = [
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
 validCommands.push(...featureCommandNames);
+validCommands.push(...detectorCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -623,6 +625,8 @@ try { collectPackImages(sock, m.messages); } catch (e) {}
 
 const msg = m.messages[0];     
 if (!msg || !msg.message) return;    
+try { cacheIncoming(sock, msg); handleRevoke({ sock, msg, sendBotMessage }).catch(() => {}); } catch (e) {}
+
 
 const from = msg.key.remoteJid;    
 const isGroup = from.endsWith('@g.us');    
@@ -882,6 +886,8 @@ if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: is
 if (!isGroup) {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
+
+if (await handleDetectorCommand({ sock, msg, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
 
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
@@ -2165,7 +2171,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
+    const detectorMenuText = `🔍 *الكشف:*\n\n> 🔓 \`.كشف\` ↞ رد على رسالة (عرض مرة واحدة) لفكها فوراً\n> 🗑️ \`.المحذوف\` ↞ قائمة بكل الرسائل المحذوفة المسجّلة\n> 🔎 \`.المحذوف <رقم>\` ↞ عرض رسالة محذوفة كاملة مع وسائطها\n> ✏️ \`.التعديل\` ↞ قائمة بكل الرسائل المعدّلة (قبل وبعد)\n> 🔍 \`.التعديل <رقم>\` ↞ عرض تعديل كامل\n> 🟢 \`.تفعيل_كشف_المحذوف\` ↞ بدء تسجيل المحذوف والمعدّل بصمت\n> 🔴 \`.ايقاف_كشف_المحذوف\` ↞ إيقاف التسجيل\n> 📱 \`.كشف_رقم @عضو\` ↞ فحص رقم عضو (الدولة + مؤشرات الوهمي)\n> 🕵️ \`.كشف_الوهمي\` ↞ فحص أرقام المجموعة كلها\n\n⚠️ أوامر الكشف (عدا كشف) للمشرفين فقط.`;    
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
@@ -2258,6 +2264,7 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 };
 
 // معالجة كل الرسائل الواصلة معاً (واتساب قد يرسل عدة رسائل في دفعة واحدة) وبشكل متوازٍ
+sock.ev.on('messages.update', (u) => { try { handleMessagesUpdate(u); } catch (e) {} });
 sock.ev.on('messages.upsert', (m) => {
     if (!m.messages || m.messages.length <= 1) { onUpsert(m).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e)); return; }
     for (const one of m.messages) onUpsert({ ...m, messages: [one] }).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e));
