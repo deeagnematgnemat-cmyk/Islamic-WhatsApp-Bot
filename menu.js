@@ -11,37 +11,37 @@ const row = (title, description, n) => ({ header: '', title, description, id: `.
 
 const SECTIONS = [
     {
-        title: 'الأقسام الأساسية',
+        title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام الأسـاسـيـة',
         rows: [
-            row('🛡️ 1. الحماية', 'أوامر الحماية والإنذارات', 1),
-            row('🎉 2. الترفيه والألعاب', 'أوامر الألعاب والفعاليات', 2),
-            row('💳 3. البنك والنقاط', 'الحساب والتحويل والمكافآت', 3),
-            row('🕌 4. القسم الإسلامي', 'القرآن والأدعية والأذكار', 4),
-            row('😂 5. الضحك', 'النكت والتساؤلات والمقولات', 5),
-            row('👥 6. المجموعات', 'أوامر وتفاعلات المجموعة', 6)
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـحـمـايـة', 'أوامـر الـحـمـايـة والإنـذارات', 1),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـرفـيـه', 'أوامـر الألـعـاب والـفـعـالـيـات', 2),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـنـقـاط', 'الـحـسـاب والـتـحـويـل والـمـكـافـآت', 3),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ اسـلامـي', 'الـقـرآن والأدعـيـة والأذكـار', 4),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـضـحـك', 'الـنـكـت والـتـسـاؤلات والـمـقـولات', 5),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـجـمـوعـات', 'أوامـر وتـفـاعـلات الـمـجـمـوعـة', 6)
         ]
     },
     {
-        title: 'أقسام إضافية',
+        title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ أقـسـام إضـافـيـة',
         rows: [
-            row('♟️ 7. المطور', 'أوامر المطور والنظام', 7),
-            row('⚡ 8. الإدارة', 'أوامر إدارة المجموعة', 8),
-            row('🔍 9. الكشف', 'أوامر كشف الوسائط', 9),
-            row('👑 10. الألقاب', 'أوامر الألقاب', 10),
-            row('🎨 11. الملصقات', 'ملصقات وتعديل الصور', 11),
-            row('📲 12. التنصيب', 'ربط بوت خاص بك', 12),
-            row('📥 13. التنزيل', 'يوتيوب وتيك توك وإنستا والمزيد', 13),
-            row('🤖 14. الذكاء الاصطناعي', 'أسئلة وصور وترجمة', 14),
-            row('🖼️ 15. الصور', 'جلب وتعديل الصور', 15),
-            row('🔧 16. الفرعي', 'التحكم ببوتك المنصّب', 16)
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', 'أوامـر الـمـطـوّر والـنـظـام', 7),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الإدَارَة', 'أوامـر إدارة الـمـجـمـوعـة', 8),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـكـشـف', 'أوامـر كـشـف الـوسـائـط', 9),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الألـقـاب', 'أوامـر الألـقـاب', 10),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـلـصـقـات', 'مـلـصـقـات وتـعـديـل الـصـور', 11),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـنـصـيـب', 'ربـط بـوت خـاص بـك', 12),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـنـزيـل', 'يـوتـيـوب وتـيـك تـوك وإنـسـتـا والـمـزيـد', 13),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـذكـاء الاصـطـنـاعـي', 'أسـئـلـة وصـور وتـرجـمـة', 14),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـصـور', 'جـلـب وتـعـديـل الـصـور', 15),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـفـرعـي', 'الـتـحـكـم بـبـوتـك الـمـنـصّـب', 16)
         ]
     }
 ];
 
 const BUTTONS = () => [
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
-    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '📢 قناة المطور', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
-    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '👑 المطور', id: '.معلومات_المطور' }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام', sections: SECTIONS }) },
+    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ قـنـاة الـمـطـوّر', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', id: '.معلومات_المطور' }) }
 ];
 
 // مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
@@ -101,7 +101,7 @@ export function getButtonId(message) {
 
 // ===== زر تحت كل قسم: [قائمة الأقسام] =====
 const SECTION_NAV_BUTTONS = () => [
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '📋 قائمة الأقسام', sections: SECTIONS }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ قـائـمـة الأقـسـام', sections: SECTIONS }) }
 ];
 
 // ترجع true إذا أُرسل القسم مع الزرّين، وfalse إذا فشل (ليُرسل القسم بالطريقة القديمة)
@@ -170,7 +170,7 @@ export function protectionButton(settings = {}) {
     return {
         name: 'single_select',
         buttonParamsJson: JSON.stringify({
-            title: '🛡️ الحماية',
+            title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـحـمـايـة',
             sections: [
                 item('🔗', 'حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
                 item('🤬', 'حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
@@ -214,7 +214,7 @@ export async function sendSectionsList(sock, jid, mentionJid) {
         ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
         nativeFlowMessage: {
             buttons: [
-                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) }
+                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام', sections: SECTIONS }) }
             ]
         }
     });
