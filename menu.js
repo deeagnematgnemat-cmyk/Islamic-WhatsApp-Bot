@@ -4,7 +4,7 @@ import * as baileysNs from '@whiskeysockets/baileys';
 const B = (baileysNs.default && baileysNs.default.generateWAMessageFromContent) ? baileysNs.default : baileysNs;
 const { generateWAMessageFromContent, prepareWAMessageMedia } = B;
 
-const CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const INSTALL_GROUP_URL = 'https://chat.whatsapp.com/DjgGvEAiIEiCXwztk4F82L?s=cl&p=a&mlu=4&ilr=4';
 
 const row = (title, description, n) => ({ header: '', title, description, id: `.${n}` });
@@ -34,7 +34,8 @@ const SECTIONS = [
             row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـذكـاء الاصـطـنـاعـي', 'أسـئـلـة وصـور وتـرجـمـة', 14),
             row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـصـور', 'جـلـب وتـعـديـل الـصـور', 15),
             row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـفـرعـي', 'الـتـحـكـم بـبـوتـك الـمـنـصّـب', 16),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأدوات', 'تـرجـمـة وحـاسـبـة وطـقـس وأدوات مـتـنـوّعـة', 17)
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأدوات', 'تـرجـمـة وحـاسـبـة وطـقـس وأدوات مـتـنـوّعـة', 17),
+            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـشـكـاوي', 'الـتـواصـل مـع الـمـطـوّر وقـنـاة الـبـوت', 18)
         ]
     }
 ];
