@@ -631,7 +631,16 @@ async function fetchEdits(name, notes) {
     return got;
 }
 
+const handledEditMsgs = new Map();      // منع تنفيذ نفس طلب .ايدت مرتين (يصل أحياناً مرتين فيفشل التنفيذ الثاني لأن الفيديوهات صارت «مكررة»)
 async function cmdEdits(c) {
+    const mid = c.msg?.key?.id;
+    if (mid) {
+        const now = Date.now();
+        for (const [k, t] of handledEditMsgs) if (now - t > 10 * 60 * 1000) handledEditMsgs.delete(k);
+        const dupKey = `${c.from}|${mid}`;
+        if (handledEditMsgs.has(dupKey)) return;
+        handledEditMsgs.set(dupKey, now);
+    }
     const name = String(c.args || '').replace(URL_RE, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'ناروتو', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
     await waiting(c, '🎬', 'إيديتات تيك توك', 'تيك توك');
