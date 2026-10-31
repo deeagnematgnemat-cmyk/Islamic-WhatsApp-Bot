@@ -595,7 +595,9 @@ async function fetchEdits(name, notes) {
     const words = [...new Set(`${name} ${en}`.toLowerCase().split(/\s+/).map(compact).filter((w) => w.length >= 3 && !EDIT_STOP.has(w)))];
     const joined = [compact(en), compact(name)].filter((w) => w.length >= 4);
     // الفيديو ذو صلة بالشخصية إذا ذُكر اسمها (أو جزء منه) في عنوانه أو حسابه
+    let looseMatch = false;                                    // آخر محاولة: اقبل نتائج بحث الاسم حتى لو لم يظهر الاسم في عنوانها
     const relevant = (v) => {
+        if (looseMatch) return true;
         const t = compact(`${v.title} ${v.author}`);
         if (!t) return true;                                   // لا عنوان متاح: نقبله لأنه جاء من بحث الاسم نفسه
         return words.some((w) => t.includes(w)) || joined.some((w) => t.includes(w));
@@ -644,7 +646,7 @@ async function fetchEdits(name, notes) {
         await harvest();
     }
     if (!got.length) {                                          // لم يبقَ شيء جديد: أعد استخدام ما أُرسل سابقاً بدل الفشل
-        allowRecent = true;
+        allowRecent = true; looseMatch = true;
         for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
         await harvest();
     }
