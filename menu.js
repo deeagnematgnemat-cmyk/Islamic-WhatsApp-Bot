@@ -43,7 +43,7 @@ const SECTIONS = [
 const BUTTONS = () => [
     { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام', sections: SECTIONS }) },
     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ قـنـاة الـمـطـوّر', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
-    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', id: '.معلومات_المطور' }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', sections: [{ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', rows: [row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', 'مـعـلـومـات الـمـطـوّر وحـسـابـه', 'معلومات_المطور')] }] }) }
 ];
 
 // مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
@@ -269,14 +269,26 @@ export async function sendVideoCarousel(sock, jid, cards, { text = '', footer = 
 }
 
 // ============ استمارة المطور: رسالة تحتها زر «التواصل مع المطور» يفتح حسابه مباشرة ============
-export async function sendDeveloperForm(sock, jid, text, contactUrl, mentionJid) {
+export async function sendDeveloperForm(sock, jid, text, contactUrl, mentionJid, videoUrl) {
+    let header = { hasMediaAttachment: false };
+    if (videoUrl) {
+        try {
+            const media = await prepareWAMessageMedia({ video: { url: videoUrl }, gifPlayback: true, mimetype: 'video/mp4' }, { upload: sock.waUploadToServer });
+            if (media && media.videoMessage) {
+                media.videoMessage.gifPlayback = true;
+                header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+            }
+        } catch (e) {
+            console.error('تعذر رفع فيديو المطور، ستُرسل الاستمارة بدونه:', e?.message || e);
+        }
+    }
     await relayInteractive(sock, jid, {
-        header: { hasMediaAttachment: false },
+        header,
         body: { text },
         ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
         nativeFlowMessage: {
             buttons: [
-                { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـواصـل مـع الـمـطـوّر', url: contactUrl, merchant_url: contactUrl }) }
+                { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ حـسـاب الـمـطـوّر', url: contactUrl, merchant_url: contactUrl }) }
             ]
         }
     }, { noForward: true });
