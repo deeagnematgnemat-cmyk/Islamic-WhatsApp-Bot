@@ -265,3 +265,17 @@ export async function sendVideoCarousel(sock, jid, cards, { text = '', footer = 
         carouselMessage: { cards: built, messageVersion: 1 }
     }, { noForward: true });
 }
+
+// ============ استمارة المطور: رسالة تحتها زر «التواصل مع المطور» يفتح حسابه مباشرة ============
+export async function sendDeveloperForm(sock, jid, text, contactUrl, mentionJid) {
+    await relayInteractive(sock, jid, {
+        header: { hasMediaAttachment: false },
+        body: { text },
+        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+        nativeFlowMessage: {
+            buttons: [
+                { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـواصـل مـع الـمـطـوّر', url: contactUrl, merchant_url: contactUrl }) }
+            ]
+        }
+    }, { noForward: true });
+}
