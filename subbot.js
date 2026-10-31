@@ -2,6 +2,11 @@
 import fs from 'fs';
 import path from 'path';
 import { sendSectionWithButtons } from './menu.js';
+import * as baileysNs from '@whiskeysockets/baileys';
+import pino from 'pino';
+
+const BL = (baileysNs.default && baileysNs.default.downloadMediaMessage) ? baileysNs.default : baileysNs;
+const { downloadMediaMessage } = BL;
 
 const MAX_SUBBOTS = 10;
 const SESSIONS_DIR = './subbots_sessions';
@@ -13,6 +18,9 @@ const subs = new Map(); // الرقم -> بيانات البوت الفرعي
 
 // ----- إعدادات كل بوت منصّب (الوضع + المشرفون) تُحفظ في ملف مستقل
 const SETTINGS_FILE = './subbots_settings.json';
+const MEDIA_DIR = './subbots_media';   // صورة/فيديو استمارة .بوت الخاصة بكل بوت منصّب
+const DEFAULT_BOT_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
+const RESET_WORDS = ['افتراضي', 'الافتراضي', 'اصلي', 'الاصلي', 'ازالة', 'حذف', 'default', 'reset'];
 let settingsStore = {};
 try { settingsStore = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) || {}; } catch (e) { settingsStore = {}; }
 
@@ -67,6 +75,74 @@ export async function isSubBotPrivateBlocked({ sock, msg, sender, isFromMe }) {
         if (num && (num === owner || st.mods.includes(num))) return false;
         return true;
     } catch (e) { return false; }
+}
+
+// ===== اسم البوت وصورة/فيديو الاستمارة لكل بوت منصّب =====
+// صيغ اسم البوت الأصلي الظاهرة في الاستمارات
+const BOT_NAME_PATTERNS = [/𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉/g, /𝐸𝓇𝑒𝓃 𝐵𝑜𝓉/g, /𝐸𝓇𝑒𝓃 𝐵𝑜𝑡/g, /Eren Bot/g];
+
+function brandText(str, name) {
+    if (typeof str !== 'string') return str;
+    let out = str;
+    for (const p of BOT_NAME_PATTERNS) out = out.replace(p, () => name);
+    return out;
+}
+
+function brandContent(content, name) {
+    const c = { ...content };
+    for (const k of ['text', 'caption', 'footer']) if (typeof c[k] === 'string') c[k] = brandText(c[k], name);
+    return c;
+}
+
+// يستبدل الاسم داخل رسالة تفاعلية جاهزة (مثل استمارة .بوت بالأزرار)
+function deepBrand(node, name, depth = 0) {
+    if (!node || typeof node !== 'object' || depth > 10) return;
+    if (Buffer.isBuffer(node) || ArrayBuffer.isView(node)) return;
+    for (const k of Object.keys(node)) {
+        const v = node[k];
+        if (typeof v === 'string') { if (k !== 'buttonParamsJson') node[k] = brandText(v, name); }
+        else if (v && typeof v === 'object') deepBrand(v, name, depth + 1);
+    }
+}
+
+// يُستدعى من index.js: يطبّق اسم البوت المخصّص على كل ما يرسله البوت المنصّب
+export function applySubBotBranding(sock) {
+    if (!sock?.isSubBot) return;
+    const getName = () => { try { const o = ownerOf(sock); return o ? (settingsStore[o]?.name || '') : ''; } catch (e) { return ''; } };
+    const origSend = sock.sendMessage.bind(sock);
+    sock.sendMessage = async (jid, content, options) => {
+        try { const n = getName(); if (n && content && typeof content === 'object') content = brandContent(content, n); } catch (e) {}
+        return origSend(jid, content, options);
+    };
+    if (typeof sock.relayMessage === 'function') {
+        const origRelay = sock.relayMessage.bind(sock);
+        sock.relayMessage = async (jid, message, opts) => {
+            try { const n = getName(); if (n && message) deepBrand(message, n); } catch (e) {}
+            return origRelay(jid, message, opts);
+        };
+    }
+}
+
+// مسار صورة/فيديو الاستمارة المخصّص لهذا البوت المنصّب (أو null إن لم يُغيَّر)
+export function getSubBotMedia(sock) {
+    try {
+        if (!sock?.isSubBot) return null;
+        const o = ownerOf(sock);
+        const f = o && settingsStore[o]?.media?.file;
+        if (f && fs.existsSync(f) && fs.statSync(f).size > 0) return f;
+    } catch (e) {}
+    return null;
+}
+
+function removeMediaFile(st) {
+    try { if (st?.media?.file) fs.rmSync(st.media.file, { force: true }); } catch (e) {}
+}
+
+// نص الوسيط بعد اسم الأمر مباشرة (بدون تطبيع الحروف حتى يبقى الاسم كما كتبه صاحبه)
+function commandArg(msg) {
+    const m = msg?.message || {};
+    const raw = (m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || m.videoMessage?.caption || '').trim();
+    return raw.slice(1).trim().split(/\s+/).slice(1).join(' ').trim();
 }
 
 function saveList() {
@@ -151,7 +227,7 @@ async function removeSub(number) {
     try { entry.sock?.end?.(undefined); } catch (e) {}
     try { entry.sock?.ws?.close(); } catch (e) {}
     try { fs.rmSync(entry.dir, { recursive: true, force: true }); } catch (e) {}
-    if (settingsStore[number]) { delete settingsStore[number]; saveSettings(); }
+    if (settingsStore[number]) { removeMediaFile(settingsStore[number]); delete settingsStore[number]; saveSettings(); }
     saveList();
     return true;
 }
@@ -191,6 +267,8 @@ const SECTION16_TEXT =
 > 👥 \`.مشرف_بوتي <رقم>\` ↞ إضافة مشرف (أو بالرد على رسالته / منشنه)
 > ➖ \`.مشرف_بوتي حذف <رقم>\` ↞ إزالة مشرف
 > 📋 \`.مشرف_بوتي\` ↞ عرض المشرفين
+> 🏷️ \`.اسم_البوت <الاسم>\` ↞ تغيير اسم بوتك في جميع الاستمارات (\`.اسم_البوت افتراضي\` للإرجاع)
+> 🖼️ \`.صورة_البوت\` ↞ رد على صورة أو فيديو (أو أرسله مع الأمر) لتغيير ما يظهر في استمارة \`.بوت\` (\`.صورة_البوت افتراضي\` للإرجاع)
 
 *ملاحظات:*
 • أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.
@@ -198,7 +276,7 @@ const SECTION16_TEXT =
 • في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.
 • دور المشرف الوحيد: أن يستجيب له البوت في الوضع الخاص.`;
 
-const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي'];
+const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت'];
 const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل'];   // موجودة أصلاً للبوت الرئيسي: نعترضها داخل البوت المنصّب فقط
 
 // أوامر قسم «الفرعي». ترجع true إذا عالجت الأمر
@@ -240,6 +318,67 @@ async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
     }
 
     if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت والمطور فقط.'); return true; }
+
+    // ----- اسم_البوت: تغيير اسم البوت في جميع الاستمارات
+    if (cmdBase === 'اسم_البوت') {
+        const arg = commandArg(msg);
+        if (!arg) {
+            await reply(`🏷️ *اسم بوتك الحالي:* ${st.name || DEFAULT_BOT_NAME}\n\nلتغييره: \`.اسم_البوت <الاسم الجديد>\`\nللإرجاع للاسم الأصلي: \`.اسم_البوت افتراضي\``);
+            return true;
+        }
+        if (RESET_WORDS.includes(arg.replace(/[أإآ]/g, 'ا').toLowerCase())) {
+            delete st.name; saveSettings();
+            await reply('✅ تم إرجاع اسم بوتك للاسم الأصلي.');
+            return true;
+        }
+        const clean = arg.replace(/[*_~`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+        if (!clean) { await reply('⚠️ اكتب اسماً صالحاً بعد الأمر.\nمثال: `.اسم_البوت بوت العائلة`'); return true; }
+        st.name = clean; saveSettings();
+        await reply(`✅ تم تغيير اسم بوتك إلى: *${clean}*\n📌 سيظهر الآن في جميع الاستمارات.`);
+        return true;
+    }
+
+    // ----- صورة_البوت: تغيير الصورة أو الفيديو الظاهر في استمارة .بوت
+    if (cmdBase === 'صورة_البوت') {
+        const arg = commandArg(msg).replace(/[أإآ]/g, 'ا').toLowerCase();
+        if (RESET_WORDS.includes(arg)) {
+            removeMediaFile(st); delete st.media; saveSettings();
+            await reply('✅ تم إرجاع الصورة/الفيديو الأصلي لاستمارة `.بوت`.');
+            return true;
+        }
+        const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
+        const kindOf = (m) => {
+            if (m?.imageMessage) return 'image';
+            if (m?.videoMessage) return 'video';
+            const mt = m?.documentMessage?.mimetype || '';
+            if (mt.startsWith('image/')) return 'image';
+            if (mt.startsWith('video/')) return 'video';
+            return '';
+        };
+        let target = unwrap(msg.message?.extendedTextMessage?.contextInfo?.quotedMessage);
+        if (!kindOf(target)) target = unwrap(msg.message);
+        const kind = kindOf(target);
+        if (!kind) {
+            await reply('📌 رد على صورة أو فيديو بالأمر `.صورة_البوت` أو أرسلها وفي وصفها `.صورة_البوت` لتغيير ما يظهر في استمارة `.بوت`.\nللإرجاع: `.صورة_البوت افتراضي`');
+            return true;
+        }
+        try {
+            const buf = await downloadMediaMessage({ key: msg.key, message: target }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+            if (!buf || !buf.length) throw new Error('empty media');
+            const mime = (target.imageMessage || target.videoMessage || target.documentMessage)?.mimetype || '';
+            const ext = kind === 'video' ? 'mp4' : (/png/.test(mime) ? 'png' : (/webp/.test(mime) ? 'webp' : 'jpg'));
+            fs.mkdirSync(MEDIA_DIR, { recursive: true });
+            removeMediaFile(st);
+            const file = `${MEDIA_DIR}/${owner}.${ext}`;
+            fs.writeFileSync(file, buf);
+            st.media = { type: kind, file }; saveSettings();
+            await reply(`✅ تم تغيير ${kind === 'video' ? 'الفيديو' : 'الصورة'} بنجاح.\n📌 سيظهر الآن في استمارة \`.بوت\` الخاصة ببوتك.`);
+        } catch (e) {
+            console.error('خطأ تغيير صورة البوت:', e?.message || e);
+            await reply('❌ فشل حفظ الملف، تأكد أنه صورة أو فيديو صالح وأعد المحاولة.');
+        }
+        return true;
+    }
 
     if (cmdBase === 'وضع_خاص') {
         st.mode = 'private'; saveSettings();
