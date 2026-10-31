@@ -166,7 +166,8 @@ function getBotCommandsVideo(sock) {
 }
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
-let extraDevelopers = []; 
+let extraDevelopers = [];
+let extraDevJids = {}; 
 let vipUsers = []; 
 let botLogs = [];
 
@@ -1629,6 +1630,7 @@ if (cmdBase === 'اضافة_مطور') {
     if (!targetUser) return sendBotMessage(sock, from, { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐' });    
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!extraDevelopers.includes(cleanNum)) extraDevelopers.push(cleanNum);
+    extraDevJids[cleanNum] = targetUser;
     
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِضَـافَـةُ مُـطَـوِّرٍ جَـدِيـد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🛡️ ⌯ الصلاحية ↞ مطور\n✅ ⌯ الحالة ↞ تمت إضافة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [targetUser] });    
@@ -1820,11 +1822,17 @@ if (cmdBase === 'قائمة_المطورين') {
     let text = `👑 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:*\n\n> @${DEVELOPER_NUMBER}\n`;
     let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
 
-    if (extraDevelopers.length > 0) {
-        extraDevelopers.forEach((dev) => {
-            text += `> @${dev}\n`;
-            mentions.push(dev + '@s.whatsapp.net');
-        });
+    const listedDevs = new Set([DEVELOPER_NUMBER]);
+    for (const dev of extraDevelopers) {
+        let jid = extraDevJids[dev] || (dev + '@s.whatsapp.net');
+        let num = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+        if (jid.endsWith('@lid')) {
+            try { const real = await resolveRealNumber(sock, msg, jid); if (real) { num = real; jid = real + '@s.whatsapp.net'; } } catch (e) {}
+        }
+        if (listedDevs.has(num)) continue;
+        listedDevs.add(num);
+        text += `> @${num}\n`;
+        mentions.push(jid);
     }
     return sendBotMessage(sock, from, { text, mentions });    
 }    
