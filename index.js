@@ -251,7 +251,7 @@ const validCommands = [
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت', 'معلومات_المطور',
+'صفر', 'بوت',
 '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
@@ -870,7 +870,8 @@ if (!trimmedBody.startsWith('.')) return;
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
 let cmdBase = cmd.split(' ')[0];    
 
-if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
+const isDevInfoButton = cmdBase === 'معلومات_المطور' && !!msg.message?.interactiveResponseMessage;
+if (!isDevInfoButton && !isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
 // البوت الفرعي: رفض أي أمر خاص بالمطور من غير المطور الأساسي وحساب البوت الرئيسي
 if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender)) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
@@ -1890,20 +1891,12 @@ if (cmdBase === 'قائمة_الاقسام') {
 }
 
 if (cmdBase === 'معلومات_المطور') {
-    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ الأَسَـاسِـي ┃ ♛*
+    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ ┃ ♛*
 
 *❐═━━━═╊⊰👑⊱╉═━━━═❐*
 
-> «┃ 👑︙عَـقْـلٌ يَـصْـنَـعُ الـمُـسْـتَـحِـيـلَ بِـالـكَـوْد،
-> ┃ ✦︙يَـنْـسُـجُ مِـنَ الأَسْـطُـرِ عَـوَالِـمَ نَـابِـضَـةً بِـالـحَـيَـاة،
-> ┃ 🔥︙وَيَـصُـوغُ مِـنَ الأَفْـكَـارِ أَنْـظِـمَـةً لا تَـعْـرِفُ الـمُـسْـتَـحِـيـل.»
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
 > 👤 *الاسم ⇠* 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-> 🛡️ *الـرُّتْـبَـة ⇠* مُـطَـوِّرٌ أَسَـاسِـيٌّ وَمُـؤَسِّـسُ الـبُـوت
-> ⚙️ *الـتَّـخَـصُّـص ⇠* بَـرْمَـجَـةُ بُـوتَـاتِ وَاتْـسَـاب مُـتَـكَـامِـلَـة
-> 🚀 *الـرُّؤْيَـة ⇠* صِـنَـاعَـةُ تَـجْـرِبَـةٍ فَـخْـمَـةٍ لا تُـشْـبِـهُ أَحَـداً
+> 📌 *نبذة ⇠* مطوّر هذا البوت.
 
 *❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
@@ -1917,15 +1910,9 @@ if (cmdBase === 'معلومات_المطور') {
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
-    // 1) الفيديو يشتغل تلقائياً أول ما تظهر الرسالة (بدون ضغط أو تحميل)
+    // الفيديو والاستمارة والزر في رسالة واحدة (الفيديو يشتغل تلقائياً)
     try {
-        await sendBotMessage(sock, from, { video: { url: DEVELOPER_INFO_VIDEO_URL }, gifPlayback: true, mimetype: 'video/mp4' });
-    } catch (e) {
-        console.error('تعذر إرسال فيديو المطور:', e?.message || e);
-    }
-    // 2) الاستمارة تحته مباشرة + زر التواصل مع المطور
-    try {
-        return await sendDeveloperForm(sock, from, devInfoText, `https://wa.me/${DEVELOPER_NUMBER}`, sender);
+        return await sendDeveloperForm(sock, from, devInfoText, `https://wa.me/${DEVELOPER_NUMBER}`, sender, DEVELOPER_INFO_VIDEO_URL);
     } catch (e) {
         console.error('تعذر إرسال استمارة المطور:', e?.message || e);
         return sendBotMessage(sock, from, { text: devInfoText + `\n\n🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}` });
