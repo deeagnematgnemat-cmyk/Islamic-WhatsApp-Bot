@@ -68,16 +68,16 @@ let handler = async (m, { conn, usedPrefix }) => {
                     name: "cta_url",
                     buttonParamsJson: JSON.stringify({
                         display_text: "📢 قناة المطور",
-                        url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d",
-                        merchant_url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d"
+                        url: "https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04",
+                        merchant_url: "https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04"
                     })
                 },
                 {
                     name: "cta_url",
                     buttonParamsJson: JSON.stringify({
                         display_text: "🌐 كروب التنصيب",
-                        url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d",
-                        merchant_url: "https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d"
+                        url: "https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04",
+                        merchant_url: "https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04"
                     })
                 }
             ]
