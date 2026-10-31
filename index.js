@@ -152,7 +152,7 @@ function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
 }
-const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
 // الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
@@ -367,7 +367,7 @@ let isPairingRequested = false;
 let lastPairingAt = 0;
 
 // ===== جعل كل رسائل البوت معاد توجيهها من القناة =====
-const CHANNEL_INVITE_CODE = '0029Vb8jc2PFHWq9IwKDk50d';
+const CHANNEL_INVITE_CODE = '0029VbAyOwm3mFY0ohjZCB04';
 const CHANNEL_FWD_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 let channelFwdInfo = null;
 let channelFwdPromise = null;
