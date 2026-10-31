@@ -585,7 +585,6 @@ async function webSearchTikTok(query, notes) {
     return list;
 }
 
-const recentEdits = [];                  // آخر الإيديتات المرسلة، حتى لا تتكرر نفس الفيديوهات
 const EDIT_STOP = new Set(['edit', 'edits', 'anime', 'amv', 'fyp', 'ايدت', 'ايديت', 'ايديتات', 'إيديت', 'تصميم', 'تصاميم', 'تصميمات', 'ايدتات']);
 const compact = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
 
@@ -606,11 +605,10 @@ async function fetchEdits(name, notes) {
     const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
     const keyOf = (v) => v.id || v.url;
     const seen = new Set(), pool = [], tried = new Set(), got = [];
-    let allowRecent = false;
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
-            if (!key || seen.has(key) || !v.url || (!allowRecent && recentEdits.includes(key))) continue;
+            if (!key || seen.has(key) || !v.url) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
             if (!relevant(v)) continue;
             seen.add(key); pool.push(v);
@@ -646,8 +644,8 @@ async function fetchEdits(name, notes) {
         await harvest();
     }
     notes.push(`المراحل 1-3: مرشّحون=${pool.length} ناجح=${got.length}`);
-    if (got.length < EDITS_COUNT) {                             // لم يكتمل العدد: استكمل بالبحث من جديد مع السماح بإعادة ما أُرسل سابقاً
-        allowRecent = true; looseMatch = true;
+    if (got.length < EDITS_COUNT) {                             // لم يكتمل العدد: استكمل بالبحث من جديد
+        looseMatch = true;
         for (const q of queries) {
             if (got.length >= EDITS_COUNT) break;
             add(await tiktokSearch(q, notes));
@@ -659,7 +657,6 @@ async function fetchEdits(name, notes) {
         }
         notes.push(`بعد الاستكمال: مرشّحون=${pool.length} ناجح=${got.length}`);
     }
-    for (const g of got) { recentEdits.push(keyOf(g.v)); if (recentEdits.length > 60) recentEdits.shift(); }
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
