@@ -114,9 +114,25 @@ async function viaYtdlp(url, platform, audio, dir) {
     return res;
 }
 
+// tikwm مجاني ويسمح بطلب واحد كل ثانية تقريباً: نرتّب الطلبات ونعيد المحاولة إذا رفض بسبب الحد
+let tikwmNext = 0;
+async function tikwmJson(u, timeout) {
+    let j = null;
+    for (let i = 0; i < 3; i++) {
+        const now = Date.now();
+        const at = Math.max(now, tikwmNext);
+        tikwmNext = at + 1200;
+        if (at > now) await new Promise((r) => setTimeout(r, at - now));
+        j = await getJson(u, timeout);
+        if (j && j.code === 0) return j;
+        if (!/limit|second/i.test(String(j?.msg || ''))) return j;
+    }
+    return j;
+}
+
 // ---- بدائل عند فشل yt-dlp
 async function viaTikwm(url, dir) {
-    const j = await getJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(url), 30000);
+    const j = await tikwmJson('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(url), 30000);
     const d = j && j.code === 0 ? j.data : null;
     if (!d) throw new Error('TIKWM_FAIL');
     const abs = (u) => (String(u || '').startsWith('/') ? 'https://www.tikwm.com' + u : String(u || ''));
@@ -523,7 +539,7 @@ async function tiktokSearch(keywords, notes) {
     const out = [];
     const cursor = [0, 0, 10, 20][Math.floor(Math.random() * 4)];       // تنويع النتائج في كل مرة
     try {
-        const j = await getJson(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 25000);
+        const j = await tikwmJson(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(keywords)}&count=20&cursor=${cursor}&hd=1`, 25000);
         const list = j && j.code === 0 ? (j.data?.videos || []) : [];
         for (const d of list) {
             const author = String(d.author?.unique_id || '').trim();
@@ -588,10 +604,11 @@ async function fetchEdits(name, notes) {
     const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
     const keyOf = (v) => v.id || v.url;
     const seen = new Set(), pool = [], tried = new Set(), got = [];
+    let allowRecent = false;
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
-            if (!key || seen.has(key) || !v.url || recentEdits.includes(key)) continue;
+            if (!key || seen.has(key) || !v.url || (!allowRecent && recentEdits.includes(key))) continue;
             if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
             if (!relevant(v)) continue;
             seen.add(key); pool.push(v);
@@ -626,34 +643,17 @@ async function fetchEdits(name, notes) {
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
         await harvest();
     }
+    if (!got.length) {                                          // لم يبقَ شيء جديد: أعد استخدام ما أُرسل سابقاً بدل الفشل
+        allowRecent = true;
+        for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
+        await harvest();
+    }
     for (const g of got) { recentEdits.push(keyOf(g.v)); if (recentEdits.length > 60) recentEdits.shift(); }
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
 
-// حارس التكرار: إذا وصل نفس الطلب مرة ثانية (من اتصال/معالج آخر) أثناء تنفيذ الأول أو بعده مباشرة يُتجاهل بصمت،
-// حتى لا تظهر رسالة «لم أجد» بعد نجاح الطلب الأول (التنفيذ الثاني يرى الفيديوهات «مكررة» فيفشل).
-const editRuns = new Map();
 async function cmdEdits(c) {
-    const nm = String(c.args || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    const key = `${c.from}|${nm}`;
-    const st = editRuns.get(key);
-    if (st && (st.running || Date.now() - st.end < 20000)) return;
-    const cur = { running: true, end: 0 };
-    editRuns.set(key, cur);
-    try { await cmdEditsRun(c); }
-    finally { cur.running = false; cur.end = Date.now(); setTimeout(() => { if (editRuns.get(key) === cur) editRuns.delete(key); }, 60000).unref?.(); }
-}
-const handledEditMsgs = new Map();      // منع تنفيذ نفس طلب .ايدت مرتين (يصل أحياناً مرتين فيفشل التنفيذ الثاني لأن الفيديوهات صارت «مكررة»)
-async function cmdEditsRun(c) {
-    const mid = c.msg?.key?.id;
-    if (mid) {
-        const now = Date.now();
-        for (const [k, t] of handledEditMsgs) if (now - t > 10 * 60 * 1000) handledEditMsgs.delete(k);
-        const dupKey = `${c.from}|${mid}`;
-        if (handledEditMsgs.has(dupKey)) return;
-        handledEditMsgs.set(dupKey, now);
-    }
     const name = String(c.args || '').replace(URL_RE, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply(usage('.ايدت', '<اسم الشخصية>', 'ناروتو', false) + '\n🎬 يجلب لك 3 إيديتات من تيك توك بشكل بطاقات أفقية.');
     await waiting(c, '🎬', 'إيديتات تيك توك', 'تيك توك');
