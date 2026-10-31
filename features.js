@@ -14,6 +14,7 @@ import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarou
 import { DlError, warmupYtdlp } from './lib/dl.js';
 import { buildMoreDownloadHandlers, MORE_COMMANDS, MORE_LINK_COMMANDS, MORE_HEAVY } from './moredl.js';
 import { cmdYtSearch } from './ytsearch.js';
+import { COMPLAINTS_COMMANDS, buildComplaintsHandlers } from './complaints.js';
 import { TOOLS_COMMANDS, TOOLS_LINK_COMMANDS, TOOLS_HEAVY, TOOLS_SECTION, buildToolsHandlers } from './tools.js';
 
 const PACK = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
@@ -48,12 +49,13 @@ const COMMANDS = {
 };
 Object.assign(COMMANDS, MORE_COMMANDS);   // أوامر قسم التنزيل الإضافية (moredl.js)
 Object.assign(COMMANDS, TOOLS_COMMANDS);   // أوامر قسم الأدوات (tools.js)
+Object.assign(COMMANDS, COMPLAINTS_COMMANDS);   // أوامر قسم الشكاوي (complaints.js)
 const CANON = {};   // الاسم (أو الاختصار) المُطبَّع -> الاسم الأساسي
 for (const [name, aliases] of Object.entries(COMMANDS)) {
     CANON[norm(name)] = name;
     for (const a of aliases) CANON[norm(a)] = name;
 }
-CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء'; CANON['15'] = 'صور'; CANON['17'] = 'ادوات';
+CANON['11'] = 'ملصقات'; CANON['13'] = 'تحميل'; CANON['14'] = 'ذكاء'; CANON['15'] = 'صور'; CANON['17'] = 'ادوات'; CANON['18'] = 'شكاوي';
 export const featureCommandNames = Object.keys(CANON);
 
 // أوامر تقبل رابطاً بعدها: لا تحذفها حماية الروابط (وإلا لا يستطيع الأعضاء استخدام التنزيل)
@@ -1361,6 +1363,7 @@ const HANDLERS = {
 
 for (const [k, fn] of Object.entries(buildMoreDownloadHandlers({ quotedText, getTarget, download }))) HANDLERS[k] = dlSafe(fn);
 Object.assign(HANDLERS, buildToolsHandlers({ quotedText, askAI, SYSTEM, clip, http, httpJson, httpBuffer, cmdTranslate, sendSection }));
+Object.assign(HANDLERS, buildComplaintsHandlers({ sendSection }));
 
 export async function handleFeatureCommand(ctx) {
     const name = CANON[ctx.cmdBase];
