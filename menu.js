@@ -80,8 +80,10 @@ export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid)
     let header = { hasMediaAttachment: false };
     if (videoUrl) {
         try {
-            const media = await prepareWAMessageMedia({ video: { url: videoUrl } }, { upload: sock.waUploadToServer });
-            if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+            const isImg = typeof videoUrl === 'string' && /\.(jpe?g|png|webp)$/i.test(videoUrl);
+            const media = await prepareWAMessageMedia(isImg ? { image: { url: videoUrl } } : { video: { url: videoUrl } }, { upload: sock.waUploadToServer });
+            if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+            else if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
         } catch (e) {
             console.error('تعذر رفع فيديو الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
         }
