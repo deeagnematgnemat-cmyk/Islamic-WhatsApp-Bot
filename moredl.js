@@ -631,8 +631,21 @@ async function fetchEdits(name, notes) {
     return got;
 }
 
-const handledEditMsgs = new Map();      // منع تنفيذ نفس طلب .ايدت مرتين (يصل أحياناً مرتين فيفشل التنفيذ الثاني لأن الفيديوهات صارت «مكررة»)
+// حارس التكرار: إذا وصل نفس الطلب مرة ثانية (من اتصال/معالج آخر) أثناء تنفيذ الأول أو بعده مباشرة يُتجاهل بصمت،
+// حتى لا تظهر رسالة «لم أجد» بعد نجاح الطلب الأول (التنفيذ الثاني يرى الفيديوهات «مكررة» فيفشل).
+const editRuns = new Map();
 async function cmdEdits(c) {
+    const nm = String(c.args || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const key = `${c.from}|${nm}`;
+    const st = editRuns.get(key);
+    if (st && (st.running || Date.now() - st.end < 20000)) return;
+    const cur = { running: true, end: 0 };
+    editRuns.set(key, cur);
+    try { await cmdEditsRun(c); }
+    finally { cur.running = false; cur.end = Date.now(); setTimeout(() => { if (editRuns.get(key) === cur) editRuns.delete(key); }, 60000).unref?.(); }
+}
+const handledEditMsgs = new Map();      // منع تنفيذ نفس طلب .ايدت مرتين (يصل أحياناً مرتين فيفشل التنفيذ الثاني لأن الفيديوهات صارت «مكررة»)
+async function cmdEditsRun(c) {
     const mid = c.msg?.key?.id;
     if (mid) {
         const now = Date.now();
