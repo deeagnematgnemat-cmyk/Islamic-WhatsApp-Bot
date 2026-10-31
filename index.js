@@ -444,6 +444,22 @@ async function getWaVersion() {
     return found || cachedWaVersion;
 }
 
+// تشخيص الربط عند التشغيل: يبيّن نسخة المكتبة الفعلية وهل تصحيح الربط مطبّق (يظهر مرة واحدة في السجل)
+(function logPairingDiagnostics() {
+    try {
+        const base = path.join(process.cwd(), 'node_modules', '@whiskeysockets', 'baileys');
+        const pkg = JSON.parse(fs.readFileSync(path.join(base, 'package.json'), 'utf8'));
+        let nonce = 'غير معروف', stage = 'غير معروف';
+        const walkDir = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walkDir(path.join(d, e.name)) : (/\.js$/.test(e.name) ? [path.join(d, e.name)] : []));
+        for (const f of walkDir(path.join(base, 'lib'))) {
+            const t = fs.readFileSync(f, 'utf8');
+            if (t.includes('link_code_pairing_nonce')) nonce = /link_code_pairing_nonce['"]\s*,\s*attrs\s*:\s*\{\s*\}\s*,\s*content\s*:\s*['"]0['"]/.test(t) ? 'غير مصحَّح ❌' : 'مصحَّح ✅';
+            if (t.includes('primary_identity_pub') && t.includes("'link_code_companion_reg'")) stage = t.includes('pairfix-stage') ? 'مصحَّح ✅' : 'غير مصحَّح ❌';
+        }
+        console.log(`📦 Baileys ${pkg.version} | 🩹 nonce الربط: ${nonce} | 🩹 فحص stage: ${stage}`);
+    } catch (e) { console.log('📦 تعذر قراءة تشخيص Baileys:', e?.message || e); }
+})();
+
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
@@ -475,15 +491,19 @@ if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
 const { connection, lastDisconnect, qr } = u;
+if (!subInfo && connection) console.log('🔌 حالة الاتصال:', connection);
+if (!subInfo && u.isNewLogin) console.log('✅ تم قبول الربط من الهاتف، جارٍ إعادة الاتصال...');
 
 // كود الاقتران: يُطلب لكل اتصال جديد بعد أن يصبح جاهزاً (أول qr)، لأن كل كود يبطل عند انقطاع اتصاله
 if (qr && !subInfo && !sock.authState.creds.registered && !sock.pairingCodeRequested) {
     sock.pairingCodeRequested = true;
     setTimeout(async () => {
         try {
-            let code = await sock.requestPairingCode('962795106901');
+            const pairingNumber = String(process.env.BOT_NUMBER || '962795106901').replace(/[^0-9]/g, '');
+            let code = await sock.requestPairingCode(pairingNumber);
             code = code?.match(/.{1,4}/g)?.join('-') || code;
             console.log(`\n========================================`);
+            console.log(`📱 الكود مخصص للرقم: +${pairingNumber} (أدخله من واتساب هذا الرقم فقط)`);
             console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
             console.log(`========================================\n`);
         } catch (e) {
