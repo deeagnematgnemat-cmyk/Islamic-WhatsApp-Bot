@@ -591,30 +591,39 @@ const compact = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9\u0600-\u0
 async function fetchEdits(name, notes) {
     const hasAr = /[\u0600-\u06FF]/.test(name);
     const en = hasAr ? await toEnglish(name) : '';
-    const words = [...new Set(`${name} ${en}`.toLowerCase().split(/\s+/).map(compact).filter((w) => w.length >= 3 && !EDIT_STOP.has(w)))];
-    const joined = [compact(en), compact(name)].filter((w) => w.length >= 4);
-    // الفيديو ذو صلة بالشخصية إذا ذُكر اسمها (أو جزء منه) في عنوانه أو حسابه
-    let looseMatch = false;                                    // آخر محاولة: اقبل نتائج بحث الاسم حتى لو لم يظهر الاسم في عنوانها
+    const rawWords = `${name} ${en}`.toLowerCase().split(/\s+/).map(compact).filter((w) => w.length >= 2 && !EDIT_STOP.has(w));
+    const words = [...new Set(rawWords)];
+
+    // المطابقة المرنة: أي فيديو جايب نتيجة بحث هو مقبول ما دام جاء من محرك تيك توك
     const relevant = (v) => {
-        if (looseMatch) return true;
         const t = compact(`${v.title} ${v.author}`);
-        if (!t) return true;                                   // لا عنوان متاح: نقبله لأنه جاء من بحث الاسم نفسه
-        return words.some((w) => t.includes(w)) || joined.some((w) => t.includes(w));
+        if (!t || words.length === 0) return true; 
+        return words.some((w) => t.includes(w));
     };
+
     const core = en && en.toLowerCase() !== name.toLowerCase() ? en : name;
-    const queries = [...new Set([`${core} edit`, `${core} anime edit`, hasAr ? `${name} ايدت` : `${core} edits`].filter(Boolean))];
+    const queries = [...new Set([
+        `${core} edit`,
+        `${core} anime edit`,
+        hasAr ? `${name} ايدت` : `${core} edits`,
+        core
+    ].filter(Boolean))];
+
     const keyOf = (v) => v.id || v.url;
     const seen = new Set(), pool = [], tried = new Set(), got = [];
+
     const add = (list) => {
         for (const v of list) {
             const key = keyOf(v);
             if (!key || seen.has(key) || !v.url) continue;
-            if (v.duration && (v.duration < 4 || v.duration > 120)) continue;
+            if (v.duration && (v.duration < 3 || v.duration > 180)) continue;
             if (!relevant(v)) continue;
             seen.add(key); pool.push(v);
         }
     };
+
     const isEdit = (v) => /edit|ايدت|إيدت|ايديت|إيديت|amv|fyp/i.test(v.title) ? 1 : 0;
+
     const harvest = async () => {
         const fresh = pool.filter((v) => !tried.has(keyOf(v))).sort((a, b) => (isEdit(b) - isEdit(a)) || (Math.random() - 0.5));
         for (let i = 0; i < fresh.length && got.length < EDITS_COUNT;) {
@@ -629,34 +638,38 @@ async function fetchEdits(name, notes) {
             for (const r of results) if (r.status === 'fulfilled' && got.length < EDITS_COUNT) got.push(r.value);
         }
     };
-    // 1) البحث في تيك توك عن تصاميم الشخصية ثم تنزيل الروابط
-    for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 9) break; }
+
+    // 1) البحث المباشر في تيك توك
+    for (const q of queries) { add(await tiktokSearch(q, notes)); if (pool.length >= 10) break; }
     await harvest();
-    // 2) بحث ويب عن روابط tiktok.com
+
+    // 2) بحث ويب عن روابط تيك توك
     if (got.length < EDITS_COUNT) {
-        for (const q of queries.slice(0, 2)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 9) break; }
+        for (const q of queries.slice(0, 2)) { add(await webSearchTikTok(q, notes)); if (pool.length >= 10) break; }
         await harvest();
     }
+
     // 3) هاشتاق تيك توك
     if (got.length < EDITS_COUNT) {
         const base = compact(en || name).replace(/[\u0600-\u06FF]/g, '');
         for (const tag of base ? [base + 'edit', base] : []) { add(await tagSearch(tag, notes)); }
         await harvest();
     }
+
     notes.push(`المراحل 1-3: مرشّحون=${pool.length} ناجح=${got.length}`);
-    if (got.length < EDITS_COUNT) {                             // لم يكتمل العدد: استكمل بالبحث من جديد
-        looseMatch = true;
+
+    // 4) محاولة أخيره بدون قيود
+    if (got.length < EDITS_COUNT) {
         for (const q of queries) {
             if (got.length >= EDITS_COUNT) break;
-            add(await tiktokSearch(q, notes));
+            const extra = await tiktokSearch(q, notes);
+            for (const x of extra) {
+                if (!seen.has(keyOf(x))) { seen.add(keyOf(x)); pool.push(x); }
+            }
             await harvest();
         }
-        if (got.length < EDITS_COUNT) {
-            add(await webSearchTikTok(queries[0], notes));
-            await harvest();
-        }
-        notes.push(`بعد الاستكمال: مرشّحون=${pool.length} ناجح=${got.length}`);
     }
+
     if (!got.length) notes.push(`مرشّحون=${pool.length}`);
     return got;
 }
