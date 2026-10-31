@@ -453,7 +453,7 @@ async function cmdVideoInfo(c, fallbackText) {
 // ---------------------------------------------------------------- ايدت: 3 إيديتات من تيك توك (بطاقات فيديو أفقية)
 const EDITS_COUNT = 3;
 const EDIT_MAX_MB = 14;                       // أكبر حجم لفيديو داخل بطاقة (البطاقات الثقيلة قد ترفضها واتساب)
-const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const EDIT_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const EDIT_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36';
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
 const absTik = (u, host = 'https://www.tikwm.com') => (String(u || '').startsWith('/') ? host + u : String(u || ''));
