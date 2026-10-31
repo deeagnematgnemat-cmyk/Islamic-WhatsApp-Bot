@@ -207,6 +207,16 @@ let dailyRewards = {};
 let mutedUsers = {};
 let userMessagesCount = {};
 let groupSettings = {};
+// ===== إعدادات الترحيب والتوديع لكل مجموعة (الحالة + النص الخاص) تُحفظ في ملف =====
+const WELCOME_FILE = './welcome_settings.json';
+let welcomeStore = {};
+try { welcomeStore = JSON.parse(fs.readFileSync(WELCOME_FILE, 'utf8')) || {}; } catch (e) { welcomeStore = {}; }
+function saveWelcomeSettings(groupId) {
+    const g = groupSettings[groupId];
+    if (!g) return;
+    welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
+    try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
+}
 
 function cleanExpiredWarnings(userJid) {
     if (!userWarnings[userJid]) return;
@@ -248,7 +258,7 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
@@ -361,14 +371,13 @@ adminOnly: false,
 antiLink: true,
 antiBadWords: true,
 antiContact: true,
-welcome: true,
-goodbye: true,
+welcome: false,
+goodbye: false,
 botMode: 'public',
-antiOtherBots: false
+antiOtherBots: false,
+...(welcomeStore[groupId] || {})
 };
 }
-// تفعيل الترحيب والتوديع دائماً (الحماية مفعلة افتراضياً ويمكن تعطيلها بأوامر الحماية)
-Object.assign(groupSettings[groupId], { welcome: true, goodbye: true });
 return groupSettings[groupId];
 }
 
@@ -568,8 +577,8 @@ const settings = getGroupSetting(id);
 
 if (action === 'add' && settings.welcome) {    
     for (let user of participants) {    
-        const userPp = await getUserProfilePic(sock, user);    
-        const welcomeMsg = `*🌾┊تـرحـيـب:*
+        const userPp = await getUserProfilePic(sock, id);    
+        const welcomeMsg = settings.welcomeText ? settings.welcomeText.replace(/@user/g, '@' + user.split('@')[0]) : `*🌾┊تـرحـيـب:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -606,7 +615,7 @@ if (action === 'add' && settings.welcome) {
 } else if (action === 'remove' && settings.goodbye) {
     for (let user of participants) {
         const userPp = await getUserProfilePic(sock, user);
-        const goodbyeMsg = `*🍂┊تـوديـع:*
+        const goodbyeMsg = settings.goodbyeText ? settings.goodbyeText.replace(/@user/g, '@' + user.split('@')[0]) : `*🍂┊تـوديـع:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -919,7 +928,7 @@ if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedB
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -1105,10 +1114,22 @@ if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {
 
 if (cmd === 'تفعيل ادمن') { getGroupSetting(from).adminOnly = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل وضع الآدمن.' }); }    
 if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف وضع الآدمن.' }); }    
-if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
-if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
-if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
-if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
+if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
+if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
+if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
+if (cmdBase === 'تغيير_ترحيب' || cmdBase === 'تغيير_توديع') {
+    const isWelcomeForm = cmdBase === 'تغيير_ترحيب';
+    const formName = isWelcomeForm ? 'الترحيب' : 'التوديع';
+    const newFormText = trimmedBody.replace(/^\.\S*/, '').trim();
+    if (!newFormText) return sendBotMessage(sock, from, { text: `📌 اكتب النص الجديد بعد الأمر.\nمثال: \`.${cmdBase} أهلاً @user في مجموعتنا\`\n\n• \`@user\` يمنشن العضو.\n• للرجوع للنص الأصلي: \`.${cmdBase} افتراضي\`` });
+    const gs = getGroupSetting(from);
+    const isReset = ['افتراضي', 'الافتراضي', 'default'].includes(newFormText.replace(/[أإآ]/g, 'ا').toLowerCase());
+    gs[isWelcomeForm ? 'welcomeText' : 'goodbyeText'] = isReset ? '' : newFormText;
+    saveWelcomeSettings(from);
+    const stateOn = isWelcomeForm ? gs.welcome : gs.goodbye;
+    return sendBotMessage(sock, from, { text: (isReset ? `✅ تم إرجاع استمارة ${formName} الأصلية لهذه المجموعة.` : `✅ تم تغيير استمارة ${formName} لهذه المجموعة فقط.`) + (stateOn ? '' : `\n⚠️ ${formName} متوقف حالياً، فعّله بـ \`.تفعيل ${isWelcomeForm ? 'ترحيب' : 'توديع'}\`.`) });
+}
+if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
 
 if (cmd.startsWith('تغيير_الاسم')) {    
     const newName = trimmedBody.replace(/^\.تغيير_الاسم/i, '').trim();    
@@ -2179,7 +2200,9 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🔊 .الغاء_كتم @عضو ↞ فك الكتم
 > 🔗 .الرابط ↞ رابط المجموعة
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
-> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
+> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
+> ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
