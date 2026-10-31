@@ -302,6 +302,24 @@ if (!sock?.isSubBot && botJidNum && (cleanNum === botJidNum || cleanNum.endsWith
 return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
 }
 
+// يستخرج الرقم الحقيقي من معرّف المرسل (يدعم @lid) ليتعرّف البوت على المطور الرئيسي دائماً بدون إضافة
+async function resolveRealNumber(sock, msg, jid, useMsgKeys = false) {
+    const pnOf = (j) => (typeof j === 'string' && j.endsWith('@s.whatsapp.net')) ? j.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
+    let num = pnOf(jid);
+    if (num) return num;
+    if (useMsgKeys) {
+        const k = msg?.key || {};
+        for (const j of [k.participantPn, k.participantAlt, k.senderPn, k.remoteJidAlt, msg?.participant_pn]) {
+            num = pnOf(j);
+            if (num) return num;
+        }
+    }
+    try {
+        const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(jid);
+        return pnOf(pn) || String(pn || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    } catch (e) { return ''; }
+}
+
 async function getUserProfilePic(sock, senderJid) {
 try {
 return await sock.profilePictureUrl(senderJid, 'image');
@@ -646,6 +664,10 @@ if (isGroup) {
 }    
     
 let isSenderDev = isDeveloper(sender, sock);    
+let realSenderNum = '';
+if (!isFromMe && sender.endsWith('@lid')) { try { realSenderNum = await resolveRealNumber(sock, msg, sender, true); } catch (e) {} }
+const isMainDevSender = cleanSenderNum === DEVELOPER_NUMBER || realSenderNum === DEVELOPER_NUMBER;
+if (isMainDevSender) isSenderDev = true;
 let isSenderExtraDev = isExtraDeveloper(sender);    
 let isSenderAdmin = isFromMe || isSenderDev;    
 
@@ -874,7 +896,7 @@ const isDevInfoButton = cmdBase === 'معلومات_المطور' && !!msg.messa
 if (!isDevInfoButton && !isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
 // البوت الفرعي: رفض أي أمر خاص بالمطور من غير المطور الأساسي وحساب البوت الرئيسي
-if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender)) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
+if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender) && !isMainDevSender) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
 
 if (commandReactionEnabled) {    
     try {    
@@ -1617,6 +1639,9 @@ if (cmdBase === 'حذف_مطور') {
     const targetUser = getTargetUser(msg);    
     if (targetUser) {
         const cleanNum = targetUser.replace(/[^0-9]/g, '');
+        let targetRealNum = cleanNum;
+        if (targetUser.endsWith('@lid')) { try { targetRealNum = (await resolveRealNumber(sock, msg, targetUser)) || cleanNum; } catch (e) {} }
+        if (cleanNum === DEVELOPER_NUMBER || targetRealNum === DEVELOPER_NUMBER) return sendBotMessage(sock, from, { text: '❌ لا يمكن إزالة صلاحيات المطور الرئيسي!' });
         extraDevelopers = extraDevelopers.filter(d => d !== cleanNum);
     }
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِزَالَـةُ صَـلَاحِـيَـاتِ مُـطَـوِّر 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${targetUser ? targetUser.split('@')[0] : 'المستخدم'}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🔓 ⌯ الإجراء ↞ إزالة صلاحيات المطور\n✅ ⌯ الحالة ↞ تمت إزالة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
