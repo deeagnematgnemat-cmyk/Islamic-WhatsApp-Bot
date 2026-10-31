@@ -446,6 +446,15 @@ async function getWaVersion() {
 
 async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+
+// إصلاح الربط بالكود: requestPairingCode يحفظ رقماً مؤقتاً (me) داخل الجلسة. إذا انقطع الاتصال قبل إتمام الربط
+// (انتهاء مهلة الكود أو إعادة تشغيل) يحاول البوت «تسجيل دخول» بدل «ربط جديد» فلا يظهر كود جديد ويعلق التحميل في الواتس.
+// نمسح هذا الرقم المؤقت فقط (ولا نلمس أي جلسة مكتملة الربط) ليبدأ البوت ربطاً نظيفاً ويطلب كوداً جديداً.
+if (!subInfo && state.creds && !state.creds.registered && state.creds.me && !state.creds.account) {
+    delete state.creds.me;
+    delete state.creds.pairingCode;
+}
+
 const version = await getWaVersion();
 
 const sock = makeWASocket({
