@@ -249,8 +249,6 @@ function removeOneWarningFromUser(userJid) {
 let groupTitles = {};
 let groupReservedTitles = {};
 let globalBotStopped = false;
-const subBotsStoppedGroups = new Set(); // المجموعات التي أُوقفت فيها البوتات المنصّبة
-const subBotsStopNoticeAt = new Map(); // لمنع تكرار الرد من عدة بوتات في نفس المجموعة
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -697,7 +695,6 @@ let trimmedBody = body.trim();
 let lowerBody = trimmedBody.toLowerCase();    
 
 if (globalBotStopped && !isSenderDev) return;
-if (sock.isSubBot && isGroup && subBotsStoppedGroups.has(from) && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
@@ -1725,18 +1722,14 @@ if (cmdBase === 'سجل_البوت') {
 
 if (cmdBase === 'ايقاف_البوت' || cmdBase === 'إيقاف_البوت' || cmdBase === 'إيقاف البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    if (!isGroup) return sendBotMessage(sock, from, { text: '❌ هذا الأمر يعمل داخل المجموعات فقط!' });
-    subBotsStoppedGroups.add(from);
-    { const k = from + ':stop', now = Date.now(); if (now - (subBotsStopNoticeAt.get(k) || 0) < 8000) return; subBotsStopNoticeAt.set(k, now); }
-    return sendBotMessage(sock, from, { text: `🔴 تم إيقاف جميع البوتات المنصّبة في هذه المجموعة فقط.` });
+    globalBotStopped = true;
+    return sendBotMessage(sock, from, { text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` });
 }
 
 if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    if (!isGroup) return sendBotMessage(sock, from, { text: '❌ هذا الأمر يعمل داخل المجموعات فقط!' });
-    subBotsStoppedGroups.delete(from);
-    { const k = from + ':start', now = Date.now(); if (now - (subBotsStopNoticeAt.get(k) || 0) < 8000) return; subBotsStopNoticeAt.set(k, now); }
-    return sendBotMessage(sock, from, { text: `🟢 تم إعادة تشغيل جميع البوتات المنصّبة في هذه المجموعة.` });
+    globalBotStopped = false;
+    return sendBotMessage(sock, from, { text: `🟢 تم تفعيل البوت بنجاح! البوت يعود للاستجابة للجميع.` });
 }
 
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
