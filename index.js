@@ -12,6 +12,7 @@ import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subb
 import { sendFormWithButtons, sendDeveloperForm, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 
+console.log('🧪 نسخة الملف: BUILD-2026-10-31-A | الجلسة:', process.env.SESSION_DIR || 'arem_new_session');
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -460,7 +461,8 @@ async function getWaVersion() {
     } catch (e) { console.log('📦 تعذر قراءة تشخيص Baileys:', e?.message || e); }
 })();
 
-async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
+const DEFAULT_SESSION_DIR = process.env.SESSION_DIR || 'arem_new_session';
+async function startBot(sessionDir = DEFAULT_SESSION_DIR, subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
 // إصلاح الربط بالكود: requestPairingCode يحفظ رقماً مؤقتاً (me) داخل الجلسة. إذا انقطع الاتصال قبل إتمام الربط
@@ -498,18 +500,24 @@ if (!subInfo && u.isNewLogin) console.log('✅ تم قبول الربط من ا�
 if (qr && !subInfo && !sock.authState.creds.registered && !sock.pairingCodeRequested) {
     sock.pairingCodeRequested = true;
     setTimeout(async () => {
-        try {
-            const pairingNumber = String(process.env.BOT_NUMBER || '962795106901').replace(/[^0-9]/g, '');
-            let code = await sock.requestPairingCode(pairingNumber);
-            code = code?.match(/.{1,4}/g)?.join('-') || code;
-            console.log(`\n========================================`);
-            console.log(`📱 الكود مخصص للرقم: +${pairingNumber} (أدخله من واتساب هذا الرقم فقط)`);
-            console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
-            console.log(`========================================\n`);
-        } catch (e) {
-            console.error('خطأ في طلب كود الاقتران:', e?.message || e);
-            sock.pairingCodeRequested = false;
+        const pairingNumber = String(process.env.BOT_NUMBER || process.env.PAIRING_NUMBER || global.botnumber || '962795106901').replace(/[^0-9]/g, '');
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                if (sock.authState.creds.registered) return;
+                let code = await sock.requestPairingCode(pairingNumber);
+                code = code?.match(/.{1,4}/g)?.join('-') || code;
+                console.log(`\n========================================`);
+                console.log(`📱 الكود مخصص للرقم: +${pairingNumber} (أدخله من واتساب هذا الرقم فقط)`);
+                console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+                console.log(`⏳ أدخله فوراً (صالح لدقائق قليلة فقط، ويبطل إذا أُعيد تشغيل البوت)`);
+                console.log(`========================================\n`);
+                return;
+            } catch (e) {
+                console.error(`خطأ في طلب كود الاقتران (محاولة ${attempt}/3):`, e?.message || e);
+                await new Promise(r => setTimeout(r, 4000));
+            }
         }
+        sock.pairingCodeRequested = false;
     }, 1500);
 }
 
