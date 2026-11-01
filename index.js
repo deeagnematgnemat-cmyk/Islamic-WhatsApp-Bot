@@ -443,7 +443,7 @@ async function getWaVersion() {
     return found || cachedWaVersion;
 }
 
-async function startBot(sessionDir = (process.env.DATA_DIR || '.') + '/arem_new_session', subInfo = null) {
+async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 const version = await getWaVersion();
 
