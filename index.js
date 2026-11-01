@@ -8,12 +8,10 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
-import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, applySubBotBranding, getSubBotMedia } from './subbot.js';
-import { sendFormWithButtons, sendDeveloperForm, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
+import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
+import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
-import { handleDetectorCommand, detectorCommandNames, cacheIncoming, handleRevoke, handleMessagesUpdate } from './detector.js';
 
-console.log('🧪 نسخة الملف: BUILD-2026-10-31-A | الجلسة:', process.env.SESSION_DIR || 'arem_new_session');
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -144,8 +142,6 @@ const hadithList = [
 
 process.on('uncaughtException', (err) => console.log('خطأ:', err));
 process.on('unhandledRejection', (err) => console.log('خطأ معالجة:', err));
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
 
 const DEVELOPER_NUMBER = '962796163926';
 // ===== حماية أوامر المطور داخل البوتات الفرعية =====
@@ -156,20 +152,17 @@ function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
 }
-const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
+const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
-const DEVELOPER_INFO_VIDEO_URL = 'https://videotourl.com/videos/1793411909499-fceac088-929e-4d67-890d-f9a40165767e.mp4';
 // الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
-function getBotCommandsVideo(sock) {
-    try { const m = sock && getSubBotMedia(sock); if (m) return m; } catch (e) {}
+function getBotCommandsVideo() {
     try { if (fs.existsSync(BOT_VIDEO_FILE) && fs.statSync(BOT_VIDEO_FILE).size > 0) return BOT_VIDEO_FILE; } catch (e) {}
     return BOT_COMMANDS_VIDEO_URL;
 }
 const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
-let extraDevelopers = [];
-let extraDevJids = {}; 
+let extraDevelopers = []; 
 let vipUsers = []; 
 let botLogs = [];
 
@@ -209,16 +202,6 @@ let dailyRewards = {};
 let mutedUsers = {};
 let userMessagesCount = {};
 let groupSettings = {};
-// ===== إعدادات الترحيب والتوديع لكل مجموعة (الحالة + النص الخاص) تُحفظ في ملف =====
-const WELCOME_FILE = './welcome_settings.json';
-let welcomeStore = {};
-try { welcomeStore = JSON.parse(fs.readFileSync(WELCOME_FILE, 'utf8')) || {}; } catch (e) { welcomeStore = {}; }
-function saveWelcomeSettings(groupId) {
-    const g = groupSettings[groupId];
-    if (!g) return;
-    welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
-    try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
-}
 
 function cleanExpiredWarnings(userJid) {
     if (!userWarnings[userJid]) return;
@@ -251,8 +234,6 @@ function removeOneWarningFromUser(userJid) {
 let groupTitles = {};
 let groupReservedTitles = {};
 let globalBotStopped = false;
-const subBotsStoppedGroups = new Set(); // المجموعات التي أُوقفت فيها البوتات المنصّبة
-const subBotsStopNoticeAt = new Map(); // لمنع تكرار الرد من عدة بوتات في نفس المجموعة
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -262,12 +243,12 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
+'صفر', 'بوت', 'معلومات_المطور',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -287,7 +268,6 @@ const validCommands = [
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
 validCommands.push(...featureCommandNames);
-validCommands.push(...detectorCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -315,24 +295,6 @@ const botJidNum = sock?.user?.id ? sock.user.id.split(':')[0].replace(/[^0-9]/g,
 if (cleanNum === devNum || cleanNum.endsWith(devNum) || devNum.endsWith(cleanNum)) return true;
 if (!sock?.isSubBot && botJidNum && (cleanNum === botJidNum || cleanNum.endsWith(botJidNum))) return true;
 return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
-}
-
-// يستخرج الرقم الحقيقي من معرّف المرسل (يدعم @lid) ليتعرّف البوت على المطور الرئيسي دائماً بدون إضافة
-async function resolveRealNumber(sock, msg, jid, useMsgKeys = false) {
-    const pnOf = (j) => (typeof j === 'string' && j.endsWith('@s.whatsapp.net')) ? j.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
-    let num = pnOf(jid);
-    if (num) return num;
-    if (useMsgKeys) {
-        const k = msg?.key || {};
-        for (const j of [k.participantPn, k.participantAlt, k.senderPn, k.remoteJidAlt, msg?.participant_pn]) {
-            num = pnOf(j);
-            if (num) return num;
-        }
-    }
-    try {
-        const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(jid);
-        return pnOf(pn) || String(pn || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-    } catch (e) { return ''; }
 }
 
 async function getUserProfilePic(sock, senderJid) {
@@ -375,13 +337,14 @@ adminOnly: false,
 antiLink: true,
 antiBadWords: true,
 antiContact: true,
-welcome: false,
-goodbye: false,
+welcome: true,
+goodbye: true,
 botMode: 'public',
-antiOtherBots: false,
-...(welcomeStore[groupId] || {})
+antiOtherBots: false
 };
 }
+// تفعيل الترحيب والتوديع دائماً (الحماية مفعلة افتراضياً ويمكن تعطيلها بأوامر الحماية)
+Object.assign(groupSettings[groupId], { welcome: true, goodbye: true });
 return groupSettings[groupId];
 }
 
@@ -404,7 +367,7 @@ let isPairingRequested = false;
 let lastPairingAt = 0;
 
 // ===== جعل كل رسائل البوت معاد توجيهها من القناة =====
-const CHANNEL_INVITE_CODE = '0029VbAyOwm3mFY0ohjZCB04';
+const CHANNEL_INVITE_CODE = '0029Vb8jc2PFHWq9IwKDk50d';
 const CHANNEL_FWD_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 let channelFwdInfo = null;
 let channelFwdPromise = null;
@@ -480,34 +443,8 @@ async function getWaVersion() {
     return found || cachedWaVersion;
 }
 
-// تشخيص الربط عند التشغيل: يبيّن نسخة المكتبة الفعلية وهل تصحيح الربط مطبّق (يظهر مرة واحدة في السجل)
-(function logPairingDiagnostics() {
-    try {
-        const base = path.join(process.cwd(), 'node_modules', '@whiskeysockets', 'baileys');
-        const pkg = JSON.parse(fs.readFileSync(path.join(base, 'package.json'), 'utf8'));
-        let nonce = 'غير معروف', stage = 'غير معروف';
-        const walkDir = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walkDir(path.join(d, e.name)) : (/\.js$/.test(e.name) ? [path.join(d, e.name)] : []));
-        for (const f of walkDir(path.join(base, 'lib'))) {
-            const t = fs.readFileSync(f, 'utf8');
-            if (t.includes('link_code_pairing_nonce')) nonce = /link_code_pairing_nonce['"]\s*,\s*attrs\s*:\s*\{\s*\}\s*,\s*content\s*:\s*['"]0['"]/.test(t) ? 'غير مصحَّح ❌' : 'مصحَّح ✅';
-            if (t.includes('primary_identity_pub') && t.includes("'link_code_companion_reg'")) stage = t.includes('pairfix-stage') ? 'مصحَّح ✅' : 'غير مصحَّح ❌';
-        }
-        console.log(`📦 Baileys ${pkg.version} | 🩹 nonce الربط: ${nonce} | 🩹 فحص stage: ${stage}`);
-    } catch (e) { console.log('📦 تعذر قراءة تشخيص Baileys:', e?.message || e); }
-})();
-
-const DEFAULT_SESSION_DIR = process.env.SESSION_DIR || 'arem_new_session';
-async function startBot(sessionDir = DEFAULT_SESSION_DIR, subInfo = null) {
+async function startBot(sessionDir = 'arem_new_session', subInfo = null) {
 const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-
-// إصلاح الربط بالكود: requestPairingCode يحفظ رقماً مؤقتاً (me) داخل الجلسة. إذا انقطع الاتصال قبل إتمام الربط
-// (انتهاء مهلة الكود أو إعادة تشغيل) يحاول البوت «تسجيل دخول» بدل «ربط جديد» فلا يظهر كود جديد ويعلق التحميل في الواتس.
-// نمسح هذا الرقم المؤقت فقط (ولا نلمس أي جلسة مكتملة الربط) ليبدأ البوت ربطاً نظيفاً ويطلب كوداً جديداً.
-if (!subInfo && state.creds && !state.creds.registered && state.creds.me && !state.creds.account) {
-    delete state.creds.me;
-    delete state.creds.pairingCode;
-}
-
 const version = await getWaVersion();
 
 const sock = makeWASocket({
@@ -524,36 +461,25 @@ markOnlineOnConnect: true
 enableChannelForward(sock);
 sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
-applySubBotBranding(sock);
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
 const { connection, lastDisconnect, qr } = u;
-if (!subInfo && connection) console.log('🔌 حالة الاتصال:', connection);
-if (!subInfo && u.isNewLogin) console.log('✅ تم قبول الربط من الهاتف، جارٍ إعادة الاتصال...');
 
 // كود الاقتران: يُطلب لكل اتصال جديد بعد أن يصبح جاهزاً (أول qr)، لأن كل كود يبطل عند انقطاع اتصاله
 if (qr && !subInfo && !sock.authState.creds.registered && !sock.pairingCodeRequested) {
     sock.pairingCodeRequested = true;
     setTimeout(async () => {
-        const pairingNumber = String(process.env.BOT_NUMBER || process.env.PAIRING_NUMBER || global.botnumber || '962795106901').replace(/[^0-9]/g, '');
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                if (sock.authState.creds.registered) return;
-                let code = await sock.requestPairingCode(pairingNumber);
-                code = code?.match(/.{1,4}/g)?.join('-') || code;
-                console.log(`\n========================================`);
-                console.log(`📱 الكود مخصص للرقم: +${pairingNumber} (أدخله من واتساب هذا الرقم فقط)`);
-                console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
-                console.log(`⏳ أدخله فوراً (صالح لدقائق قليلة فقط، ويبطل إذا أُعيد تشغيل البوت)`);
-                console.log(`========================================\n`);
-                return;
-            } catch (e) {
-                console.error(`خطأ في طلب كود الاقتران (محاولة ${attempt}/3):`, e?.message || e);
-                await new Promise(r => setTimeout(r, 4000));
-            }
+        try {
+            let code = await sock.requestPairingCode('962795106901');
+            code = code?.match(/.{1,4}/g)?.join('-') || code;
+            console.log(`\n========================================`);
+            console.log(`🔑 كود الاقتران الخاص بك هو: ${code}`);
+            console.log(`========================================\n`);
+        } catch (e) {
+            console.error('خطأ في طلب كود الاقتران:', e?.message || e);
+            sock.pairingCodeRequested = false;
         }
-        sock.pairingCodeRequested = false;
     }, 1500);
 }
 
@@ -581,8 +507,8 @@ const settings = getGroupSetting(id);
 
 if (action === 'add' && settings.welcome) {    
     for (let user of participants) {    
-        const userPp = await getUserProfilePic(sock, id);    
-        const welcomeMsg = settings.welcomeText ? settings.welcomeText.replace(/@user/g, '@' + user.split('@')[0]) : `*🌾┊تـرحـيـب:*
+        const userPp = await getUserProfilePic(sock, user);    
+        const welcomeMsg = `*🌾┊تـرحـيـب:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -619,7 +545,7 @@ if (action === 'add' && settings.welcome) {
 } else if (action === 'remove' && settings.goodbye) {
     for (let user of participants) {
         const userPp = await getUserProfilePic(sock, user);
-        const goodbyeMsg = settings.goodbyeText ? settings.goodbyeText.replace(/@user/g, '@' + user.split('@')[0]) : `*🍂┊تـوديـع:*
+        const goodbyeMsg = `*🍂┊تـوديـع:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -659,8 +585,6 @@ try { collectPackImages(sock, m.messages); } catch (e) {}
 
 const msg = m.messages[0];     
 if (!msg || !msg.message) return;    
-try { cacheIncoming(sock, msg); handleRevoke({ sock, msg, sendBotMessage }).catch(() => {}); } catch (e) {}
-
 
 const from = msg.key.remoteJid;    
 const isGroup = from.endsWith('@g.us');    
@@ -678,10 +602,6 @@ if (isGroup) {
 }    
     
 let isSenderDev = isDeveloper(sender, sock);    
-let realSenderNum = '';
-if (!isFromMe && sender.endsWith('@lid')) { try { realSenderNum = await resolveRealNumber(sock, msg, sender, true); } catch (e) {} }
-const isMainDevSender = cleanSenderNum === DEVELOPER_NUMBER || realSenderNum === DEVELOPER_NUMBER;
-if (isMainDevSender) isSenderDev = true;
 let isSenderExtraDev = isExtraDeveloper(sender);    
 let isSenderAdmin = isFromMe || isSenderDev;    
 
@@ -699,7 +619,6 @@ let trimmedBody = body.trim();
 let lowerBody = trimmedBody.toLowerCase();    
 
 if (globalBotStopped && !isSenderDev) return;
-if (sock.isSubBot && isGroup && subBotsStoppedGroups.has(from) && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
@@ -907,11 +826,10 @@ if (!trimmedBody.startsWith('.')) return;
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
 let cmdBase = cmd.split(' ')[0];    
 
-const isDevInfoButton = cmdBase === 'معلومات_المطور' && !!msg.message?.interactiveResponseMessage;
-if (!isDevInfoButton && !isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
+if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
 // البوت الفرعي: رفض أي أمر خاص بالمطور من غير المطور الأساسي وحساب البوت الرئيسي
-if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender) && !isMainDevSender) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
+if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender)) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
 
 if (commandReactionEnabled) {    
     try {    
@@ -927,13 +845,11 @@ if (!isGroup) {
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
 
-if (await handleDetectorCommand({ sock, msg, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
-
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -1119,22 +1035,10 @@ if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {
 
 if (cmd === 'تفعيل ادمن') { getGroupSetting(from).adminOnly = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل وضع الآدمن.' }); }    
 if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف وضع الآدمن.' }); }    
-if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
-if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
-if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
-if (cmdBase === 'تغيير_ترحيب' || cmdBase === 'تغيير_توديع') {
-    const isWelcomeForm = cmdBase === 'تغيير_ترحيب';
-    const formName = isWelcomeForm ? 'الترحيب' : 'التوديع';
-    const newFormText = trimmedBody.replace(/^\.\S*/, '').trim();
-    if (!newFormText) return sendBotMessage(sock, from, { text: `📌 اكتب النص الجديد بعد الأمر.\nمثال: \`.${cmdBase} أهلاً @user في مجموعتنا\`\n\n• \`@user\` يمنشن العضو.\n• للرجوع للنص الأصلي: \`.${cmdBase} افتراضي\`` });
-    const gs = getGroupSetting(from);
-    const isReset = ['افتراضي', 'الافتراضي', 'default'].includes(newFormText.replace(/[أإآ]/g, 'ا').toLowerCase());
-    gs[isWelcomeForm ? 'welcomeText' : 'goodbyeText'] = isReset ? '' : newFormText;
-    saveWelcomeSettings(from);
-    const stateOn = isWelcomeForm ? gs.welcome : gs.goodbye;
-    return sendBotMessage(sock, from, { text: (isReset ? `✅ تم إرجاع استمارة ${formName} الأصلية لهذه المجموعة.` : `✅ تم تغيير استمارة ${formName} لهذه المجموعة فقط.`) + (stateOn ? '' : `\n⚠️ ${formName} متوقف حالياً، فعّله بـ \`.تفعيل ${isWelcomeForm ? 'ترحيب' : 'توديع'}\`.`) });
-}
-if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; saveWelcomeSettings(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
+if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
+if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
+if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
+if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
 
 if (cmd.startsWith('تغيير_الاسم')) {    
     const newName = trimmedBody.replace(/^\.تغيير_الاسم/i, '').trim();    
@@ -1656,7 +1560,6 @@ if (cmdBase === 'اضافة_مطور') {
     if (!targetUser) return sendBotMessage(sock, from, { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐' });    
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!extraDevelopers.includes(cleanNum)) extraDevelopers.push(cleanNum);
-    extraDevJids[cleanNum] = targetUser;
     
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِضَـافَـةُ مُـطَـوِّرٍ جَـدِيـد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🛡️ ⌯ الصلاحية ↞ مطور\n✅ ⌯ الحالة ↞ تمت إضافة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [targetUser] });    
@@ -1667,9 +1570,6 @@ if (cmdBase === 'حذف_مطور') {
     const targetUser = getTargetUser(msg);    
     if (targetUser) {
         const cleanNum = targetUser.replace(/[^0-9]/g, '');
-        let targetRealNum = cleanNum;
-        if (targetUser.endsWith('@lid')) { try { targetRealNum = (await resolveRealNumber(sock, msg, targetUser)) || cleanNum; } catch (e) {} }
-        if (cleanNum === DEVELOPER_NUMBER || targetRealNum === DEVELOPER_NUMBER) return sendBotMessage(sock, from, { text: '❌ لا يمكن إزالة صلاحيات المطور الرئيسي!' });
         extraDevelopers = extraDevelopers.filter(d => d !== cleanNum);
     }
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِزَالَـةُ صَـلَاحِـيَـاتِ مُـطَـوِّر 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${targetUser ? targetUser.split('@')[0] : 'المستخدم'}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🔓 ⌯ الإجراء ↞ إزالة صلاحيات المطور\n✅ ⌯ الحالة ↞ تمت إزالة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
@@ -1727,18 +1627,14 @@ if (cmdBase === 'سجل_البوت') {
 
 if (cmdBase === 'ايقاف_البوت' || cmdBase === 'إيقاف_البوت' || cmdBase === 'إيقاف البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    if (!isGroup) return sendBotMessage(sock, from, { text: '❌ هذا الأمر يعمل داخل المجموعات فقط!' });
-    subBotsStoppedGroups.add(from);
-    { const k = from + ':stop', now = Date.now(); if (now - (subBotsStopNoticeAt.get(k) || 0) < 8000) return; subBotsStopNoticeAt.set(k, now); }
-    return sendBotMessage(sock, from, { text: `🔴 تم إيقاف جميع البوتات المنصّبة في هذه المجموعة فقط.` });
+    globalBotStopped = true;
+    return sendBotMessage(sock, from, { text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` });
 }
 
 if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    if (!isGroup) return sendBotMessage(sock, from, { text: '❌ هذا الأمر يعمل داخل المجموعات فقط!' });
-    subBotsStoppedGroups.delete(from);
-    { const k = from + ':start', now = Date.now(); if (now - (subBotsStopNoticeAt.get(k) || 0) < 8000) return; subBotsStopNoticeAt.set(k, now); }
-    return sendBotMessage(sock, from, { text: `🟢 تم إعادة تشغيل جميع البوتات المنصّبة في هذه المجموعة.` });
+    globalBotStopped = false;
+    return sendBotMessage(sock, from, { text: `🟢 تم تفعيل البوت بنجاح! البوت يعود للاستجابة للجميع.` });
 }
 
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
@@ -1852,17 +1748,11 @@ if (cmdBase === 'قائمة_المطورين') {
     let text = `👑 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:*\n\n> @${DEVELOPER_NUMBER}\n`;
     let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
 
-    const listedDevs = new Set([DEVELOPER_NUMBER]);
-    for (const dev of extraDevelopers) {
-        let jid = extraDevJids[dev] || (dev + '@s.whatsapp.net');
-        let num = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-        if (jid.endsWith('@lid')) {
-            try { const real = await resolveRealNumber(sock, msg, jid); if (real) { num = real; jid = real + '@s.whatsapp.net'; } } catch (e) {}
-        }
-        if (listedDevs.has(num)) continue;
-        listedDevs.add(num);
-        text += `> @${num}\n`;
-        mentions.push(jid);
+    if (extraDevelopers.length > 0) {
+        extraDevelopers.forEach((dev) => {
+            text += `> @${dev}\n`;
+            mentions.push(dev + '@s.whatsapp.net');
+        });
     }
     return sendBotMessage(sock, from, { text, mentions });    
 }    
@@ -1954,12 +1844,19 @@ if (cmdBase === 'قائمة_الاقسام') {
 }
 
 if (cmdBase === 'معلومات_المطور') {
-    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ ┃ ♛*
+    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ الأَسَـاسِـي ┃ ♛*
 
 *❐═━━━═╊⊰👑⊱╉═━━━═❐*
 
+> «┃ 👑︙صَـانِـعُ هَـذَا الـعَـمَـلِ وَمُـطَـوِّرُهُ،
+> ┃ ✦︙بَـنَـى كُـلَّ تَـفْـصِـيـلَـةٍ بِـشَـغَـفٍ وَإِتْـقَـان،
+> ┃ 🍷︙لِـيَـكُـونَ حُـضُـورُ الـبُـوتِ مُـخْـتَـلِـفاً وَأَثَـرُهُ بَـاقِـيـاً.»
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
 > 👤 *الاسم ⇠* 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-> 📌 *نبذة ⇠* مطوّر هذا البوت.
+> 📱 *رقم المطور ⇠* +${DEVELOPER_NUMBER}
+> 🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}
 
 *❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
@@ -1968,17 +1865,13 @@ if (cmdBase === 'معلومات_المطور') {
 > ✦ لِـلاسْـتِـفْـسَـارِ أَوِ الـدَّعْـمِ الـفَـنِّـي
 > ✦ لِلاقْـتِـرَاحَـاتِ وَالـمُـلَاحَـظَـات
 
-> 👇 *لِلتَّـوَاصُـلِ مَـعَ الـمُـطَـوِّر اضْـغَـطِ الـزِّرَّ بِـالأَسْـفَـل* ✨
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+> تَـوَاصَـلْ مَـعَـهُ مُـبَـاشَـرَةً عَـلَى الـرَّقَـمِ أَعْـلَاهُ ✨
 
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
-    // الفيديو والاستمارة والزر في رسالة واحدة (الفيديو يشتغل تلقائياً)
     try {
-        return await sendDeveloperForm(sock, from, devInfoText, `https://wa.me/${DEVELOPER_NUMBER}`, sender, DEVELOPER_INFO_VIDEO_URL);
+        return await sendBotMessage(sock, from, { video: { url: getBotCommandsVideo() }, gifPlayback: true, mimetype: 'video/mp4', caption: devInfoText });
     } catch (e) {
-        console.error('تعذر إرسال استمارة المطور:', e?.message || e);
-        return sendBotMessage(sock, from, { text: devInfoText + `\n\n🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}` });
+        return sendBotMessage(sock, from, { text: devInfoText });
     }
 }
 
@@ -2005,13 +1898,12 @@ if (cmdBase === 'بوت') {
 
     // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
     try {
-        await sendFormWithButtons(sock, from, botWelcomeText, getBotCommandsVideo(sock), sender);
+        await sendFormWithButtons(sock, from, botWelcomeText, getBotCommandsVideo(), sender);
     } catch (e) {
         console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
         try { 
-            const fallbackMedia = getBotCommandsVideo(sock);
             await sendBotMessage(sock, from, { 
-                ...(/\.(jpe?g|png|webp)$/i.test(fallbackMedia) ? { image: { url: fallbackMedia } } : { video: { url: fallbackMedia } }), 
+                video: { url: getBotCommandsVideo() }, 
                 caption: botWelcomeText,
                 mentions: [sender]
             }); 
@@ -2209,9 +2101,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🔊 .الغاء_كتم @عضو ↞ فك الكتم
 > 🔗 .الرابط ↞ رابط المجموعة
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
-> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
-> ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
-> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة`;
+> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
@@ -2226,7 +2116,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:*\n\n> 🔓 \`.كشف\` ↞ رد على رسالة (عرض مرة واحدة) لفكها فوراً\n> 🗑️ \`.المحذوف\` ↞ قائمة بكل الرسائل المحذوفة المسجّلة\n> 🔎 \`.المحذوف <رقم>\` ↞ عرض رسالة محذوفة كاملة مع وسائطها\n> ✏️ \`.التعديل\` ↞ قائمة بكل الرسائل المعدّلة (قبل وبعد)\n> 🔍 \`.التعديل <رقم>\` ↞ عرض تعديل كامل\n> 🟢 \`.تفعيل_كشف_المحذوف\` ↞ بدء تسجيل المحذوف والمعدّل بصمت\n> 🔴 \`.ايقاف_كشف_المحذوف\` ↞ إيقاف التسجيل\n> 📱 \`.كشف_رقم @عضو\` ↞ فحص رقم عضو (الدولة + مؤشرات الوهمي)\n> 🕵️ \`.كشف_الوهمي\` ↞ فحص أرقام المجموعة كلها\n\n⚠️ أوامر الكشف (عدا كشف) للمشرفين فقط.`;    
+    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
@@ -2319,7 +2209,6 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 };
 
 // معالجة كل الرسائل الواصلة معاً (واتساب قد يرسل عدة رسائل في دفعة واحدة) وبشكل متوازٍ
-sock.ev.on('messages.update', (u) => { try { handleMessagesUpdate(u); } catch (e) {} });
 sock.ev.on('messages.upsert', (m) => {
     if (!m.messages || m.messages.length <= 1) { onUpsert(m).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e)); return; }
     for (const one of m.messages) onUpsert({ ...m, messages: [one] }).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e));
