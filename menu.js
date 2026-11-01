@@ -74,9 +74,16 @@ async function relayInteractive(sock, jid, interactiveMessage, { noForward = fal
 }
 
 // يرسل الاستمارة نفسها (فيديو + نص) ومعها الأزرار في رسالة واحدة
-export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid) {
+export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid, imageUrl = null) {
     let header = { hasMediaAttachment: false };
-    if (videoUrl) {
+    if (imageUrl) {
+        try {
+            const media = await prepareWAMessageMedia({ image: { url: imageUrl } }, { upload: sock.waUploadToServer });
+            if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+        } catch (e) {
+            console.error('تعذر رفع صورة الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
+        }
+    } else if (videoUrl) {
         try {
             const media = await prepareWAMessageMedia({ video: { url: videoUrl } }, { upload: sock.waUploadToServer });
             if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
