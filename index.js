@@ -8,10 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
-import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, applySubBotBranding, getSubBotMedia } from './subbot.js';
+import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
 import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
-import { handleDetectorCommand, detectorCommandNames, cacheIncoming, handleRevoke, handleMessagesUpdate } from './detector.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -249,7 +248,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'معلومات_المطور',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -269,7 +268,6 @@ const validCommands = [
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
 validCommands.push(...featureCommandNames);
-validCommands.push(...detectorCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -463,7 +461,6 @@ markOnlineOnConnect: true
 enableChannelForward(sock);
 sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
-applySubBotBranding(sock);
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
@@ -588,7 +585,6 @@ try { collectPackImages(sock, m.messages); } catch (e) {}
 
 const msg = m.messages[0];     
 if (!msg || !msg.message) return;    
-try { cacheIncoming(sock, msg); handleRevoke({ sock, msg, sendBotMessage }).catch(() => {}); } catch (e) {}
 
 const from = msg.key.remoteJid;    
 const isGroup = from.endsWith('@g.us');    
@@ -848,8 +844,6 @@ if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: is
 if (!isGroup) {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
-
-if (await handleDetectorCommand({ sock, msg, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
 
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
@@ -1904,14 +1898,12 @@ if (cmdBase === 'بوت') {
 
     // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
     try {
-        const customBotMedia = getSubBotMedia(sock);
-        await sendFormWithButtons(sock, from, botWelcomeText, customBotMedia?.type === 'video' ? customBotMedia.file : getBotCommandsVideo(), sender, customBotMedia?.type === 'image' ? customBotMedia.file : null);
+        await sendFormWithButtons(sock, from, botWelcomeText, getBotCommandsVideo(), sender);
     } catch (e) {
         console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
         try { 
-            const fbMedia = getSubBotMedia(sock);
             await sendBotMessage(sock, from, { 
-                ...(fbMedia?.type === 'image' ? { image: { url: fbMedia.file } } : { video: { url: fbMedia?.type === 'video' ? fbMedia.file : getBotCommandsVideo() } }), 
+                video: { url: getBotCommandsVideo() }, 
                 caption: botWelcomeText,
                 mentions: [sender]
             }); 
@@ -2124,12 +2116,11 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:*\n\n> 🔓 \`.كشف\` ↞ رد على رسالة (عرض مرة واحدة) لفكها فوراً\n> 🗑️ \`.المحذوف\` ↞ قائمة بكل الرسائل المحذوفة المسجّلة\n> 🔎 \`.المحذوف <رقم>\` ↞ عرض رسالة محذوفة كاملة مع وسائطها\n> ✏️ \`.التعديل\` ↞ قائمة بكل الرسائل المعدّلة (قبل وبعد)\n> 🔍 \`.التعديل <رقم>\` ↞ عرض تعديل كامل\n> 🟢 \`.تفعيل_كشف_المحذوف\` ↞ بدء تسجيل المحذوف والمعدّل بصمت\n> 🔴 \`.ايقاف_كشف_المحذوف\` ↞ إيقاف التسجيل\n> 📱 \`.كشف_رقم @عضو\` ↞ فحص رقم عضو (الدولة + مؤشرات الوهمي)\n> 🕵️ \`.كشف_الوهمي\` ↞ فحص أرقام المجموعة كلها\n\n👇 أو اضغط زر «تفعيل كشف المعدل» بالأسفل لبدء التسجيل.\n⚠️ أوامر الكشف (عدا كشف) للمشرفين فقط.`;
-    const detectorEditButton = { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '✏️ تفعيل كشف المعدل', id: '.تفعيل_كشف_المحذوف' }) };    
+    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
-            if (!(await sendSectionWithButtons(sock, from, detectorMenuText, userPp, sender, [detectorEditButton]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
+            if (!(await sendSectionWithButtons(sock, from, detectorMenuText, userPp, sender))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: detectorMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: detectorMenuText, mentions: [sender] });
         }
@@ -2218,7 +2209,6 @@ if (cmdBase === 'مكافأة' || cmd === 'هدية') {
 };
 
 // معالجة كل الرسائل الواصلة معاً (واتساب قد يرسل عدة رسائل في دفعة واحدة) وبشكل متوازٍ
-sock.ev.on('messages.update', (u) => { try { handleMessagesUpdate(u); } catch (e) {} });
 sock.ev.on('messages.upsert', (m) => {
     if (!m.messages || m.messages.length <= 1) { onUpsert(m).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e)); return; }
     for (const one of m.messages) onUpsert({ ...m, messages: [one] }).catch(e => console.error('خطأ في معالجة الرسالة:', e?.message || e));
