@@ -2,11 +2,6 @@
 import fs from 'fs';
 import path from 'path';
 import { sendSectionWithButtons } from './menu.js';
-import pino from 'pino';
-import * as baileysNs from '@whiskeysockets/baileys';
-
-const BX = (baileysNs.default && baileysNs.default.downloadMediaMessage) ? baileysNs.default : baileysNs;
-const { downloadMediaMessage } = BX;
 
 const MAX_SUBBOTS = 10;
 const SESSIONS_DIR = './subbots_sessions';
@@ -51,70 +46,6 @@ async function numberOfJid(sock, msg, jid, useMsgKeys = false) {
         const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(jid);
         return pnOf(pn) || String(pn || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
     } catch (e) { return ''; }
-}
-
-// ===== اسم البوت وصورة/فيديو استمارة .بوت لكل بوت منصّب (يحفظان في إعدادات صاحب البوت) =====
-const MEDIA_DIR = './subbots_media';
-const NAME_RE = /𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉|𝐸𝓇𝑒𝓃 𝐵𝑜𝓉|𝐸𝓇𝑒𝓃 𝐵𝑜𝑡|Eren Bot/g;
-
-function brandText(name, t) {
-    return (name && typeof t === 'string') ? t.replace(NAME_RE, () => name) : t;
-}
-
-function brandInteractive(im, name) {
-    if (!im || typeof im !== 'object') return;
-    if (im.body && typeof im.body.text === 'string') im.body.text = brandText(name, im.body.text);
-    if (im.footer && typeof im.footer.text === 'string') im.footer.text = brandText(name, im.footer.text);
-    if (im.header) {
-        if (typeof im.header.title === 'string') im.header.title = brandText(name, im.header.title);
-        if (typeof im.header.subtitle === 'string') im.header.subtitle = brandText(name, im.header.subtitle);
-    }
-    const cards = im.carouselMessage?.cards;
-    if (Array.isArray(cards)) cards.forEach(c => brandInteractive(c, name));
-}
-
-// يُستدعى من index.js لكل اتصال: يستبدل اسم البوت الافتراضي باسم صاحب البوت المنصّب في كل الرسائل والاستمارات
-export function applySubBotBranding(sock) {
-    if (!sock?.isSubBot) return;
-    const nameOf = () => { try { return getSettings(ownerOf(sock)).botName || ''; } catch (e) { return ''; } };
-
-    const origSend = sock.sendMessage.bind(sock);
-    sock.sendMessage = async (jid, content, options) => {
-        try {
-            const name = nameOf();
-            if (name && content && typeof content === 'object') {
-                content = { ...content };
-                for (const k of ['text', 'caption', 'footer', 'title', 'subtitle']) {
-                    if (typeof content[k] === 'string') content[k] = brandText(name, content[k]);
-                }
-            }
-        } catch (e) {}
-        return origSend(jid, content, options);
-    };
-
-    const origRelay = sock.relayMessage.bind(sock);
-    sock.relayMessage = async (jid, message, opts) => {
-        try {
-            const name = nameOf();
-            if (name && message && typeof message === 'object') {
-                const im = message.viewOnceMessage?.message?.interactiveMessage
-                    || message.viewOnceMessageV2?.message?.interactiveMessage
-                    || message.interactiveMessage;
-                brandInteractive(im, name);
-            }
-        } catch (e) {}
-        return origRelay(jid, message, opts);
-    };
-}
-
-// صورة/فيديو استمارة .بوت الخاص بهذا البوت المنصّب (أو null لاستخدام الافتراضي)
-export function getSubBotMedia(sock) {
-    try {
-        if (!sock?.isSubBot) return null;
-        const m = getSettings(ownerOf(sock)).media;
-        if (m && m.file && (m.type === 'image' || m.type === 'video') && fs.existsSync(m.file) && fs.statSync(m.file).size > 0) return { file: m.file, type: m.type };
-    } catch (e) {}
-    return null;
 }
 
 function fmtDuration(ms) {
@@ -260,8 +191,6 @@ const SECTION16_TEXT =
 > 👥 \`.مشرف_بوتي <رقم>\` ↞ إضافة مشرف (أو بالرد على رسالته / منشنه)
 > ➖ \`.مشرف_بوتي حذف <رقم>\` ↞ إزالة مشرف
 > 📋 \`.مشرف_بوتي\` ↞ عرض المشرفين
-> 🏷️ \`.اسم_البوت <الاسم>\` ↞ تغيير اسم بوتك في جميع الاستمارات
-> 🖼️ \`.صورة_البوت\` ↞ تغيير صورة أو فيديو استمارة \`.بوت\` (رد على صورة/فيديو أو أرسله مع الأمر)
 
 *ملاحظات:*
 • أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.
@@ -269,7 +198,7 @@ const SECTION16_TEXT =
 • في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.
 • دور المشرف الوحيد: أن يستجيب له البوت في الوضع الخاص.`;
 
-const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت'];
+const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي'];
 const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل'];   // موجودة أصلاً للبوت الرئيسي: نعترضها داخل البوت المنصّب فقط
 
 // أوامر قسم «الفرعي». ترجع true إذا عالجت الأمر
@@ -311,72 +240,6 @@ async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
     }
 
     if (!isOwner) { await reply('❌ هذا الأمر لصاحب البوت والمطور فقط.'); return true; }
-
-    // ----- اسم_البوت: يغيّر اسم بوتك في جميع الاستمارات
-    if (cmdBase === 'اسم_البوت') {
-        const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-        const arg = rawText.trim().replace(/^\.\S*\s*/, '').replace(/\s+/g, ' ').trim();
-        if (!arg) {
-            await reply(`🏷️ *اسم بوتك الحالي:* ${st.botName || 'الافتراضي'}\n\nللتغيير: \`.اسم_البوت <الاسم الجديد>\`\nللعودة للاسم الافتراضي: \`.اسم_البوت افتراضي\``);
-            return true;
-        }
-        if (/^(افتراضي|الافتراضي|default|reset)$/i.test(arg)) {
-            delete st.botName; saveSettings();
-            await reply('✅ تمت إعادة اسم البوت إلى الاسم الافتراضي.');
-            return true;
-        }
-        if (arg.length > 50) { await reply('⚠️ الاسم طويل جداً، الحد الأقصى 50 حرفاً.'); return true; }
-        st.botName = arg; saveSettings();
-        await reply(`✅ تم تغيير اسم بوتك إلى: *${arg}*\nسيظهر في جميع الاستمارات.`);
-        return true;
-    }
-
-    // ----- صورة_البوت: يغيّر صورة أو فيديو استمارة .بوت
-    if (cmdBase === 'صورة_البوت') {
-        const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || '';
-        const arg = rawText.trim().replace(/^\.\S*\s*/, '').trim();
-        const delMedia = () => {
-            try { if (st.media?.file) fs.rmSync(st.media.file, { force: true }); } catch (e) {}
-            delete st.media;
-        };
-        if (/^(افتراضي|الافتراضي|default|reset)$/i.test(arg)) {
-            delMedia(); saveSettings();
-            await reply('✅ تمت إعادة صورة/فيديو الاستمارة إلى الافتراضي.');
-            return true;
-        }
-        try {
-            const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
-            const kindOf = (m) => {
-                if (m?.imageMessage) return 'image';
-                if (m?.videoMessage) return 'video';
-                const mt = m?.documentMessage?.mimetype || '';
-                if (mt.startsWith('image/')) return 'image';
-                if (mt.startsWith('video/')) return 'video';
-                return '';
-            };
-            const ctx = msg.message?.extendedTextMessage?.contextInfo || msg.message?.imageMessage?.contextInfo || msg.message?.videoMessage?.contextInfo || {};
-            let target = unwrap(ctx.quotedMessage);
-            if (!kindOf(target)) target = unwrap(msg.message);
-            const type = kindOf(target);
-            if (!type) {
-                await reply('📌 رد على صورة أو فيديو بكلمة `.صورة_البوت` أو أرسل الصورة/الفيديو وفي وصفه `.صورة_البوت` لتغيير استمارة `.بوت`.\nللعودة للافتراضي: `.صورة_البوت افتراضي`');
-                return true;
-            }
-            const buffer = await downloadMediaMessage({ key: msg.key, message: target }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-            if (!buffer || !buffer.length) throw new Error('empty media');
-            fs.mkdirSync(MEDIA_DIR, { recursive: true });
-            const file = path.join(MEDIA_DIR, `${owner}_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`);
-            fs.writeFileSync(file, buffer);
-            delMedia();
-            st.media = { file, type };
-            saveSettings();
-            await reply(`✅ تم حفظ ${type === 'image' ? 'الصورة' : 'الفيديو'} الجديد، وسيظهر الآن في استمارة \`.بوت\`.`);
-        } catch (e) {
-            console.error('خطأ تغيير صورة استمارة البوت المنصّب:', e?.message || e);
-            await reply('❌ فشل حفظ الصورة/الفيديو، تأكد أنه ملف صالح وأعد المحاولة.');
-        }
-        return true;
-    }
 
     if (cmdBase === 'وضع_خاص') {
         st.mode = 'private'; saveSettings();
