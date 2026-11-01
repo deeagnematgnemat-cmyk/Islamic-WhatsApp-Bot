@@ -4,46 +4,44 @@ import * as baileysNs from '@whiskeysockets/baileys';
 const B = (baileysNs.default && baileysNs.default.generateWAMessageFromContent) ? baileysNs.default : baileysNs;
 const { generateWAMessageFromContent, prepareWAMessageMedia } = B;
 
-const CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
+const CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
 const INSTALL_GROUP_URL = 'https://chat.whatsapp.com/DjgGvEAiIEiCXwztk4F82L?s=cl&p=a&mlu=4&ilr=4';
 
 const row = (title, description, n) => ({ header: '', title, description, id: `.${n}` });
 
 const SECTIONS = [
     {
-        title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام الأسـاسـيـة',
+        title: 'الأقسام الأساسية',
         rows: [
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـحـمـايـة', 'أوامـر الـحـمـايـة والإنـذارات', 1),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـرفـيـه', 'أوامـر الألـعـاب والـفـعـالـيـات', 2),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـنـقـاط', 'الـحـسـاب والـتـحـويـل والـمـكـافـآت', 3),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ اسـلامـي', 'الـقـرآن والأدعـيـة والأذكـار', 4),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـضـحـك', 'الـنـكـت والـتـسـاؤلات والـمـقـولات', 5),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـجـمـوعـات', 'أوامـر وتـفـاعـلات الـمـجـمـوعـة', 6)
+            row('🛡️ 1. الحماية', 'أوامر الحماية والإنذارات', 1),
+            row('🎉 2. الترفيه والألعاب', 'أوامر الألعاب والفعاليات', 2),
+            row('💳 3. البنك والنقاط', 'الحساب والتحويل والمكافآت', 3),
+            row('🕌 4. القسم الإسلامي', 'القرآن والأدعية والأذكار', 4),
+            row('😂 5. الضحك', 'النكت والتساؤلات والمقولات', 5),
+            row('👥 6. المجموعات', 'أوامر وتفاعلات المجموعة', 6)
         ]
     },
     {
-        title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ أقـسـام إضـافـيـة',
+        title: 'أقسام إضافية',
         rows: [
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', 'أوامـر الـمـطـوّر والـنـظـام', 7),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الإدَارَة', 'أوامـر إدارة الـمـجـمـوعـة', 8),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـكـشـف', 'أوامـر كـشـف الـوسـائـط', 9),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الألـقـاب', 'أوامـر الألـقـاب', 10),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـلـصـقـات', 'مـلـصـقـات وتـعـديـل الـصـور', 11),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـنـصـيـب', 'ربـط بـوت خـاص بـك', 12),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـتـنـزيـل', 'يـوتـيـوب وتـيـك تـوك وإنـسـتـا والـمـزيـد', 13),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـذكـاء الاصـطـنـاعـي', 'أسـئـلـة وصـور وتـرجـمـة', 14),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـصـور', 'جـلـب وتـعـديـل الـصـور', 15),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـفـرعـي', 'الـتـحـكـم بـبـوتـك الـمـنـصّـب', 16),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأدوات', 'تـرجـمـة وحـاسـبـة وطـقـس وأدوات مـتـنـوّعـة', 17),
-            row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـشـكـاوي', 'الـتـواصـل مـع الـمـطـوّر وقـنـاة الـبـوت', 18)
+            row('♟️ 7. المطور', 'أوامر المطور والنظام', 7),
+            row('⚡ 8. الإدارة', 'أوامر إدارة المجموعة', 8),
+            row('🔍 9. الكشف', 'أوامر كشف الوسائط', 9),
+            row('👑 10. الألقاب', 'أوامر الألقاب', 10),
+            row('🎨 11. الملصقات', 'ملصقات وتعديل الصور', 11),
+            row('📲 12. التنصيب', 'ربط بوت خاص بك', 12),
+            row('📥 13. التنزيل', 'يوتيوب وتيك توك وإنستا والمزيد', 13),
+            row('🤖 14. الذكاء الاصطناعي', 'أسئلة وصور وترجمة', 14),
+            row('🖼️ 15. الصور', 'جلب وتعديل الصور', 15),
+            row('🔧 16. الفرعي', 'التحكم ببوتك المنصّب', 16)
         ]
     }
 ];
 
 const BUTTONS = () => [
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام', sections: SECTIONS }) },
-    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ قـنـاة الـمـطـوّر', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', sections: [{ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', rows: [row('𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـمـطـوّر', 'مـعـلـومـات الـمـطـوّر وحـسـابـه', 'معلومات_المطور')] }] }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) },
+    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '📢 قناة المطور', url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
+    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '👑 المطور', id: '.معلومات_المطور' }) }
 ];
 
 // مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
@@ -80,10 +78,8 @@ export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid)
     let header = { hasMediaAttachment: false };
     if (videoUrl) {
         try {
-            const isImg = typeof videoUrl === 'string' && /\.(jpe?g|png|webp)$/i.test(videoUrl);
-            const media = await prepareWAMessageMedia(isImg ? { image: { url: videoUrl } } : { video: { url: videoUrl } }, { upload: sock.waUploadToServer });
-            if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
-            else if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+            const media = await prepareWAMessageMedia({ video: { url: videoUrl } }, { upload: sock.waUploadToServer });
+            if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
         } catch (e) {
             console.error('تعذر رفع فيديو الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
         }
@@ -105,7 +101,7 @@ export function getButtonId(message) {
 
 // ===== زر تحت كل قسم: [قائمة الأقسام] =====
 const SECTION_NAV_BUTTONS = () => [
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ قـائـمـة الأقـسـام', sections: SECTIONS }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '📋 قائمة الأقسام', sections: SECTIONS }) }
 ];
 
 // ترجع true إذا أُرسل القسم مع الزرّين، وfalse إذا فشل (ليُرسل القسم بالطريقة القديمة)
@@ -174,7 +170,7 @@ export function protectionButton(settings = {}) {
     return {
         name: 'single_select',
         buttonParamsJson: JSON.stringify({
-            title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الـحـمـايـة',
+            title: '🛡️ الحماية',
             sections: [
                 item('🔗', 'حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
                 item('🤬', 'حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
@@ -218,7 +214,7 @@ export async function sendSectionsList(sock, jid, mentionJid) {
         ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
         nativeFlowMessage: {
             buttons: [
-                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ الأقـسـام', sections: SECTIONS }) }
+                { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'الأقسام', sections: SECTIONS }) }
             ]
         }
     });
@@ -265,31 +261,5 @@ export async function sendVideoCarousel(sock, jid, cards, { text = '', footer = 
         body: { text: text || ' ' },
         footer: { text: footer || ' ' },
         carouselMessage: { cards: built, messageVersion: 1 }
-    }, { noForward: true });
-}
-
-// ============ استمارة المطور: رسالة تحتها زر «التواصل مع المطور» يفتح حسابه مباشرة ============
-export async function sendDeveloperForm(sock, jid, text, contactUrl, mentionJid, videoUrl) {
-    let header = { hasMediaAttachment: false };
-    if (videoUrl) {
-        try {
-            const media = await prepareWAMessageMedia({ video: { url: videoUrl }, gifPlayback: true, mimetype: 'video/mp4' }, { upload: sock.waUploadToServer });
-            if (media && media.videoMessage) {
-                media.videoMessage.gifPlayback = true;
-                header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
-            }
-        } catch (e) {
-            console.error('تعذر رفع فيديو المطور، ستُرسل الاستمارة بدونه:', e?.message || e);
-        }
-    }
-    await relayInteractive(sock, jid, {
-        header,
-        body: { text },
-        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
-        nativeFlowMessage: {
-            buttons: [
-                { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '𓆩 𝑹𝑶𝒀𝑨𝑳 𓆪 ┊ حـسـاب الـمـطـوّر', url: contactUrl, merchant_url: contactUrl }) }
-            ]
-        }
     }, { noForward: true });
 }
