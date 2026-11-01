@@ -5,16 +5,16 @@ import fs from 'fs';
 import moment from 'moment-timezone';
 
 // رقم البوت المصرح له
-global.botnumber = "962796163926"
+global.botnumber = "962795106901"
 
 // قائمة المالكين والمطورين واسم البوت
 global.owner = [
-  ['962795106901', '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』', true],
-  ['962796163926', 'البوت', true]
+  ['962796163926', '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』', true],
+  ['962795106901', 'البوت', true]
 ];
 
-global.suittag = ['962795106901'];
-global.prems = ['962795106901'];
+global.suittag = ['962796163926'];
+global.prems = ['962796163926'];
 
 global.packname = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
 global.author = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
@@ -23,7 +23,7 @@ global.igfg = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』'
 global.wait = '*⠿⠶ إنتظر ⠶⠿*'
 global.eror = '*خطأ في جلب البيانات*'
 global.sitfe = 'ᴡᴡᴡ.ᴛᴇᴄʜsᴏᴜɴᴇ.ᴄᴏᴍ'
-global.nomorown = '962795106901'
+global.nomorown = '962796163926'
 
 global.mods = [];
 
