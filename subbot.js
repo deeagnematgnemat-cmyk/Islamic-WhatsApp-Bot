@@ -4,7 +4,7 @@ import path from 'path';
 import { sendSectionWithButtons } from './menu.js';
 
 const MAX_SUBBOTS = 10;
-const SESSIONS_DIR = (process.env.DATA_DIR || '.') + '/subbots_sessions';
+const SESSIONS_DIR = './subbots_sessions';
 const LIST_FILE = './subbots.json';
 const PAIR_TIMEOUT_MS = 3 * 60 * 1000; // مهلة إدخال الكود: 3 دقائق
 
