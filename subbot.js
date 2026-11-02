@@ -2,6 +2,8 @@
 import fs from 'fs';
 import path from 'path';
 import { sendSectionWithButtons } from './menu.js';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import pino from 'pino';
 
 const MAX_SUBBOTS = 10;
 const SESSIONS_DIR = './subbots_sessions';
@@ -69,6 +71,57 @@ export async function isSubBotPrivateBlocked({ sock, msg, sender, isFromMe }) {
     } catch (e) { return false; }
 }
 
+// ----- اسم البوت وصورته/فيديوه لكل بوت منصّب (تظهر في الاستمارات)
+const MEDIA_DIR = './subbots_media';
+const BRAND_PATTERNS = [/𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉/gu, /𝐸𝓇𝑒𝓃 𝐵𝑜[𝓉𝑡]/gu, /Eren Bot/g];
+
+function brandStr(s, name) {
+    for (const p of BRAND_PATTERNS) s = s.replace(p, () => name);
+    return s;
+}
+
+function brandWalk(v, name, depth = 0) {
+    if (typeof v === 'string') return brandStr(v, name);
+    if (!v || typeof v !== 'object' || depth > 8) return v;
+    if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer || typeof v.pipe === 'function') return v;
+    if (Array.isArray(v)) return v.map(x => brandWalk(x, name, depth + 1));
+    if (Object.getPrototypeOf(v) === Object.prototype) {
+        const out = {};
+        for (const k of Object.keys(v)) out[k] = brandWalk(v[k], name, depth + 1);
+        return out;
+    }
+    for (const k of Object.keys(v)) { try { v[k] = brandWalk(v[k], name, depth + 1); } catch (e) {} }
+    return v;
+}
+
+// يستبدل اسم البوت الافتراضي بالاسم الذي حدده صاحب البوت المنصّب في كل رسائله (الاستمارات وغيرها)
+function applyBrand(sock) {
+    const nameOf = () => { try { return settingsStore[ownerOf(sock)]?.name || ''; } catch (e) { return ''; } };
+    const origSend = sock.sendMessage.bind(sock);
+    sock.sendMessage = (jid, content, options) => {
+        try {
+            const n = nameOf();
+            if (n && content && typeof content === 'object' && !('react' in content) && !('delete' in content) && !('forward' in content)) content = brandWalk(content, n);
+        } catch (e) {}
+        return origSend(jid, content, options);
+    };
+    const origRelay = sock.relayMessage.bind(sock);
+    sock.relayMessage = (jid, message, opts) => {
+        try { const n = nameOf(); if (n) message = brandWalk(message, n); } catch (e) {}
+        return origRelay(jid, message, opts);
+    };
+}
+
+// تُستدعى من index.js: صورة/فيديو استمارة .بوت الخاص بالبوت المنصّب (null إذا لم يحدد صاحبه شيئاً أو كان البوت الرئيسي)
+export function getSubBotMedia(sock) {
+    try {
+        if (!sock?.isSubBot) return null;
+        const st = settingsStore[ownerOf(sock)];
+        if (!st?.media || !st.mediaFile || !fs.existsSync(st.mediaFile)) return null;
+        return { file: st.mediaFile, type: st.media };
+    } catch (e) { return null; }
+}
+
 function saveList() {
     try { fs.writeFileSync(LIST_FILE, JSON.stringify([...subs.values()].filter(e => e.connected).map(e => e.number))); } catch (e) {}
 }
@@ -89,6 +142,7 @@ function launch(number, opts = {}) {
         // يستدعيها startBot كل مرة ينشئ فيها اتصالاً
         onSock(sock) {
             entry.sock = sock;
+            applyBrand(sock);
             sock.ev.on('connection.update', ({ connection }) => {
                 if (connection === 'open' && !entry.connected) {
                     entry.connected = true;
@@ -151,6 +205,7 @@ async function removeSub(number) {
     try { entry.sock?.end?.(undefined); } catch (e) {}
     try { entry.sock?.ws?.close(); } catch (e) {}
     try { fs.rmSync(entry.dir, { recursive: true, force: true }); } catch (e) {}
+    try { for (const ext of ['jpg', 'mp4']) fs.rmSync(path.join(MEDIA_DIR, `${number}.${ext}`), { force: true }); } catch (e) {}
     if (settingsStore[number]) { delete settingsStore[number]; saveSettings(); }
     saveList();
     return true;
@@ -191,6 +246,8 @@ const SECTION16_TEXT =
 > 👥 \`.مشرف_بوتي <رقم>\` ↞ إضافة مشرف (أو بالرد على رسالته / منشنه)
 > ➖ \`.مشرف_بوتي حذف <رقم>\` ↞ إزالة مشرف
 > 📋 \`.مشرف_بوتي\` ↞ عرض المشرفين
+> ✏️ \`.اسم_البوت <الاسم>\` ↞ تغيير اسم بوتك في جميع الاستمارات
+> 🖼️ \`.صورة_البوت\` ↞ تغيير صورة أو فيديو استمارة \`.بوت\` (رد على صورة/فيديو أو أرسله مع الأمر)
 
 *ملاحظات:*
 • أوامر هذا القسم تعمل من داخل بوتك المنصّب فقط.
@@ -198,7 +255,7 @@ const SECTION16_TEXT =
 • في الوضع الخاص يتجاهل البوت أي شخص غير صاحبه ومشرفيه.
 • دور المشرف الوحيد: أن يستجيب له البوت في الوضع الخاص.`;
 
-const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي'];
+const SUB_ONLY = ['حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت'];
 const SUB_OVERRIDE = ['وضع_خاص', 'وضع_عام', 'اعادة_تشغيل'];   // موجودة أصلاً للبوت الرئيسي: نعترضها داخل البوت المنصّب فقط
 
 // أوامر قسم «الفرعي». ترجع true إذا عالجت الأمر
@@ -257,6 +314,47 @@ async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
         await reply('🔄 جاري إعادة تشغيل بوتك... سيعود خلال ثوانٍ.');
         if (entry) entry.connectedAt = Date.now();
         setTimeout(() => { try { sock.end(new Error('restart')); } catch (e) {} }, 1500);
+        return true;
+    }
+
+    if (cmdBase === 'اسم_البوت') {
+        const rawText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || '';
+        const name = rawText.trim().replace(/^\S+\s*/, '').replace(/\s+/g, ' ').trim();
+        if (!name) {
+            await reply(`✏️ *اسم البوت:*\n\n> الاسم الحالي: ${st.name || 'الافتراضي'}\n\nللتغيير: \`.اسم_البوت <الاسم الجديد>\``);
+            return true;
+        }
+        if (name.length > 40) { await reply('⚠️ الاسم طويل، الحد الأقصى 40 حرفاً.'); return true; }
+        st.name = name; saveSettings();
+        await reply(`✅ تم تغيير اسم بوتك إلى: ${name}\nسيظهر الاسم الجديد في جميع الاستمارات.`);
+        return true;
+    }
+
+    if (cmdBase === 'صورة_البوت') {
+        try {
+            const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.viewOnceMessageV2Extension?.message || m?.documentWithCaptionMessage?.message || m;
+            const kindOf = (m) => m?.imageMessage ? 'image' : (m?.videoMessage || (m?.documentMessage && (m.documentMessage.mimetype || '').startsWith('video/'))) ? 'video' : (m?.documentMessage && (m.documentMessage.mimetype || '').startsWith('image/')) ? 'image' : '';
+            const own = unwrap(msg.message);
+            const ctxInfo = own?.extendedTextMessage?.contextInfo || own?.imageMessage?.contextInfo || own?.videoMessage?.contextInfo || own?.documentMessage?.contextInfo || {};
+            let target = own, kind = kindOf(own);
+            if (!kind) { target = unwrap(ctxInfo.quotedMessage); kind = kindOf(target); }
+            if (!kind) {
+                await reply('📌 رد على صورة أو فيديو بكلمة `.صورة_البوت` أو أرسل الصورة/الفيديو وفي وصفه `.صورة_البوت` لتغيير استمارة `.بوت` الخاصة ببوتك.');
+                return true;
+            }
+            const buf = await downloadMediaMessage({ key: msg.key, message: target }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+            if (!buf || !buf.length) throw new Error('empty media');
+            fs.mkdirSync(MEDIA_DIR, { recursive: true });
+            const ext = kind === 'image' ? 'jpg' : 'mp4';
+            for (const e of ['jpg', 'mp4']) fs.rmSync(path.join(MEDIA_DIR, `${owner}.${e}`), { force: true });
+            const file = path.join(MEDIA_DIR, `${owner}.${ext}`);
+            fs.writeFileSync(file, buf);
+            st.media = kind; st.mediaFile = file; saveSettings();
+            await reply(`✅ تم تغيير ${kind === 'image' ? 'صورة' : 'فيديو'} استمارة \`.بوت\` الخاصة ببوتك.`);
+        } catch (e) {
+            console.error('خطأ تغيير صورة البوت المنصّب:', e?.message || e);
+            await reply('❌ فشل تغيير الصورة/الفيديو، تأكد أنه صالح وأعد المحاولة.');
+        }
         return true;
     }
 
