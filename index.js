@@ -275,6 +275,7 @@ const validCommands = [
 ];
 validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
+validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -366,6 +367,320 @@ function persistWelcome(groupId) {
 const g = getGroupSetting(groupId);
 welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
 try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
+}
+
+// ===== أوامر المجموعات الإضافية: قوانين / منشن_المشرفين / حظر_اكواد / غير_المتفاعلين / طرد_غير_المتفاعلين / قفل_مؤقت / جدولة_قفل =====
+const GROUP_EXTRA_FILE = './group_extra.json';
+let groupExtra = { rules: {}, blockedCodes: {}, lastSeen: {}, joined: {}, trackStart: {}, tempLocks: {}, schedules: {} };
+try { const d = JSON.parse(fs.readFileSync(GROUP_EXTRA_FILE, 'utf8')); if (d && typeof d === 'object') groupExtra = { ...groupExtra, ...d }; } catch (e) {}
+let groupExtraDirty = false;
+let groupExtraFlusher = null;
+const mentionAdminsCooldown = {};
+const GE_CMDS = new Set(['قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل']);
+const GE_ALIASES = [
+    [/^طرد[ _]غير[ _]المتفاعلين(?=\s|$)/, 'طرد_غير_المتفاعلين'],
+    [/^غير[ _]المتفاعلين(?=\s|$)/, 'غير_المتفاعلين'],
+    [/^قفل[ _]مؤقت(?=\s|$)/, 'قفل_مؤقت'],
+    [/^جدول[ةه][ _]قفل(?=\s|$)/, 'جدولة_قفل'],
+    [/^منشن[ _]المشرفين(?=\s|$)/, 'منشن_المشرفين'],
+    [/^حظر[ _]اكواد(?=\s|$)/, 'حظر_اكواد'],
+    [/^سماح[ _]اكواد(?=\s|$)/, 'سماح_اكواد'],
+    [/^ضبط[ _]قوانين(?=\s|$)/, 'ضبط_قوانين'],
+];
+// يحوّل صيغ الأوامر الجديدة التي فيها مسافة إلى صيغة موحّدة (حتى لا تتعارض مع قفل/طرد/منشن الأصلية)
+function normalizeGroupExtraCmd(cmd) {
+    for (const [re, to] of GE_ALIASES) { if (re.test(cmd)) { cmd = cmd.replace(re, to); break; } }
+    const m = cmd.match(/^(\S+)\n/);
+    if (m && GE_CMDS.has(m[1])) cmd = cmd.replace('\n', ' ');
+    return cmd;
+}
+function saveGroupExtra() { try { fs.writeFileSync(GROUP_EXTRA_FILE, JSON.stringify(groupExtra)); } catch (e) {} groupExtraDirty = false; }
+function jidDigits(j) { return String(j || '').split('@')[0].split(':')[0].replace(/\D/g, ''); }
+function memberKeys(p) { return [p?.id, p?.phoneNumber, p?.lid, p?.jid].map(jidDigits).filter(Boolean); }
+function toLatinDigits(str) { return String(str || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)); }
+function ensureTrack(groupId) { if (!groupExtra.trackStart[groupId]) { groupExtra.trackStart[groupId] = Date.now(); groupExtraDirty = true; } }
+function fmtAmman(ts) { return new Date(ts).toLocaleTimeString('ar-EG', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', hour12: true }); }
+function ammanMinutesNow() {
+    const t = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Amman', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+    const [h, m] = t.split(':').map(Number);
+    return ((h % 24) * 60) + m;
+}
+function fmtHM(hhmm) {
+    const [h, m] = hhmm.split(':').map(Number);
+    const suffix = h >= 12 ? 'م' : 'ص';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${suffix} (${hhmm})`;
+}
+// قراءة وقت مثل 23:00 أو 6:00ص أو 12م
+function parseTimeToken(tok) {
+    const m = String(tok).match(/^(\d{1,2})(?::(\d{2}))?(ص|م|am|pm)?$/i);
+    if (!m) return null;
+    let h = Number(m[1]); const min = m[2] ? Number(m[2]) : 0; const suf = (m[3] || '').toLowerCase();
+    if (min > 59) return null;
+    if (suf) { if (h < 1 || h > 12) return null; h = (suf === 'م' || suf === 'pm') ? (h % 12) + 12 : h % 12; }
+    else if (h > 23) return null;
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+function computeInactive(sock, meta, groupId, days) {
+    const now = Date.now();
+    const limit = days * 86400000;
+    const ls = groupExtra.lastSeen[groupId] || {};
+    const jn = groupExtra.joined[groupId] || {};
+    const start = groupExtra.trackStart[groupId] || now;
+    const botD = jidDigits(sock.user?.id);
+    const list = [];
+    for (const p of meta.participants || []) {
+        if (p.admin === 'admin' || p.admin === 'superadmin') continue;
+        const keys = memberKeys(p);
+        if (botD && keys.includes(botD)) continue;
+        if (isDeveloper(p.phoneNumber || p.id, sock) || isDeveloper(p.id, sock)) continue;
+        const seen = Math.max(0, ...keys.map((k) => ls[k] || 0));
+        const joined = Math.max(0, ...keys.map((k) => jn[k] || 0));
+        const last = Math.max(start, seen, joined);
+        if (now - last >= limit) list.push({ id: p.id, last, seen: seen > 0 });
+    }
+    list.sort((a, b) => a.last - b.last);
+    return { list, trackDays: (now - start) / 86400000 };
+}
+
+async function handleGroupExtraCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev }) {
+    const base = cmd.split(' ')[0];
+    if (!GE_CMDS.has(base)) return false;
+    const args = cmd.slice(base.length).trim();
+    const isAdm = isSenderAdmin || isSenderDev;
+    const reply = (text, mentions) => sendBotMessage(sock, from, mentions ? { text, mentions } : { text }).catch(() => {});
+    const adminOnly = () => reply('❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!');
+    ensureTrack(from);
+
+    // ---------- القوانين ----------
+    if (base === 'قوانين') {
+        const rules = groupExtra.rules[from];
+        if (!rules) return reply('📜 لم يتم ضبط قوانين لهذه المجموعة بعد.' + (isAdm ? '\n📌 اضبطها بالأمر: `.ضبط_قوانين <النص>`' : '')), true;
+        return reply(`📜 *قوانين المجموعة:*\n\n${rules}`), true;
+    }
+    if (base === 'ضبط_قوانين') {
+        if (!isAdm) return adminOnly(), true;
+        const text = trimmedBody.replace(/^\.ضبط[ _]قوانين/i, '').trim();
+        if (!text) return reply('📌 اكتب القوانين بعد الأمر.\nمثال:\n`.ضبط_قوانين\n1- الاحترام المتبادل\n2- ممنوع الروابط`'), true;
+        if (text.length > 3000) return reply('❌ القوانين طويلة جداً، الحد الأقصى 3000 حرف.'), true;
+        groupExtra.rules[from] = text; saveGroupExtra();
+        return reply('✅ تم حفظ قوانين المجموعة، يعرضها الجميع بـ `.قوانين`'), true;
+    }
+
+    // ---------- منشن المشرفين ----------
+    if (base === 'منشن_المشرفين') {
+        if (!isAdm) {
+            const last = mentionAdminsCooldown[from + sender] || 0;
+            if (Date.now() - last < 60000) return reply('⏳ انتظر دقيقة قبل استدعاء المشرفين مرة أخرى.'), true;
+            mentionAdminsCooldown[from + sender] = Date.now();
+        }
+        try {
+            const meta = await sock.groupMetadata(from);
+            const botD = jidDigits(sock.user?.id);
+            const admins = (meta.participants || []).filter((p) => (p.admin === 'admin' || p.admin === 'superadmin') && !(botD && memberKeys(p).includes(botD))).map((p) => p.id);
+            if (!admins.length) return reply('❌ لا يوجد مشرفون لمنشنهم.'), true;
+            const reason = trimmedBody.replace(/^\.منشن[ _]المشرفين/i, '').trim();
+            let text = `🚨 *نِـدَاءٌ لِـلْـمُـشْـرِفِـيـن*\n\n👤 من: @${sender.split('@')[0]}\n`;
+            if (reason) text += `📝 السبب: ${reason}\n`;
+            text += `\n`;
+            admins.forEach((id) => { text += `> 👑 @${id.split('@')[0]}\n`; });
+            return reply(text, [...admins, sender]), true;
+        } catch (e) { return reply('❌ تعذر منشن المشرفين.'), true; }
+    }
+
+    // ---------- حظر / سماح أكواد الدول ----------
+    if (base === 'حظر_اكواد' || base === 'سماح_اكواد') {
+        if (!isAdm) return adminOnly(), true;
+        const list = groupExtra.blockedCodes[from] || [];
+        const codes = toLatinDigits(args).split(/[\s,،]+/).map((c) => c.replace(/^\+/, '').replace(/^00/, '')).filter(Boolean);
+        if (base === 'حظر_اكواد') {
+            if (!codes.length) return reply(list.length ? `🚫 *أكواد الدول المحظورة:*\n${list.map((c) => `> +${c}`).join('\n')}\n\n📌 للإضافة: \`.حظر_اكواد 1 212\`\n📌 للإزالة: \`.سماح_اكواد 1\`` : '📌 لا توجد أكواد محظورة.\nمثال: `.حظر_اكواد 1 212` (يطرد أي عضو جديد رقمه يبدأ بهذه الأكواد)'), true;
+            const bad = codes.filter((c) => !/^\d{1,4}$/.test(c));
+            if (bad.length) return reply('❌ اكتب الأكواد أرقاماً فقط (مثل 1 أو 212 أو 972).'), true;
+            groupExtra.blockedCodes[from] = [...new Set([...list, ...codes])]; saveGroupExtra();
+            return reply(`🚫 تم حظر الأكواد: ${codes.map((c) => '+' + c).join('، ')}\n📌 يُطبّق على الأعضاء الجدد، ويلزم أن يكون البوت مشرفاً.`), true;
+        }
+        if (!codes.length) return reply('📌 اكتب الكود المراد السماح به، مثال: `.سماح_اكواد 1` أو `.سماح_اكواد الكل`'), true;
+        if (args.trim() === 'الكل') { groupExtra.blockedCodes[from] = []; saveGroupExtra(); return reply('✅ تم السماح بكل الأكواد.'), true; }
+        groupExtra.blockedCodes[from] = list.filter((c) => !codes.includes(c)); saveGroupExtra();
+        return reply(`✅ تم السماح بالأكواد: ${codes.map((c) => '+' + c).join('، ')}`), true;
+    }
+
+    // ---------- غير المتفاعلين / طرد غير المتفاعلين ----------
+    if (base === 'غير_المتفاعلين' || base === 'طرد_غير_المتفاعلين') {
+        if (!isAdm) return adminOnly(), true;
+        const days = parseInt(toLatinDigits(args).replace(/[^0-9]/g, ''), 10);
+        const isKick = base === 'طرد_غير_المتفاعلين';
+        if (!days || days < 1 || days > 365) return reply(`📌 اكتب عدد الأيام بعد الأمر.\nمثال: \`.${base} 5\``), true;
+        try {
+            const meta = await sock.groupMetadata(from);
+            const { list, trackDays } = computeInactive(sock, meta, from, days);
+            const trackTxt = trackDays < 1 ? 'أقل من يوم' : `${Math.floor(trackDays)} يوم`;
+            if (isKick) {
+                if (trackDays < days) return reply(`⚠️ البوت يتتبع نشاط الأعضاء منذ ${trackTxt} فقط، ولا يمكن طرد من لم يتفاعل ${days} يوم قبل اكتمال المدة.\nجرّب مدة أقل أو انتظر.`), true;
+                if (!list.length) return reply(`✅ لا يوجد أعضاء غير متفاعلين منذ ${days} يوم.`), true;
+                await reply(`⏳ جارٍ طرد ${list.length} عضو غير متفاعل منذ ${days} يوم...`);
+                let ok = 0;
+                for (let i = 0; i < list.length; i += 10) {
+                    const chunk = list.slice(i, i + 10).map((x) => x.id);
+                    try { await sock.groupParticipantsUpdate(from, chunk, 'remove'); ok += chunk.length; } catch (e) {}
+                    await new Promise((r) => setTimeout(r, 2000));
+                }
+                if (!ok) return reply('❌ فشل الطرد، تأكد أن البوت مشرف ولديه الصلاحيات.'), true;
+                return reply(`╭━━━〔 ⚔️ 〕━━━╮\n『 طَـرْدُ غَـيْـرِ الـمُـتَـفَـاعِـلِـيـن 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📅 ⌯ المدة ↞ ${days} يوم\n✅ ⌯ تم طرد ↞ ${ok} من ${list.length}»`, [sender]), true;
+            }
+            let text = `📉 *الأعضاء غير المتفاعلين منذ ${days} يوم أو أكثر:* (${list.length})\n`;
+            if (trackDays < days) text += `⚠️ البوت يتتبع النشاط منذ ${trackTxt} فقط، فالنتائج غير مكتملة.\n`;
+            if (!list.length) return reply(text + `\n✅ لا يوجد أعضاء غير متفاعلين.`), true;
+            text += `\n`;
+            const shown = list.slice(0, 60);
+            const now = Date.now();
+            shown.forEach((x) => {
+                const d = Math.floor((now - x.last) / 86400000);
+                text += `> 👤 @${x.id.split('@')[0]} ↞ ${x.seen ? `آخر رسالة قبل ${d} يوم` : `بدون رسائل منذ ${d} يوم`}\n`;
+            });
+            if (list.length > shown.length) text += `\n... و ${list.length - shown.length} آخرين`;
+            text += `\n\n📌 للطرد: \`.طرد_غير_المتفاعلين ${days}\``;
+            return reply(text, shown.map((x) => x.id)), true;
+        } catch (e) { return reply('❌ تعذر جلب بيانات الأعضاء.'), true; }
+    }
+
+    // ---------- قفل مؤقت ----------
+    if (base === 'قفل_مؤقت') {
+        if (!isAdm) return adminOnly(), true;
+        if (args === 'الغاء') {
+            if (!groupExtra.tempLocks[from]) return reply('📌 لا يوجد قفل مؤقت نشط.'), true;
+            delete groupExtra.tempLocks[from]; saveGroupExtra();
+            return reply('✅ تم إلغاء الفتح التلقائي، افتح المجموعة يدوياً بـ `.فتح`.'), true;
+        }
+        const mins = parseInt(toLatinDigits(args).replace(/[^0-9]/g, ''), 10);
+        if (!mins || mins < 1 || mins > 1440) return reply('📌 اكتب المدة بالدقائق (من 1 إلى 1440).\nمثال: `.قفل_مؤقت 30`\nللإلغاء: `.قفل_مؤقت الغاء`'), true;
+        try { await sock.groupSettingUpdate(from, 'announcement'); }
+        catch (e) { return reply('❌ فشل قفل المجموعة، تأكد أن البوت مشرف.'), true; }
+        const unlockAt = Date.now() + mins * 60000;
+        groupExtra.tempLocks[from] = { unlockAt, botId: jidDigits(sock.user?.id), by: sender, tries: 0 };
+        saveGroupExtra();
+        return reply(`╭━━━〔 🔒 〕━━━╮\n『 قَـفْـلٌ مُـؤَقَّـت 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n⏳ ⌯ المدة ↞ ${mins} دقيقة\n🔓 ⌯ تفتح تلقائياً ↞ ${fmtAmman(unlockAt)} (توقيت عمّان)»`, [sender]), true;
+    }
+
+    // ---------- جدولة قفل ----------
+    if (base === 'جدولة_قفل') {
+        if (!isAdm) return adminOnly(), true;
+        const cur = groupExtra.schedules[from];
+        if (args === 'الغاء') {
+            if (!cur) return reply('📌 لا توجد جدولة قفل لهذه المجموعة.'), true;
+            delete groupExtra.schedules[from]; saveGroupExtra();
+            return reply('✅ تم إلغاء جدولة القفل.'), true;
+        }
+        if (!args) {
+            return reply(cur ? `🗓️ *جدولة القفل الحالية:*\n🔒 القفل ↞ ${fmtHM(cur.lock)}\n🔓 الفتح ↞ ${fmtHM(cur.unlock)}\n🌍 التوقيت ↞ عمّان\n\n📌 للإلغاء: \`.جدولة_قفل الغاء\`` : '📌 اكتب وقت القفل ثم وقت الفتح.\nمثال: `.جدولة_قفل 23:00 06:00`\nأو بالصباح/المساء: `.جدولة_قفل 11:00م 6:00ص`\nللإلغاء: `.جدولة_قفل الغاء`\n🌍 التوقيت: عمّان'), true;
+        }
+        const cleaned = toLatinDigits(args).replace(/\s+(ص|م|am|pm)(?=\s|$)/gi, '$1');
+        const toks = cleaned.split(/[\s,،\-–]+/).filter((t) => t && !['الى', 'الي', 'حتى', 'و'].includes(t));
+        const times = toks.map(parseTimeToken);
+        if (toks.length !== 2 || times.some((t) => !t)) return reply('❌ صيغة غير صحيحة.\nمثال: `.جدولة_قفل 23:00 06:00` أو `.جدولة_قفل 11:00م 6:00ص`'), true;
+        if (times[0] === times[1]) return reply('❌ وقت القفل ووقت الفتح لا يمكن أن يكونا متساويين.'), true;
+        groupExtra.schedules[from] = { lock: times[0], unlock: times[1], botId: jidDigits(sock.user?.id), lastLock: 0, lastUnlock: 0, by: sender };
+        saveGroupExtra();
+        return reply(`╭━━━〔 🗓️ 〕━━━╮\n『 جَـدْوَلَـةُ الـقَـفْـل 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«🔒 ⌯ القفل يومياً ↞ ${fmtHM(times[0])}\n🔓 ⌯ الفتح يومياً ↞ ${fmtHM(times[1])}\n🌍 ⌯ التوقيت ↞ عمّان»\n\n📌 يلزم أن يكون البوت مشرفاً.`), true;
+    }
+    return false;
+}
+
+// تشغيل التتبع والمجدول والحماية بالأكواد لكل اتصال (يعمل بمستمعين خاصين دون التأثير على بقية الأحداث)
+function setupGroupAutomation(sock) {
+    // تتبع آخر نشاط للأعضاء
+    sock.ev.on('messages.upsert', (m) => {
+        try {
+            if (m.type !== 'notify') return;
+            for (const mm of m.messages || []) {
+                const gid = mm?.key?.remoteJid;
+                if (!gid || !gid.endsWith('@g.us') || mm.key.fromMe || !mm.message) continue;
+                const keys = [mm.key.participant, mm.key.participantAlt, mm.key.participantPn].map(jidDigits).filter(Boolean);
+                if (!keys.length) continue;
+                ensureTrack(gid);
+                if (!groupExtra.lastSeen[gid]) groupExtra.lastSeen[gid] = {};
+                const now = Date.now();
+                keys.forEach((k) => { groupExtra.lastSeen[gid][k] = now; });
+                groupExtraDirty = true;
+            }
+        } catch (e) {}
+    });
+
+    // بدء التتبع لكل المجموعات عند الاتصال
+    sock.ev.on('connection.update', async ({ connection }) => {
+        if (connection === 'open') {
+            try { const all = await sock.groupFetchAllParticipating(); Object.keys(all || {}).forEach(ensureTrack); saveGroupExtra(); } catch (e) {}
+        }
+    });
+
+    // وقت دخول الأعضاء + طرد الأكواد المحظورة
+    sock.ev.on('group-participants.update', async (anu) => {
+        try {
+            const { id, action } = anu;
+            if (action !== 'add') return;
+            ensureTrack(id);
+            if (!groupExtra.joined[id]) groupExtra.joined[id] = {};
+            const blocked = groupExtra.blockedCodes[id] || [];
+            for (const p of anu.participants || []) {
+                const obj = typeof p === 'string' ? { id: p } : p;
+                const now = Date.now();
+                memberKeys(obj).forEach((k) => { groupExtra.joined[id][k] = now; });
+                groupExtraDirty = true;
+                if (!blocked.length) continue;
+                const phoneJid = [obj.phoneNumber, obj.id].find((j) => j && String(j).endsWith('@s.whatsapp.net'));
+                if (!phoneJid) continue;
+                const num = jidDigits(phoneJid);
+                if (isDeveloper(phoneJid, sock)) continue;
+                if (blocked.some((c) => num.startsWith(c))) {
+                    try {
+                        await sock.groupParticipantsUpdate(id, [obj.id || phoneJid], 'remove');
+                        await sendBotMessage(sock, id, { text: `🚫 تم طرد @${num} تلقائياً لأن كود دولته محظور في هذه المجموعة.`, mentions: [phoneJid] });
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+    });
+
+    // مجدول القفل المؤقت والقفل المجدول + حفظ دوري
+    if (!groupExtraFlusher) {
+        groupExtraFlusher = setInterval(() => { if (groupExtraDirty) saveGroupExtra(); }, 30000);
+        if (groupExtraFlusher.unref) groupExtraFlusher.unref();
+    }
+    const timer = setInterval(async () => {
+        try {
+            const myId = jidDigits(sock.user?.id);
+            if (!myId) return;
+            const now = Date.now();
+            for (const [gid, e] of Object.entries(groupExtra.tempLocks)) {
+                if (e.botId !== myId || e.unlockAt > now) continue;
+                try {
+                    await sock.groupSettingUpdate(gid, 'not_announcement');
+                    delete groupExtra.tempLocks[gid]; saveGroupExtra();
+                    await sendBotMessage(sock, gid, { text: '🔓 انتهى القفل المؤقت وتم فتح المجموعة تلقائياً.' });
+                } catch (err) {
+                    e.tries = (e.tries || 0) + 1;
+                    if (e.tries >= 3) { delete groupExtra.tempLocks[gid]; }
+                    saveGroupExtra();
+                }
+            }
+            const nowMin = ammanMinutesNow();
+            for (const [gid, s] of Object.entries(groupExtra.schedules)) {
+                if (s.botId !== myId) continue;
+                const due = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return ((nowMin - (h * 60 + m) + 1440) % 1440) < 10; };
+                if (due(s.lock) && now - (s.lastLock || 0) > 20 * 3600000) {
+                    s.lastLock = now; saveGroupExtra();
+                    try { await sock.groupSettingUpdate(gid, 'announcement'); await sendBotMessage(sock, gid, { text: `🔒 تم قفل المجموعة تلقائياً حسب الجدولة، وتفتح الساعة ${fmtHM(s.unlock)}.` }); } catch (err) {}
+                }
+                if (due(s.unlock) && now - (s.lastUnlock || 0) > 20 * 3600000) {
+                    s.lastUnlock = now; saveGroupExtra();
+                    try { await sock.groupSettingUpdate(gid, 'not_announcement'); await sendBotMessage(sock, gid, { text: '🔓 تم فتح المجموعة تلقائياً حسب الجدولة.' }); } catch (err) {}
+                }
+            }
+        } catch (e) {}
+    }, 20000);
+    sock.ev.on('connection.update', ({ connection }) => { if (connection === 'close') clearInterval(timer); });
 }
 
 // ===== كشف الرسائل المحذوفة والمعدّلة (لكل مجموعة على حدة) =====
@@ -604,6 +919,7 @@ markOnlineOnConnect: true
 enableChannelForward(sock);
 sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
+setupGroupAutomation(sock);
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
@@ -970,6 +1286,7 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
 if (!trimmedBody.startsWith('.')) return;    
 
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
+cmd = normalizeGroupExtraCmd(cmd);
 let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n')[0] : cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
@@ -995,6 +1312,8 @@ if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedB
 if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
+
+if (await handleGroupExtraCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev })) return;
 
 if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
@@ -2305,7 +2624,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
 > ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
-> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي`;
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي\n> 📜 .قوانين ↞ عرض قوانين المجموعة\n> ✏️ .ضبط_قوانين <النص> ↞ ضبط القوانين\n> 🚨 .منشن_المشرفين ↞ منشن المشرفين فقط\n> 🚫 .حظر_اكواد <الكود> ↞ طرد الأعضاء الجدد بكود دولة معين\n> ✅ .سماح_اكواد <الكود> ↞ إزالة كود من الحظر\n> 📉 .غير_المتفاعلين <أيام> ↞ عرض غير المتفاعلين\n> ⚔️ .طرد_غير_المتفاعلين <أيام> ↞ طرد غير المتفاعلين\n> ⏳ .قفل_مؤقت <دقائق> ↞ قفل ثم فتح تلقائي\n> 🗓️ .جدولة_قفل 23:00 06:00 ↞ قفل وفتح يومي تلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
