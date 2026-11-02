@@ -249,7 +249,7 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
@@ -355,6 +355,13 @@ Object.assign(groupSettings[groupId], welcomeStore[groupId] || {});
 return groupSettings[groupId];
 }
 
+// استبدال علامة المنشن في نص الترحيب/التوديع المخصص (@العضو أو @منشن أو @user)، وإن لم توجد تُضاف منشن للعضو في آخر النص
+function applyMemberMention(text, user) {
+const tag = '@' + user.split('@')[0];
+const re = /@(العضو|منشن|user)/g;
+if (re.test(text)) return text.replace(/@(العضو|منشن|user)/g, () => tag);
+return text + '\n\n' + tag;
+}
 function persistWelcome(groupId) {
 const g = getGroupSetting(groupId);
 welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
@@ -644,7 +651,7 @@ const settings = getGroupSetting(id);
 if (action === 'add' && settings.welcome) {    
     for (let user of participants) {    
         const userPp = await getUserProfilePic(sock, id);    
-        const welcomeMsg = settings.welcomeText ? settings.welcomeText.replace(/@العضو/g, () => '@' + user.split('@')[0]) : `*🌾┊تـرحـيـب:*
+        const welcomeMsg = settings.welcomeText ? applyMemberMention(settings.welcomeText, user) : `*🌾┊تـرحـيـب:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -681,7 +688,7 @@ if (action === 'add' && settings.welcome) {
 } else if (action === 'remove' && settings.goodbye) {
     for (let user of participants) {
         const userPp = await getUserProfilePic(sock, user);
-        const goodbyeMsg = settings.goodbyeText ? settings.goodbyeText.replace(/@العضو/g, () => '@' + user.split('@')[0]) : `*🍂┊تـوديـع:*
+        const goodbyeMsg = settings.goodbyeText ? applyMemberMention(settings.goodbyeText, user) : `*🍂┊تـوديـع:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -989,7 +996,7 @@ if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBod
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -1214,15 +1221,23 @@ if (cmdBase === 'قائمة_المحذوف' || cmdBase === 'قائمة_المع�
 
 if (cmd.startsWith('تغيير_ترحيب')) {
     const newText = trimmedBody.replace(/^\.تغيير_ترحيب/i, '').trim();
-    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص الترحيب الجديد بعد الأمر.\nمثال: `.تغيير_ترحيب أهلاً بك @العضو في مجموعتنا`' });
+    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص الترحيب الجديد بعد الأمر.\nاكتب `@العضو` في المكان الذي تريد أن يظهر فيه منشن العضو الداخل.\nمثال: `.تغيير_ترحيب أهلاً بك @العضو في مجموعتنا`' });
     getGroupSetting(from).welcomeText = newText; persistWelcome(from);
     return sendBotMessage(sock, from, { text: '✅ تم تغيير استمارة الترحيب لهذه المجموعة فقط.' });
 }
 if (cmd.startsWith('تغيير_توديع')) {
     const newText = trimmedBody.replace(/^\.تغيير_توديع/i, '').trim();
-    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص التوديع الجديد بعد الأمر.\nمثال: `.تغيير_توديع وداعاً @العضو نتمنى لك التوفيق`' });
+    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص التوديع الجديد بعد الأمر.\nاكتب `@العضو` في المكان الذي تريد أن يظهر فيه منشن العضو الخارج.\nمثال: `.تغيير_توديع وداعاً @العضو نتمنى لك التوفيق`' });
     getGroupSetting(from).goodbyeText = newText; persistWelcome(from);
     return sendBotMessage(sock, from, { text: '✅ تم تغيير استمارة التوديع لهذه المجموعة فقط.' });
+}
+if (cmd === 'ترحيب_افتراضي') {
+    getGroupSetting(from).welcomeText = ''; persistWelcome(from);
+    return sendBotMessage(sock, from, { text: '✅ تم إرجاع استمارة الترحيب الأساسية لهذه المجموعة.' });
+}
+if (cmd === 'توديع_افتراضي') {
+    getGroupSetting(from).goodbyeText = ''; persistWelcome(from);
+    return sendBotMessage(sock, from, { text: '✅ تم إرجاع استمارة التوديع الأساسية لهذه المجموعة.' });
 }
 if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; persistWelcome(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
 
@@ -2290,7 +2305,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
 > ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
-> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة`;
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
