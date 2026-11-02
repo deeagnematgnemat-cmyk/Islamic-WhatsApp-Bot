@@ -30,7 +30,7 @@ export function royal(label) {
     return ROYAL_PREFIX + tatweel(t.replace(/^[^\u0600-\u06FFA-Za-z0-9]+/, ''));
 }
 
-const CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const INSTALL_GROUP_URL = 'https://chat.whatsapp.com/DjgGvEAiIEiCXwztk4F82L?s=cl&p=a&mlu=4&ilr=4';
 
 const row = (title, description, n) => ({ header: '', title, description, id: `.${n}` });
@@ -73,7 +73,7 @@ const SECTIONS = [
 const BUTTONS = () => [
     { name: 'single_select', buttonParamsJson: JSON.stringify({ title: royal('الأقسام'), sections: SECTIONS }) },
     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: royal('قناة المطوّر'), url: CHANNEL_URL, merchant_url: CHANNEL_URL }) },
-    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: royal('المطوّر'), sections: [{ title: 'المطور', rows: [{ header: '', title: royal('المطوّر'), description: '', id: '.devinfo_form' }] }] }) }
+    { name: 'single_select', buttonParamsJson: JSON.stringify({ title: royal('المطوّر'), sections: [{ title: 'المطور', rows: [{ header: '', title: royal('المطوّر'), description: 'استمارة تعريفية بالمطور', id: '.devinfo_form' }] }] }) }
 ];
 
 // مزوّد سياق إعادة التوجيه من القناة (يضبطه index.js) حتى تظهر رسائل الأزرار أيضاً «مُعاد توجيهها»
