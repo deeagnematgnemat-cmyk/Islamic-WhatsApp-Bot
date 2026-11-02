@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
-import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
+import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedia } from './subbot.js';
 import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
@@ -250,7 +250,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'معلومات_المطور',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -1901,13 +1901,14 @@ if (cmdBase === 'بوت') {
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
 
     // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
+    const subMedia = getSubBotMedia(sock);
     try {
-        await sendFormWithButtons(sock, from, botWelcomeText, getBotCommandsVideo(), sender);
+        await sendFormWithButtons(sock, from, botWelcomeText, subMedia ? subMedia.file : getBotCommandsVideo(), sender, !!subMedia && subMedia.type === 'image');
     } catch (e) {
         console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
         try { 
             await sendBotMessage(sock, from, { 
-                video: { url: getBotCommandsVideo() }, 
+                ...(subMedia && subMedia.type === 'image' ? { image: { url: subMedia.file } } : { video: { url: subMedia ? subMedia.file : getBotCommandsVideo() } }), 
                 caption: botWelcomeText,
                 mentions: [sender]
             }); 
