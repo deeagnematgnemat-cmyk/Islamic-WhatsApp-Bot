@@ -9,7 +9,7 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedia } from './subbot.js';
-import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
+import { sendFormWithButtons, sendDevInfoWithButton, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
 
@@ -153,9 +153,10 @@ function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
 }
-const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8jc2PFHWq9IwKDk50d';
+const BOT_CHANNEL_URL = 'https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04';
 const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5430a-35a6-4703-83a2-f9ed1224cfe3.mp4';
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
+const DEV_INFO_VIDEO_URL = 'https://videotourl.com/videos/1793411909499-fceac088-929e-4d67-890d-f9a40165767e.mp4';
 // الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
 function getBotCommandsVideo() {
     try { if (fs.existsSync(BOT_VIDEO_FILE) && fs.statSync(BOT_VIDEO_FILE).size > 0) return BOT_VIDEO_FILE; } catch (e) {}
@@ -249,7 +250,7 @@ const validCommands = [
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
-'صفر', 'بوت', 'معلومات_المطور',
+'صفر', 'بوت', 'devinfo_form',
 '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
@@ -370,7 +371,7 @@ let isPairingRequested = false;
 let lastPairingAt = 0;
 
 // ===== جعل كل رسائل البوت معاد توجيهها من القناة =====
-const CHANNEL_INVITE_CODE = '0029Vb8jc2PFHWq9IwKDk50d';
+const CHANNEL_INVITE_CODE = '0029VbAyOwm3mFY0ohjZCB04';
 const CHANNEL_FWD_NAME = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 let channelFwdInfo = null;
 let channelFwdPromise = null;
@@ -844,7 +845,7 @@ logBotAction(`استخدام أمر (${cmd}) من قبل العضو ${cleanSende
 
 if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: isSenderDev })) return;
 
-if (!isGroup) {    
+if (!isGroup && cmdBase !== 'devinfo_form') {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
 
@@ -1847,33 +1848,39 @@ if (cmdBase === 'قائمة_الاقسام') {
     return;
 }
 
-if (cmdBase === 'معلومات_المطور') {
-    const devInfoText = `*♛ ┃ الـمُـطَـوِّرُ الأَسَـاسِـي ┃ ♛*
+if (cmdBase === 'devinfo_form' && getButtonId(msg.message) === '.devinfo_form') {
+    const devInfoText = `*🍷 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 ┃ بِـطَـاقَـةُ الـمُـطَـوِّر 🍷*
 
 *❐═━━━═╊⊰👑⊱╉═━━━═❐*
 
-> «┃ 👑︙صَـانِـعُ هَـذَا الـعَـمَـلِ وَمُـطَـوِّرُهُ،
-> ┃ ✦︙بَـنَـى كُـلَّ تَـفْـصِـيـلَـةٍ بِـشَـغَـفٍ وَإِتْـقَـان،
-> ┃ 🍷︙لِـيَـكُـونَ حُـضُـورُ الـبُـوتِ مُـخْـتَـلِـفاً وَأَثَـرُهُ بَـاقِـيـاً.»
+> «┃ 🤖︙اسم البوت ⇠ 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
+> ┃ 👑︙الصفة ⇠ مطوّر المشروع والمسؤول عنه
+> ┃ 🛠️︙المهمة ⇠ التطوير والصيانة والتحديث»
 
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-> 👤 *الاسم ⇠* 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-> 📱 *رقم المطور ⇠* +${DEVELOPER_NUMBER}
-> 🔗 *واتساب ⇠* https://wa.me/${DEVELOPER_NUMBER}
+*✨ نَـبْـذَةٌ تَـعْـرِيـفِـيَّـة:*
+> «┃ ♟️︙بُنِيَ هذا البوت بجهدٍ هادئ واهتمامٍ بالتفاصيل،
+> ┃ ✦︙ليكون أداةً نافعة وبسيطة الاستخدام للجميع.
+> ┃ 🍷︙ونسعى لتطويره باستمرار بناءً على آرائكم.»
 
 *❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
-📩 *لِلتَّـوَاصُـلِ مَـعَـهُ:*
-> ✦ لِـطَـلَـبِ تَـنْـصِـيـبِ بُـوتٍ خَـاصٍّ بِـكَ
-> ✦ لِـلاسْـتِـفْـسَـارِ أَوِ الـدَّعْـمِ الـفَـنِّـي
-> ✦ لِلاقْـتِـرَاحَـاتِ وَالـمُـلَاحَـظَـات
+*💬 كَـلِـمَـةُ الـمُـطَـوِّر:*
+> «شكراً لكل من يستخدم البوت ويدعمه،
+> وأي ملاحظة أو اقتراح يصلنا نقدّره ونأخذه بعين الاعتبار.»
 
-> تَـوَاصَـلْ مَـعَـهُ مُـبَـاشَـرَةً عَـلَى الـرَّقَـمِ أَعْـلَاهُ ✨
+> للتواصل المباشر اضغط على زر «حساب المطور» بالأسفل ✨
 
 　　  *『 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 』*`;
     try {
-        return await sendBotMessage(sock, from, { video: { url: getBotCommandsVideo() }, gifPlayback: true, mimetype: 'video/mp4', caption: devInfoText });
+        await sendDevInfoWithButton(sock, from, devInfoText, DEV_INFO_VIDEO_URL, `https://wa.me/${DEVELOPER_NUMBER}`);
+        return;
+    } catch (e) {
+        console.error('تعذر إرسال معلومات المطور مع الزر:', e?.message || e);
+    }
+    try {
+        return await sendBotMessage(sock, from, { video: { url: DEV_INFO_VIDEO_URL }, gifPlayback: true, mimetype: 'video/mp4', caption: devInfoText });
     } catch (e) {
         return sendBotMessage(sock, from, { text: devInfoText });
     }
