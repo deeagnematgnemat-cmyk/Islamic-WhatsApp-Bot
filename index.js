@@ -204,6 +204,9 @@ let dailyRewards = {};
 let mutedUsers = {};
 let userMessagesCount = {};
 let groupSettings = {};
+const WELCOME_FILE = './group_welcome.json';
+let welcomeStore = {};
+try { welcomeStore = JSON.parse(fs.readFileSync(WELCOME_FILE, 'utf8')) || {}; } catch (e) { welcomeStore = {}; }
 
 function cleanExpiredWarnings(userJid) {
     if (!userWarnings[userJid]) return;
@@ -246,7 +249,7 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
@@ -341,15 +344,21 @@ adminOnly: false,
 antiLink: true,
 antiBadWords: true,
 antiContact: true,
-welcome: true,
-goodbye: true,
+welcome: false,
+goodbye: false,
 botMode: 'public',
 antiOtherBots: false
 };
+// الترحيب والتوديع متوقفان افتراضياً حتى يشغّلهما المشرف، وكل مجموعة لها إعداداتها ونصوصها الخاصة
+Object.assign(groupSettings[groupId], welcomeStore[groupId] || {});
 }
-// تفعيل الترحيب والتوديع دائماً (الحماية مفعلة افتراضياً ويمكن تعطيلها بأوامر الحماية)
-Object.assign(groupSettings[groupId], { welcome: true, goodbye: true });
 return groupSettings[groupId];
+}
+
+function persistWelcome(groupId) {
+const g = getGroupSetting(groupId);
+welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
+try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
 }
 
 function getTargetUser(msg) {
@@ -511,8 +520,8 @@ const settings = getGroupSetting(id);
 
 if (action === 'add' && settings.welcome) {    
     for (let user of participants) {    
-        const userPp = await getUserProfilePic(sock, user);    
-        const welcomeMsg = `*🌾┊تـرحـيـب:*
+        const userPp = await getUserProfilePic(sock, id);    
+        const welcomeMsg = settings.welcomeText ? settings.welcomeText.replace(/@العضو/g, () => '@' + user.split('@')[0]) : `*🌾┊تـرحـيـب:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -549,7 +558,7 @@ if (action === 'add' && settings.welcome) {
 } else if (action === 'remove' && settings.goodbye) {
     for (let user of participants) {
         const userPp = await getUserProfilePic(sock, user);
-        const goodbyeMsg = `*🍂┊تـوديـع:*
+        const goodbyeMsg = settings.goodbyeText ? settings.goodbyeText.replace(/@العضو/g, () => '@' + user.split('@')[0]) : `*🍂┊تـوديـع:*
 
 *❋・────━【🗡】━────・❋*
 
@@ -828,7 +837,7 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
 if (!trimmedBody.startsWith('.')) return;    
 
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
-let cmdBase = cmd.split(' ')[0];    
+let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n')[0] : cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
@@ -854,7 +863,7 @@ if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBod
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -1040,10 +1049,22 @@ if (cmdBase === 'الغاء_كتم' || cmdBase === 'فك_كتم') {
 
 if (cmd === 'تفعيل ادمن') { getGroupSetting(from).adminOnly = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل وضع الآدمن.' }); }    
 if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف وضع الآدمن.' }); }    
-if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
-if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
-if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
-if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
+if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; persistWelcome(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
+if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; persistWelcome(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
+if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; persistWelcome(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
+if (cmd.startsWith('تغيير_ترحيب')) {
+    const newText = trimmedBody.replace(/^\.تغيير_ترحيب/i, '').trim();
+    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص الترحيب الجديد بعد الأمر.\nمثال: `.تغيير_ترحيب أهلاً بك @العضو في مجموعتنا`' });
+    getGroupSetting(from).welcomeText = newText; persistWelcome(from);
+    return sendBotMessage(sock, from, { text: '✅ تم تغيير استمارة الترحيب لهذه المجموعة فقط.' });
+}
+if (cmd.startsWith('تغيير_توديع')) {
+    const newText = trimmedBody.replace(/^\.تغيير_توديع/i, '').trim();
+    if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص التوديع الجديد بعد الأمر.\nمثال: `.تغيير_توديع وداعاً @العضو نتمنى لك التوفيق`' });
+    getGroupSetting(from).goodbyeText = newText; persistWelcome(from);
+    return sendBotMessage(sock, from, { text: '✅ تم تغيير استمارة التوديع لهذه المجموعة فقط.' });
+}
+if (cmd === 'توقيف توديع') { getGroupSetting(from).goodbye = false; persistWelcome(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف التوديع.' }); }    
 
 if (cmd.startsWith('تغيير_الاسم')) {    
     const newName = trimmedBody.replace(/^\.تغيير_الاسم/i, '').trim();    
@@ -1849,26 +1870,20 @@ if (cmdBase === 'قائمة_الاقسام') {
 }
 
 if (cmdBase === 'devinfo_form' && getButtonId(msg.message) === '.devinfo_form') {
-    const devInfoText = `*🍷 𝐸𝓇𝑒𝓃 𝐵𝑜𝓉 ┃ بِـطَـاقَـةُ الـمُـطَـوِّر 🍷*
+    const devInfoText = `*♛ ┃ الـمُـطَـوِّر ┃ ♛*
 
 *❐═━━━═╊⊰👑⊱╉═━━━═❐*
 
-> «┃ 🤖︙اسم البوت ⇠ 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』
-> ┃ 👑︙الصفة ⇠ مطوّر المشروع والمسؤول عنه
-> ┃ 🛠️︙المهمة ⇠ التطوير والصيانة والتحديث»
-
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-*✨ نَـبْـذَةٌ تَـعْـرِيـفِـيَّـة:*
 > «┃ ♟️︙بُنِيَ هذا البوت بجهدٍ هادئ واهتمامٍ بالتفاصيل،
 > ┃ ✦︙ليكون أداةً نافعة وبسيطة الاستخدام للجميع.
 > ┃ 🍷︙ونسعى لتطويره باستمرار بناءً على آرائكم.»
 
-*❐═━━━═╊⊰♟️⊱╉═━━━═❐*
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
-*💬 كَـلِـمَـةُ الـمُـطَـوِّر:*
 > «شكراً لكل من يستخدم البوت ويدعمه،
 > وأي ملاحظة أو اقتراح يصلنا نقدّره ونأخذه بعين الاعتبار.»
+
+*❐═━━━═╊⊰♟️⊱╉═━━━═❐*
 
 > للتواصل المباشر اضغط على زر «حساب المطور» بالأسفل ✨
 
@@ -2113,7 +2128,9 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🔊 .الغاء_كتم @عضو ↞ فك الكتم
 > 🔗 .الرابط ↞ رابط المجموعة
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
-> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي`;
+> 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
+> ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
