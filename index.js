@@ -249,7 +249,7 @@ let devReactionEmoji = '👑';
 const validCommands = [
 'كشف', 'الكاشف',
 'تفاعل', 'تفاعل_مطور', 'اعطاء', 'إعطاء', 'اذاعة', 'إذاعة', 'ريستارت', 'اعادة_تشغيل', 'حذف', 'مسح', 'كتم', 'الغاء_كتم', 'فك_كتم',
-'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع',
+'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
@@ -359,6 +359,129 @@ function persistWelcome(groupId) {
 const g = getGroupSetting(groupId);
 welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
 try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
+}
+
+// ===== كشف الرسائل المحذوفة والمعدّلة (لكل مجموعة على حدة) =====
+const DETECT_FILE = './group_detect.json';
+let detectStore = {};
+try { detectStore = JSON.parse(fs.readFileSync(DETECT_FILE, 'utf8')) || {}; } catch (e) { detectStore = {}; }
+function setDetect(groupId, key, val) {
+detectStore[groupId] = { ...(detectStore[groupId] || {}), [key]: val };
+try { fs.writeFileSync(DETECT_FILE, JSON.stringify(detectStore)); } catch (e) {}
+}
+
+const msgCache = new Map();          // `${jid}|${id}` -> الرسالة الأصلية
+const MSG_CACHE_MAX = 2000;
+const DETECT_MEDIA_MAX = 8 * 1024 * 1024;
+const deletedLog = {};               // jid -> { n, list }
+const editedLog = {};
+const bufferedEntries = [];
+
+const numOf = (v) => v == null ? 0 : (typeof v === 'number' ? v : (typeof v.toNumber === 'function' ? v.toNumber() : (Number(v) || 0)));
+const unwrapDetect = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.viewOnceMessageV2Extension?.message || m?.documentWithCaptionMessage?.message || m;
+const detectText = (m) => m?.conversation || m?.extendedTextMessage?.text || m?.imageMessage?.caption || m?.videoMessage?.caption || m?.documentMessage?.caption || '';
+function detectKind(m) {
+if (m?.conversation || m?.extendedTextMessage) return 'text';
+if (m?.imageMessage) return 'image';
+if (m?.videoMessage) return 'video';
+if (m?.audioMessage) return 'audio';
+if (m?.stickerMessage) return 'sticker';
+if (m?.documentMessage) return 'document';
+if (m?.contactMessage) return 'contact';
+if (m?.locationMessage) return 'location';
+return 'other';
+}
+const KIND_LABEL = { text: '📝 نص', image: '🖼️ صورة', video: '🎬 فيديو', audio: '🎤 صوت', sticker: '🎭 ملصق', document: '📄 ملف', contact: '📇 جهة اتصال', location: '📍 موقع', other: '📦 رسالة' };
+const dTag = (jid) => '@' + String(jid || '').split('@')[0].split(':')[0];
+const dTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', hour12: true });
+const dCut = (t, n) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
+
+function recordDeleted(jid, id, actor) {
+const e = msgCache.get(`${jid}|${id}`);
+if (!e || e.deleted) return;
+e.deleted = true;
+const log = deletedLog[jid] || (deletedLog[jid] = { n: 0, list: [] });
+log.n += 1;
+log.list.push({ num: log.n, entry: e, deleter: actor || e.sender, at: Date.now() });
+if (log.list.length > 50) log.list.shift();
+}
+
+function recordEdited(jid, id, edited, actor) {
+const e = msgCache.get(`${jid}|${id}`);
+const newText = detectText(unwrapDetect(edited));
+if (e && e.lastEdit === newText) return;
+const oldText = e ? e.text : '';
+if (e) { e.lastEdit = newText; e.text = newText; }
+const log = editedLog[jid] || (editedLog[jid] = { n: 0, list: [] });
+log.n += 1;
+log.list.push({ num: log.n, sender: (e && e.sender) || actor || '', oldText, newText, known: !!e, at: Date.now() });
+if (log.list.length > 50) log.list.shift();
+}
+
+function trackDetect(sock, mm) {
+const jid = mm?.key?.remoteJid;
+if (!jid || !jid.endsWith('@g.us') || !mm.message) return;
+const cfg = detectStore[jid];
+if (!cfg || (!cfg.del && !cfg.edit)) return;
+const m = unwrapDetect(mm.message);
+const pm = m?.protocolMessage || m?.editedMessage?.message?.protocolMessage;
+if (pm) {
+const id = pm.key?.id;
+if (!id) return;
+const actor = mm.key.participant || mm.participant || '';
+if ((pm.type === 0 || pm.type === 'REVOKE') && cfg.del) recordDeleted(jid, id, actor);
+else if ((pm.type === 14 || pm.type === 'MESSAGE_EDIT') && cfg.edit && pm.editedMessage) recordEdited(jid, id, pm.editedMessage, actor);
+return;
+}
+if (mm.key.fromMe) return;
+const k = `${jid}|${mm.key.id}`;
+if (msgCache.has(k)) return;
+const kind = detectKind(m);
+const entry = { jid, id: mm.key.id, sender: mm.key.participant || '', msg: mm, kind, text: detectText(m), buffer: null };
+msgCache.set(k, entry);
+if (msgCache.size > MSG_CACHE_MAX) msgCache.delete(msgCache.keys().next().value);
+if (cfg.del && ['image', 'video', 'audio', 'sticker', 'document'].includes(kind)) {
+const media = m[kind + 'Message'];
+if (numOf(media?.fileLength) <= DETECT_MEDIA_MAX) {
+downloadMediaMessage({ key: mm.key, message: m }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage })
+.then((buf) => { entry.buffer = buf; bufferedEntries.push(entry); while (bufferedEntries.length > 60) bufferedEntries.shift().buffer = null; })
+.catch(() => {});
+}
+}
+}
+
+function trackDetectUpdate(u) {
+const jid = u?.key?.remoteJid;
+if (!jid || !jid.endsWith('@g.us')) return;
+const cfg = detectStore[jid];
+if (!cfg) return;
+const st = u.update?.messageStubType;
+if ((st === 1 || st === 'REVOKE') && cfg.del) recordDeleted(jid, u.key.id, u.update?.key?.participant || '');
+const em = u.update?.message?.editedMessage?.message;
+if (em && cfg.edit) recordEdited(jid, u.key.id, em, '');
+}
+
+async function restoreDeleted(sock, from, item) {
+const e = item.entry;
+const head = `♻️ *الرسالة المحذوفة رقم ${item.num}*\n\n> 👤 المرسل ↞ ${dTag(e.sender)}\n> 🗑️ حذفها ↞ ${item.deleter === e.sender ? 'صاحبها' : dTag(item.deleter)}\n> 📦 النوع ↞ ${KIND_LABEL[e.kind]}\n> 🕒 وقت الحذف ↞ ${dTime(item.at)}`;
+const mentions = [...new Set([e.sender, item.deleter].filter(Boolean))];
+const m = unwrapDetect(e.msg.message);
+if (e.kind === 'text') return sendBotMessage(sock, from, { text: `${head}\n\n${e.text}`, mentions });
+if (e.kind === 'contact') return sendBotMessage(sock, from, { text: `${head}\n\n📇 ${m.contactMessage?.displayName || ''}`, mentions });
+if (e.kind === 'location') return sendBotMessage(sock, from, { text: `${head}\n\n📍 https://maps.google.com/?q=${m.locationMessage?.degreesLatitude},${m.locationMessage?.degreesLongitude}`, mentions });
+if (!['image', 'video', 'audio', 'sticker', 'document'].includes(e.kind)) return sendBotMessage(sock, from, { text: `${head}\n\n⚠️ هذا النوع من الرسائل لا يمكن إرجاعه.`, mentions });
+let buf = e.buffer;
+if (!buf) {
+try { buf = await downloadMediaMessage({ key: e.msg.key, message: m }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }); } catch (err) { buf = null; }
+}
+if (!buf) return sendBotMessage(sock, from, { text: `${head}\n\n⚠️ تعذّر استرجاع الملف (لم يُحفظ أو انتهت صلاحيته).`, mentions });
+const cap = e.text ? `${head}\n\n${e.text}` : head;
+if (e.kind === 'image') return sendBotMessage(sock, from, { image: buf, caption: cap, mentions });
+if (e.kind === 'video') return sendBotMessage(sock, from, { video: buf, caption: cap, mentions });
+if (e.kind === 'document') return sendBotMessage(sock, from, { document: buf, mimetype: m.documentMessage?.mimetype || 'application/octet-stream', fileName: m.documentMessage?.fileName || 'file', caption: cap, mentions });
+await sendBotMessage(sock, from, { text: head, mentions });
+if (e.kind === 'audio') return sendBotMessage(sock, from, { audio: buf, mimetype: m.audioMessage?.mimetype || 'audio/mp4', ptt: !!m.audioMessage?.ptt });
+return sendBotMessage(sock, from, { sticker: buf });
 }
 
 function getTargetUser(msg) {
@@ -592,9 +715,12 @@ if (action === 'add' && settings.welcome) {
 } catch (e) { console.error('خطأ الترحيب/التوديع:', e?.message || e); }
 });
 
+sock.ev.on('messages.update', (updates) => { try { for (const u of updates || []) trackDetectUpdate(u); } catch (e) {} });
+
 const onUpsert = async (m) => {
 if (!['notify', 'append'].includes(m.type)) return;
 try { collectPackImages(sock, m.messages); } catch (e) {}
+try { for (const mm of m.messages || []) trackDetect(sock, mm); } catch (e) {}
 
 const msg = m.messages[0];     
 if (!msg || !msg.message) return;    
@@ -863,7 +989,7 @@ if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBod
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -1052,6 +1178,40 @@ if (cmd === 'توقيف ادمن') { getGroupSetting(from).adminOnly = false; re
 if (cmd === 'تفعيل ترحيب') { getGroupSetting(from).welcome = true; persistWelcome(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل الترحيب.' }); }    
 if (cmd === 'توقيف ترحيب') { getGroupSetting(from).welcome = false; persistWelcome(from); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف الترحيب.' }); }    
 if (cmd === 'تفعيل توديع') { getGroupSetting(from).goodbye = true; persistWelcome(from); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل التوديع.' }); }    
+if (cmdBase === 'تفعيل_كشف_المحذوف') { setDetect(from, 'del', true); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل كشف الرسائل المحذوفة في هذه المجموعة.\n📌 تُحفظ الرسائل المحذوفة من الآن، وتعرضها بـ `.قائمة_المحذوف`' }); }
+if (cmdBase === 'توقيف_كشف_المحذوف') { setDetect(from, 'del', false); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف كشف الرسائل المحذوفة.' }); }
+if (cmdBase === 'تفعيل_كشف_المعدل') { setDetect(from, 'edit', true); return sendBotMessage(sock, from, { text: '🟢 تم تفعيل كشف الرسائل المعدلة في هذه المجموعة.\n📌 تُحفظ الرسائل المعدلة من الآن، وتعرضها بـ `.قائمة_المعدل`' }); }
+if (cmdBase === 'توقيف_كشف_المعدل') { setDetect(from, 'edit', false); return sendBotMessage(sock, from, { text: '🔴 تم إيقاف كشف الرسائل المعدلة.' }); }
+
+if (cmdBase === 'قائمة_المحذوف' || cmdBase === 'قائمة_المعدل') {
+    const isDel = cmdBase === 'قائمة_المحذوف';
+    const cfg = detectStore[from] || {};
+    if (isDel ? !cfg.del : !cfg.edit) return sendBotMessage(sock, from, { text: isDel ? '⚠️ كشف المحذوف غير مفعّل، فعّله بـ `.تفعيل_كشف_المحذوف`' : '⚠️ كشف المعدل غير مفعّل، فعّله بـ `.تفعيل_كشف_المعدل`' });
+    const list = ((isDel ? deletedLog : editedLog)[from] || {}).list || [];
+    if (!list.length) return sendBotMessage(sock, from, { text: isDel ? '📭 لا توجد رسائل محذوفة محفوظة حتى الآن.' : '📭 لا توجد رسائل معدلة محفوظة حتى الآن.' });
+    const arg = cmd.split(' ').slice(1).join('').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g, '');
+    if (!arg) {
+        const mentions = new Set();
+        const lines = list.map((x) => {
+            if (isDel) {
+                const e = x.entry;
+                if (e.sender) mentions.add(e.sender);
+                if (x.deleter) mentions.add(x.deleter);
+                return `> ${x.num} ┃ 👤 ${dTag(e.sender)} ┃ 🗑️ ${x.deleter === e.sender ? 'صاحبها' : dTag(x.deleter)} ┃ ${KIND_LABEL[e.kind]} ┃ 🕒 ${dTime(x.at)}` + (e.kind === 'text' ? `\n> ↳ «${dCut(e.text, 30)}»` : '');
+            }
+            if (x.sender) mentions.add(x.sender);
+            return `> ${x.num} ┃ 👤 ${dTag(x.sender)} ┃ 🕒 ${dTime(x.at)}\n> ↳ قبل: «${x.known ? dCut(x.oldText, 25) : 'غير متوفر'}»\n> ↳ بعد: «${dCut(x.newText, 25)}»`;
+        });
+        const title = isDel ? `🗑️ *قائمة الرسائل المحذوفة (${list.length}):*` : `✏️ *قائمة الرسائل المعدلة (${list.length}):*`;
+        const hint = isDel ? '📌 لإرجاع رسالة: `.قائمة_المحذوف <الرقم>`' : '📌 لعرض رسالة كاملة: `.قائمة_المعدل <الرقم>`';
+        return sendBotMessage(sock, from, { text: `${title}\n\n${lines.join('\n\n')}\n\n${hint}`, mentions: [...mentions] });
+    }
+    const item = list.find((x) => x.num === Number(arg));
+    if (!item) return sendBotMessage(sock, from, { text: `⚠️ لا توجد رسالة بالرقم ${arg}، راجع القائمة بـ \`.${cmdBase}\`` });
+    if (isDel) return restoreDeleted(sock, from, item);
+    return sendBotMessage(sock, from, { text: `✏️ *الرسالة المعدلة رقم ${item.num}*\n\n> 👤 صاحبها ↞ ${dTag(item.sender)}\n> 🕒 وقت التعديل ↞ ${dTime(item.at)}\n\n*قبل التعديل:*\n${item.known ? (item.oldText || '—') : 'غير متوفر (عُدّلت قبل التفعيل)'}\n\n*بعد التعديل:*\n${item.newText || '—'}`, mentions: item.sender ? [item.sender] : [] });
+}
+
 if (cmd.startsWith('تغيير_ترحيب')) {
     const newText = trimmedBody.replace(/^\.تغيير_ترحيب/i, '').trim();
     if (!newText) return sendBotMessage(sock, from, { text: '📌 اكتب نص الترحيب الجديد بعد الأمر.\nمثال: `.تغيير_ترحيب أهلاً بك @العضو في مجموعتنا`' });
@@ -2145,7 +2305,12 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 }
 
 if (cmdBase === '9' || cmd === 'الكاشف') {    
-    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.`;    
+    const detectorMenuText = `🔍 *الكشف:* رد على رسالة (عرض مرة واحدة) بكلمة \`كشف\` لفكها فوراً.
+
+> 🗑️ \`.تفعيل_كشف_المحذوف\` / \`.توقيف_كشف_المحذوف\` ↞ حفظ الرسائل المحذوفة
+> 📋 \`.قائمة_المحذوف\` ↞ قائمة المحذوف، و\`.قائمة_المحذوف 2\` ↞ إرجاع الرسالة رقم 2
+> ✏️ \`.تفعيل_كشف_المعدل\` / \`.توقيف_كشف_المعدل\` ↞ حفظ الرسائل المعدلة
+> 📋 \`.قائمة_المعدل\` ↞ قائمة المعدل، و\`.قائمة_المعدل 2\` ↞ عرض الرسالة رقم 2`;    
     const userPp = await getUserProfilePic(sock, sender);    
     try { 
         try {
