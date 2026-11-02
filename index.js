@@ -235,6 +235,7 @@ function removeOneWarningFromUser(userJid) {
 let groupTitles = {};
 let groupReservedTitles = {};
 let globalBotStopped = false;
+const stoppedSubBotGroups = new Set(); // المجموعات التي أُوقفت فيها البوتات المنصّبة فقط
 
 let commandReactionEnabled = true;
 let commandReactionEmoji = '⚡';
@@ -620,7 +621,7 @@ const body = rawBody;
 let trimmedBody = body.trim();    
 let lowerBody = trimmedBody.toLowerCase();    
 
-if (globalBotStopped && !isSenderDev) return;
+if (sock.isSubBot && isGroup && stoppedSubBotGroups.has(from) && !isSenderDev) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
@@ -1630,14 +1631,14 @@ if (cmdBase === 'سجل_البوت') {
 
 if (cmdBase === 'ايقاف_البوت' || cmdBase === 'إيقاف_البوت' || cmdBase === 'إيقاف البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    globalBotStopped = true;
-    return sendBotMessage(sock, from, { text: `🟢 تم إيقاف البوت كلياً! لا يستجيب لأي أحد نهائياً.` });
+    stoppedSubBotGroups.add(from);
+    return sendBotMessage(sock, from, { text: `🟢 تم إيقاف جميع البوتات المنصّبة في هذه المجموعة فقط.` });
 }
 
 if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') {
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
-    globalBotStopped = false;
-    return sendBotMessage(sock, from, { text: `🟢 تم تفعيل البوت بنجاح! البوت يعود للاستجابة للجميع.` });
+    stoppedSubBotGroups.delete(from);
+    return sendBotMessage(sock, from, { text: `🟢 تم إعادة تشغيل جميع البوتات المنصّبة في هذه المجموعة.` });
 }
 
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
