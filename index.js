@@ -11,6 +11,7 @@ import http from 'http';
 import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked } from './subbot.js';
 import { sendFormWithButtons, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
+import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -268,6 +269,7 @@ const validCommands = [
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
 validCommands.push(...featureCommandNames);
+validCommands.push(...toolsCommandNames);
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -671,7 +673,7 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
         violationDetected = true;    
         violationType = 'جهات الاتصال';    
         shouldLockChat = true;
-    } else if (settings.antiLink && !isFeatureLinkCommand(trimmedBody) && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
+    } else if (settings.antiLink && !isFeatureLinkCommand(trimmedBody) && !isToolsLinkCommand(trimmedBody) && (lowerBody.includes('http://') || lowerBody.includes('https://'))) {    
         violationDetected = true;    
         violationType = 'الروابط';    
         shouldLockChat = true;
@@ -846,6 +848,7 @@ if (!isGroup) {
 }    
 
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
+if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
