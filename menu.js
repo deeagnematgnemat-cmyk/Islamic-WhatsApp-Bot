@@ -80,12 +80,13 @@ async function relayInteractive(sock, jid, interactiveMessage, { noForward = fal
 }
 
 // يرسل الاستمارة نفسها (فيديو + نص) ومعها الأزرار في رسالة واحدة
-export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid) {
+export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid, isImage = false) {
     let header = { hasMediaAttachment: false };
     if (videoUrl) {
         try {
-            const media = await prepareWAMessageMedia({ video: { url: videoUrl } }, { upload: sock.waUploadToServer });
-            if (media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+            const media = await prepareWAMessageMedia(isImage ? { image: { url: videoUrl } } : { video: { url: videoUrl } }, { upload: sock.waUploadToServer });
+            if (isImage && media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+            else if (!isImage && media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
         } catch (e) {
             console.error('تعذر رفع فيديو الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
         }
