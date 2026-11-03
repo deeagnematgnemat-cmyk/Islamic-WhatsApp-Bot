@@ -14,6 +14,7 @@ import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collec
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
 import { handleIslamicCommand, normalizeIslamicCmd, islamicCommandNames, setupIslamicReminders } from './islamic.js';
 import { buildTopImage } from './topimage.js';
+import { handleAnimeCommand, handleAnimeAnswer, handleAnimePrivate, animeCommandNames } from './anime.js';
 import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
 
 const PORT = process.env.PORT || 8080;
@@ -466,6 +467,7 @@ const validCommands = [
 validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
+validCommands.push(...animeCommandNames);
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى');
 
@@ -529,6 +531,12 @@ createdAt: new Date().toLocaleDateString('ar-EG')
 if (userPoints[senderJid] === undefined) userPoints[senderJid] = 0;
 return bankAccounts[senderJid];
 }
+
+// محوّل نقاط البنك لألعاب الأنمي (anime.js)
+const animeBank = {
+    get: async (jid) => { getBankAccount(jid); return userPoints[jid]; },
+    add: async (jid, n) => { getBankAccount(jid); userPoints[jid] = Math.max(0, (userPoints[jid] || 0) + n); return userPoints[jid]; }
+};
 
 function getGroupSetting(groupId) {
 if (!groupSettings[groupId]) {
@@ -1729,6 +1737,8 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
 
 if (privateBlocked) return;
 
+if (isGroup && !trimmedBody.startsWith('.') && await handleAnimeAnswer({ sock, msg, from, sender, isGroup, trimmedBody, bank: animeBank })) return;
+
 if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {    
     if (activeGames[from]) {    
         clearTimeout(activeGames[from].timer);    
@@ -1870,6 +1880,8 @@ logBotAction(`استخدام أمر (${cmd}) من قبل العضو ${cleanSende
 
 if (await handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBase, isDev: isSenderDev })) return;
 
+if (!isGroup && await handleAnimePrivate({ sock, msg, from, sender, isGroup, cmd, cmdBase, bank: animeBank })) return;
+
 if (!isGroup && cmdBase !== 'devinfo_form') {    
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
@@ -1877,6 +1889,7 @@ if (!isGroup && cmdBase !== 'devinfo_form') {
 if (await handleIslamicCommand({ sock, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
+if (await handleAnimeCommand({ sock, msg, from, sender, isGroup, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, bank: animeBank, getTarget: getTargetUser, hasActiveGame: () => !!activeGames[from] })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
@@ -3062,6 +3075,20 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 > 🔤 .رتب ↞ ترتيب الحروف
 > 🎯 .خمن ↞ خمن الرقم
 > 🔠 .حرف ↞ كلمات بالحرف
+> 🥷 .مافيا ↞ مافيا الأكاتسكي (الأدوار في الخاص)
+> 🕶️ .برا_السالفة ↞ دخيل الأنمي
+> 🧠 .مسابقة ↞ أسئلة أنمي سريعة
+> 💣 .قنبلة ↞ قنبلة ديدارا (.مرر @منشن)
+> 🎰 .سلوت <رهان> ↞ سلوت الأنمي
+> 🪙 .قلب_عملة | 🎲 .نرد | 🎡 .عجلة
+> ✊ .حجر | .ورقة | .مقص ↞ ضد البوت أو @منشن
+> ⭕ .اكس_او ↞ تحدي XO
+> 🎭 .خمن_ايموجي ↞ خمن الأنمي بالإيموجي
+> 🖼️ .خمن_الشخصية ↞ شخصية مموّهة
+> 🎴 .معرفة_الشخصية ↞ صور عشوائية من بنتريست
+> 👁️ .عين ↞ خمن صاحب العيون (.عين اسم ↞ صور عيونه)
+> 👥 .انضم | .ابدا | .لاعبين | .صوت | .دوري
+> 🛑 .انهاء_اللعبة ↞ إنهاء لعبة الأنمي
 > 🚪 .انسحب ↞ إلغاء الفعالية`;
 const userPp = await getUserProfilePic(sock, sender);
 try { 
