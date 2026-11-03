@@ -276,6 +276,7 @@ const validCommands = [
 validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
+validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة');
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -683,6 +684,360 @@ function setupGroupAutomation(sock) {
     sock.ev.on('connection.update', ({ connection }) => { if (connection === 'close') clearInterval(timer); });
 }
 
+// ===== قسم المجموعات المميز: مستويات / تايتن / أعياد ميلاد / بطاقة / مزاد / كبسولة =====
+const GROUP_FUN_FILE = './group_fun.json';
+let groupFun = { xp: {}, msgs: {}, births: {}, capsules: [] };
+try { const d = JSON.parse(fs.readFileSync(GROUP_FUN_FILE, 'utf8')); if (d && typeof d === 'object') groupFun = { ...groupFun, ...d }; } catch (e) {}
+let groupFunDirty = false;
+let groupFunFlusher = null;
+const gfSeen = new Set();
+const gfLastXp = new Map();
+const gfBoss = {};
+const gfBossLast = {};
+const gfBossCd = {};
+const gfAuctions = {};
+const GF_CMDS = new Set(['مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة']);
+const GF_ALIASES = [
+    [/^توب[ _]المستويات(?=\s|$)/, 'توب_المستويات'],
+    [/^توب[ _]المهاجمين(?=\s|$)/, 'توب_المهاجمين'],
+    [/^اقرب[ _]ميلاد(?=\s|$)/, 'اقرب_ميلاد'],
+];
+function normalizeGroupFunCmd(cmd) {
+    for (const [re, to] of GF_ALIASES) { if (re.test(cmd)) { cmd = cmd.replace(re, to); break; } }
+    return cmd;
+}
+function saveGroupFun() { try { fs.writeFileSync(GROUP_FUN_FILE, JSON.stringify(groupFun)); } catch (e) {} groupFunDirty = false; }
+const GF_RANKS = [[0, 'أكاديمي 🥋'], [1, 'جينين 🍃'], [3, 'تشونين 🍂'], [5, 'جونين ⚔️'], [8, 'أنبو 🎭'], [12, 'سانين 🐸'], [16, 'كاجي 👑'], [20, 'هوكاجي 🔥']];
+function gfLevel(xp) { return Math.floor(Math.sqrt((xp || 0) / 100)); }
+function gfXpFor(level) { return level * level * 100; }
+function gfRank(level) { let r = GF_RANKS[0][1]; for (const [l, n] of GF_RANKS) if (level >= l) r = n; return r; }
+function gfBar(p, len = 10) { const f = Math.max(0, Math.min(len, Math.round(p * len))); return '▰'.repeat(f) + '▱'.repeat(len - f); }
+function gfN(n) { return Number(n || 0).toLocaleString('en-US'); }
+function gfLeap(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+function gfToday() { const [y, m, d] = getJordanDateKey().split('-').map(Number); return { y, m, d, key: getJordanDateKey() }; }
+function gfDaysUntil(d, m, today) {
+    const base = Date.UTC(today.y, today.m - 1, today.d);
+    for (let yy = today.y; yy <= today.y + 1; yy++) {
+        const dd = (m === 2 && d === 29 && !gfLeap(yy)) ? 28 : d;
+        const t = Date.UTC(yy, m - 1, dd);
+        if (t >= base) return Math.round((t - base) / 86400000);
+    }
+    return 999;
+}
+function gfGroupRank(groupId, jid) {
+    const entries = Object.entries(groupFun.xp[groupId] || {}).sort((a, b) => b[1] - a[1]);
+    const idx = entries.findIndex(([k]) => k === jid);
+    return { pos: idx === -1 ? entries.length + 1 : idx + 1, total: Math.max(entries.length, 1) };
+}
+
+async function gfBuildCard(pp, info) {
+    const sharp = (await import('sharp')).default;
+    let avatar = null;
+    try {
+        const r = await axios.get(pp, { responseType: 'arraybuffer', timeout: 10000 });
+        avatar = await sharp(Buffer.from(r.data)).resize(200, 200, { fit: 'cover' })
+            .composite([{ input: Buffer.from('<svg width="200" height="200"><circle cx="100" cy="100" r="100" fill="#fff"/></svg>'), blend: 'dest-in' }]).png().toBuffer();
+    } catch (e) {}
+    const font = 'DejaVu Sans, Arial, Helvetica, sans-serif';
+    const barW = 680;
+    const filled = Math.max(8, Math.round(barW * info.pct));
+    const svg = `<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14142b"/><stop offset="1" stop-color="#3a0ca3"/></linearGradient></defs>
+<rect width="800" height="400" rx="28" fill="url(#g)"/>
+<rect x="16" y="16" width="768" height="368" rx="22" fill="none" stroke="#f1c40f" stroke-width="3"/>
+<circle cx="150" cy="150" r="108" fill="#f1c40f"/>
+<text x="300" y="105" font-family="${font}" font-size="30" fill="#f1c40f">LEVEL</text>
+<text x="300" y="185" font-family="${font}" font-size="84" font-weight="bold" fill="#ffffff">${info.level}</text>
+<text x="520" y="105" font-family="${font}" font-size="30" fill="#f1c40f">RANK</text>
+<text x="520" y="185" font-family="${font}" font-size="64" font-weight="bold" fill="#ffffff">#${info.pos}</text>
+<rect x="60" y="262" width="${barW}" height="34" rx="17" fill="#ffffff" fill-opacity="0.18"/>
+<rect x="60" y="262" width="${filled}" height="34" rx="17" fill="#2ecc71"/>
+<text x="400" y="287" font-family="${font}" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">${info.xpText}</text>
+<text x="60" y="350" font-family="${font}" font-size="26" fill="#f1c40f">PTS</text><text x="125" y="350" font-family="${font}" font-size="26" fill="#ffffff">${info.points}</text>
+<text x="290" y="350" font-family="${font}" font-size="26" fill="#f1c40f">MSG</text><text x="358" y="350" font-family="${font}" font-size="26" fill="#ffffff">${info.msgs}</text>
+<text x="540" y="350" font-family="${font}" font-size="26" fill="#f1c40f">WARN</text><text x="625" y="350" font-family="${font}" font-size="26" fill="#ffffff">${info.warns}</text>
+</svg>`;
+    let img = sharp(Buffer.from(svg));
+    if (avatar) img = img.composite([{ input: avatar, left: 50, top: 50 }]);
+    return await img.png().toBuffer();
+}
+
+async function handleGroupFunCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev }) {
+    const base = cmd.split(' ')[0];
+    if (!GF_CMDS.has(base)) return false;
+    const args = cmd.slice(base.length).trim();
+    const isAdm = isSenderAdmin || isSenderDev;
+    const reply = (text, mentions) => sendBotMessage(sock, from, mentions ? { text, mentions } : { text }).catch(() => {});
+    const now = Date.now();
+
+    // ---------- المستويات ----------
+    if (base === 'مستواي') {
+        const target = getTargetUser(msg) || sender;
+        const xp = groupFun.xp[from]?.[target] || 0;
+        const lvl = gfLevel(xp);
+        const cur = gfXpFor(lvl), next = gfXpFor(lvl + 1);
+        const pct = (xp - cur) / (next - cur);
+        const { pos, total } = gfGroupRank(from, target);
+        return reply(`╭━━━〔 🏅 〕━━━╮\n『 مُـسْـتَـوَى الـعُـضْـو 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${target.split('@')[0]}\n🎖️ ⌯ الرتبة ↞ ${gfRank(lvl)}\n📈 ⌯ المستوى ↞ ${lvl}\n✨ ⌯ الخبرة ↞ ${gfN(xp)} / ${gfN(next)}\n🏆 ⌯ الترتيب ↞ ${pos} من ${total}»\n\n${gfBar(pct)} ${Math.round(pct * 100)}%`, [target]), true;
+    }
+    if (base === 'توب_المستويات') {
+        const entries = Object.entries(groupFun.xp[from] || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        if (!entries.length) return reply('📭 لا توجد بيانات مستويات بعد، تفاعلوا في المجموعة وستبدأ الخبرة بالتجمع.'), true;
+        const medals = ['🥇', '🥈', '🥉'];
+        let text = '📊 *أعلى الأعضاء مستوى:*\n\n';
+        entries.forEach(([jid, xp], i) => { const l = gfLevel(xp); text += `${medals[i] || '👤'} *${i + 1}* ↞ @${jid.split('@')[0]}\n> 🎖️ ${gfRank(l)} ┃ 📈 مستوى ${l} ┃ ✨ ${gfN(xp)}\n\n`; });
+        return reply(text.trim(), entries.map(([j]) => j)), true;
+    }
+
+    // ---------- تايتن المجموعة ----------
+    if (base === 'تايتن' || base === 'اهجم' || base === 'توب_المهاجمين') {
+        let b = gfBoss[from];
+        if (b && b.endsAt <= now) {
+            gfBossLast[from] = { name: b.name, hits: b.hits, defeated: false };
+            delete gfBoss[from];
+            await reply(`💨 هرب ${b.emoji} *${b.name}* لأن الوقت انتهى قبل أن يُهزم!`);
+            b = null;
+        }
+        if (base === 'تايتن') {
+            if (b) {
+                return reply(`${b.emoji} *${b.name}* ما زال حياً!\n\n❤️ ${gfBar(b.hp / b.maxHp)} ${gfN(b.hp)} / ${gfN(b.maxHp)}\n⏳ يهرب بعد ${Math.max(1, Math.ceil((b.endsAt - now) / 60000))} دقيقة\n\n⚔️ هاجموه بـ \`.اهجم\``), true;
+            }
+            if ((gfBossCd[from] || 0) > now) return reply(`⏳ انتظر ${Math.ceil((gfBossCd[from] - now) / 60000)} دقيقة قبل استدعاء تايتن جديد.`), true;
+            let members = 30;
+            try { members = (await sock.groupMetadata(from)).participants.length; } catch (e) {}
+            const maxHp = Math.max(1500, Math.min(20000, members * 80));
+            const types = [['التايتن المدرّع', '🛡️'], ['التايتن الأنثى', '👸'], ['التايتن العملاق', '🗿'], ['تايتن الحرب', '🔨'], ['التايتن الأسطوري', '🐉'], ['التايتن الكولوسال', '🔥']];
+            const [name, emoji] = types[Math.floor(Math.random() * types.length)];
+            gfBoss[from] = { name, emoji, hp: maxHp, maxHp, hits: {}, lastHit: {}, endsAt: now + 30 * 60000 };
+            gfBossCd[from] = now + 10 * 60000;
+            return reply(`╭━━━〔 ${emoji} 〕━━━╮\n『 ظَـهَـرَ تَـايْـتَـن! 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👹 ⌯ الوحش ↞ ${name}\n❤️ ⌯ الحياة ↞ ${gfN(maxHp)}\n⏳ ⌯ المهلة ↞ 30 دقيقة»\n\n⚔️ اتحدوا وهاجموه بـ \`.اهجم\`\n💰 المكافآت نقاط بنك لكل من شارك!`), true;
+        }
+        if (base === 'اهجم') {
+            if (!b) return reply('🕊️ لا يوجد تايتن الآن، استدعِه بـ `.تايتن`'), true;
+            const wait = 20000 - (now - (b.lastHit[sender] || 0));
+            if (wait > 0) return reply(`⏳ سلاحك يحتاج ${Math.ceil(wait / 1000)} ثانية للراحة.`), true;
+            b.lastHit[sender] = now;
+            const lvl = gfLevel(groupFun.xp[from]?.[sender] || 0);
+            let dmg = 40 + Math.floor(Math.random() * 121) + lvl * 3;
+            const crit = Math.random() < 0.1;
+            if (crit) dmg *= 2;
+            dmg = Math.min(dmg, b.hp);
+            b.hp -= dmg;
+            b.hits[sender] = (b.hits[sender] || 0) + dmg;
+            if (b.hp > 0) return reply(`⚔️ @${sender.split('@')[0]} ضرب ${b.emoji} ${b.name} بـ *${dmg}* ضرر${crit ? ' 💥 (ضربة حرجة!)' : ''}\n❤️ ${gfBar(b.hp / b.maxHp)} ${gfN(b.hp)} / ${gfN(b.maxHp)}`, [sender]), true;
+            const totalDmg = Object.values(b.hits).reduce((a, c) => a + c, 0) || 1;
+            const sorted = Object.entries(b.hits).sort((a, c) => c[1] - a[1]);
+            const rewards = {};
+            sorted.forEach(([jid, d]) => { rewards[jid] = 20 + Math.round(200 * d / totalDmg) + (jid === sender ? 50 : 0); getBankAccount(jid); userPoints[jid] += rewards[jid]; });
+            gfBossLast[from] = { name: b.name, hits: b.hits, defeated: true };
+            gfBossCd[from] = now + 10 * 60000;
+            delete gfBoss[from];
+            let text = `🏆 *سقط ${b.emoji} ${b.name}!*\n\n🗡️ الضربة القاضية ↞ @${sender.split('@')[0]} (+50 إضافية)\n\n*🎖️ أبرز المهاجمين:*\n`;
+            sorted.slice(0, 5).forEach(([jid, d], i) => { text += `> ${['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i]} @${jid.split('@')[0]} ↞ ${gfN(d)} ضرر ┃ 💰 +${rewards[jid]}\n`; });
+            text += `\n💰 حصل كل ${sorted.length} مشارك على نقاط حسب مساهمته.`;
+            return reply(text, sorted.slice(0, 5).map(([j]) => j).concat(sender)), true;
+        }
+        const src = b ? { name: b.name, hits: b.hits, defeated: null } : gfBossLast[from];
+        if (!src || !Object.keys(src.hits).length) return reply('📭 لا توجد هجمات مسجلة بعد. استدعِ تايتن بـ `.تايتن`'), true;
+        const sorted = Object.entries(src.hits).sort((a, c) => c[1] - a[1]).slice(0, 10);
+        let text = `🗡️ *أقوى المهاجمين على ${src.name}:*${src.defeated === true ? ' (تم هزيمته)' : src.defeated === false ? ' (هرب)' : ''}\n\n`;
+        sorted.forEach(([jid, d], i) => { text += `${['🥇', '🥈', '🥉'][i] || '👤'} @${jid.split('@')[0]} ↞ ${gfN(d)} ضرر\n`; });
+        return reply(text.trim(), sorted.map(([j]) => j)), true;
+    }
+
+    // ---------- أعياد الميلاد ----------
+    if (base === 'ميلادي') {
+        if (!groupFun.births[from]) groupFun.births[from] = {};
+        if (args === 'الغاء') {
+            if (!groupFun.births[from][sender]) return reply('📌 لم تسجّل ميلادك في هذه المجموعة.'), true;
+            delete groupFun.births[from][sender]; saveGroupFun();
+            return reply('✅ تم حذف ميلادك من هذه المجموعة.'), true;
+        }
+        const m = toLatinDigits(args).trim().match(/^(\d{1,2})[\/\-.\s](\d{1,2})(?:[\/\-.\s](\d{4}))?$/);
+        if (!m) {
+            const cur = groupFun.births[from][sender];
+            return reply(cur ? `🎂 ميلادك المسجّل: ${cur.d}/${cur.m}${cur.y ? '/' + cur.y : ''}\nللحذف: \`.ميلادي الغاء\`` : '🎂 سجّل ميلادك ليهنئك البوت تلقائياً.\nمثال: `.ميلادي 15/3` أو `.ميلادي 15/3/2000` (السنة اختيارية)'), true;
+        }
+        const d = Number(m[1]), mo = Number(m[2]), y = m[3] ? Number(m[3]) : null;
+        const dim = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
+        const thisYear = gfToday().y;
+        if (mo < 1 || mo > 12 || d < 1 || d > dim || (y && (y < 1940 || y > thisYear - 5))) return reply('❌ تاريخ غير صحيح.\nمثال: `.ميلادي 15/3` أو `.ميلادي 15/3/2000`'), true;
+        groupFun.births[from][sender] = { d, m: mo, y, botId: jidDigits(sock.user?.id), last: '' };
+        saveGroupFun();
+        return reply(`🎂 تم تسجيل ميلادك يا @${sender.split('@')[0]} بتاريخ ${d}/${mo}${y ? '/' + y : ''}\n🎉 سيهنئك البوت في المجموعة صباح ذلك اليوم.`, [sender]), true;
+    }
+    if (base === 'اقرب_ميلاد') {
+        const list = Object.entries(groupFun.births[from] || {});
+        if (!list.length) return reply('📭 لا أحد سجّل ميلاده بعد. سجّل ميلادك بـ `.ميلادي 15/3`'), true;
+        const today = gfToday();
+        const rows = list.map(([jid, e]) => ({ jid, e, left: gfDaysUntil(e.d, e.m, today) })).sort((a, b) => a.left - b.left).slice(0, 5);
+        let text = '🎂 *أقرب أعياد الميلاد:*\n\n';
+        rows.forEach((r) => { text += `> 🎉 @${r.jid.split('@')[0]} ↞ ${r.e.d}/${r.e.m} ┃ ${r.left === 0 ? '*اليوم!* 🥳' : r.left === 1 ? 'غداً' : `بعد ${r.left} يوم`}\n`; });
+        return reply(text.trim(), rows.map((r) => r.jid)), true;
+    }
+
+    // ---------- بطاقة العضو ----------
+    if (base === 'بطاقتي') {
+        const target = getTargetUser(msg) || sender;
+        const xp = groupFun.xp[from]?.[target] || 0;
+        const lvl = gfLevel(xp);
+        const cur = gfXpFor(lvl), next = gfXpFor(lvl + 1);
+        const pct = (xp - cur) / (next - cur);
+        const { pos, total } = gfGroupRank(from, target);
+        getBankAccount(target);
+        const points = userPoints[target] || 0;
+        const totalMsgs = groupFun.msgs[from]?.[target] || 0;
+        const todayMsgs = userMessagesCount[from]?.[getJordanDateKey()]?.[target] || 0;
+        const warns = (userWarnings[target] || []).filter((t) => now - t < 2 * 86400000).length;
+        const title = groupTitles[from]?.[target] || 'بدون لقب';
+        const caption = `╭━━━〔 🪪 〕━━━╮\n『 بِـطَـاقَـةُ الـعُـضْـو 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${target.split('@')[0]}\n🏷️ ⌯ اللقب ↞ ${title}\n🎖️ ⌯ الرتبة ↞ ${gfRank(lvl)}\n📈 ⌯ المستوى ↞ ${lvl} (${gfN(xp)} / ${gfN(next)} خبرة)\n🏆 ⌯ الترتيب ↞ ${pos} من ${total}\n💰 ⌯ النقاط ↞ ${gfN(points)}\n💬 ⌯ الرسائل ↞ ${gfN(totalMsgs)} (اليوم ${gfN(todayMsgs)})\n⚠️ ⌯ الإنذارات ↞ ${warns}/3»\n\n${gfBar(pct)} ${Math.round(pct * 100)}%`;
+        const pp = await getUserProfilePic(sock, target);
+        try {
+            const buf = await gfBuildCard(pp, { level: lvl, pos, pct, xpText: `${gfN(xp)} / ${gfN(next)} XP`, points: gfN(points), msgs: gfN(totalMsgs), warns });
+            await sendBotMessage(sock, from, { image: buf, caption, mentions: [target] });
+        } catch (e) {
+            try { await sendBotMessage(sock, from, { image: { url: pp }, caption, mentions: [target] }); }
+            catch (e2) { await reply(caption, [target]); }
+        }
+        return true;
+    }
+
+    // ---------- مزاد الألقاب ----------
+    if (base === 'مزاد' || base === 'زايد') {
+        let a = gfAuctions[from];
+        if (base === 'مزاد') {
+            if (args === 'الغاء') {
+                if (!isAdm) return reply('❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!'), true;
+                if (!a) return reply('📌 لا يوجد مزاد نشط.'), true;
+                if (a.top) { getBankAccount(a.top.jid); userPoints[a.top.jid] += a.top.amount; }
+                delete gfAuctions[from];
+                return reply('🛑 تم إلغاء المزاد وأُعيدت النقاط لآخر مزايد.'), true;
+            }
+            if (!args) {
+                if (!a) return reply('🔨 لا يوجد مزاد حالياً.' + (isAdm ? '\n📌 لبدء مزاد: `.مزاد <دقائق> <اللقب>`\nمثال: `.مزاد 10 ملك الصمت`' : '')), true;
+                return reply(`🔨 *مزاد على لقب «${a.title}»*\n\n💰 أعلى مزايدة ↞ ${a.top ? `${gfN(a.top.amount)} من @${a.top.jid.split('@')[0]}` : `لا توجد (الحد الأدنى ${a.minBid})`}\n⏳ ينتهي بعد ${Math.max(1, Math.ceil((a.endsAt - now) / 60000))} دقيقة\n\n📌 زايد بـ \`.زايد <المبلغ>\``, a.top ? [a.top.jid] : []), true;
+            }
+            if (!isAdm) return reply('❌ بدء المزاد للمشرفين والمطور فقط، أما المزايدة فللجميع بـ `.زايد <المبلغ>`'), true;
+            if (a && a.endsAt > now) return reply('⚠️ يوجد مزاد نشط بالفعل، انتظر انتهاءه أو ألغه بـ `.مزاد الغاء`'), true;
+            const mm = trimmedBody.match(/^\.مزاد\s+(\S+)\s+([\s\S]+)$/);
+            const mins = mm ? parseInt(toLatinDigits(mm[1]).replace(/[^0-9]/g, ''), 10) : 0;
+            const title = mm ? mm[2].trim() : '';
+            if (!mins || mins < 1 || mins > 120 || !title || title.length > 30) return reply('📌 مثال: `.مزاد 10 ملك الصمت`\n(المدة من 1 إلى 120 دقيقة، واللقب حتى 30 حرفاً)'), true;
+            if (Object.values(groupTitles[from] || {}).includes(title) || Object.values(groupReservedTitles[from] || {}).includes(title)) return reply('❌ هذا اللقب مستخدم أو محجوز بالفعل، اختر لقباً آخر.'), true;
+            gfAuctions[from] = { title, endsAt: now + mins * 60000, minBid: 10, top: null, botId: jidDigits(sock.user?.id), by: sender };
+            return reply(`╭━━━〔 🔨 〕━━━╮\n『 مَـزَادُ الأَلْـقَـاب 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«🏷️ ⌯ اللقب ↞ ${title}\n💰 ⌯ بداية المزاد ↞ 10 نقاط\n⏳ ⌯ المدة ↞ ${mins} دقيقة»\n\n📌 زايدوا بـ \`.زايد <المبلغ>\` (من نقاط البنك)`), true;
+        }
+        if (!a || a.endsAt <= now) return reply('🔨 لا يوجد مزاد نشط الآن.'), true;
+        const amount = parseInt(toLatinDigits(args).replace(/[^0-9]/g, ''), 10);
+        if (!amount) return reply('📌 اكتب المبلغ، مثال: `.زايد 50`'), true;
+        const minNeeded = a.top ? a.top.amount + 1 : a.minBid;
+        if (amount < minNeeded) return reply(`❌ يجب أن تكون مزايدتك ${minNeeded} نقطة أو أكثر.`), true;
+        getBankAccount(sender);
+        const available = userPoints[sender] + (a.top && a.top.jid === sender ? a.top.amount : 0);
+        if (amount > available) return reply(`❌ رصيدك لا يكفي. رصيدك المتاح: ${gfN(available)} نقطة.`), true;
+        const prev = a.top;
+        if (prev) { getBankAccount(prev.jid); userPoints[prev.jid] += prev.amount; }
+        userPoints[sender] -= amount;
+        a.top = { jid: sender, amount };
+        const mentions = [sender]; if (prev && prev.jid !== sender) mentions.push(prev.jid);
+        return reply(`🔨 مزايدة جديدة على «${a.title}»!\n\n💰 @${sender.split('@')[0]} ↞ *${gfN(amount)}* نقطة${prev && prev.jid !== sender ? `\n😤 تجاوز @${prev.jid.split('@')[0]}` : ''}`, mentions), true;
+    }
+
+    // ---------- كبسولة الزمن ----------
+    if (base === 'كبسولة') {
+        const mm = trimmedBody.match(/^\.كبسولة\s+(\S+)\s+([\s\S]+)$/);
+        const days = mm ? parseInt(toLatinDigits(mm[1]).replace(/[^0-9]/g, ''), 10) : 0;
+        const text = mm ? mm[2].trim() : '';
+        if (!days || days < 1 || days > 365 || !text) return reply('📦 اكتب رسالة تصل المجموعة بعد مدة.\nمثال: `.كبسولة 30 أتمنى نكون كلنا بخير`\n(المدة من 1 إلى 365 يوم)'), true;
+        if (text.length > 500) return reply('❌ الرسالة طويلة، الحد الأقصى 500 حرف.'), true;
+        const mine = groupFun.capsules.filter((c) => c.g === from && c.jid === sender).length;
+        if (mine >= 5) return reply('❌ لديك 5 كبسولات منتظرة بالفعل، انتظر حتى تُفتح إحداها.'), true;
+        const due = now + days * 86400000;
+        groupFun.capsules.push({ g: from, jid: sender, text, at: due, created: now, botId: jidDigits(sock.user?.id) });
+        saveGroupFun();
+        const dateTxt = new Date(due).toLocaleDateString('ar-EG', { timeZone: 'Asia/Amman', year: 'numeric', month: 'long', day: 'numeric' });
+        return reply(`📦 تم حفظ كبسولتك يا @${sender.split('@')[0]}!\n⏳ ستُفتح في المجموعة بتاريخ ${dateTxt}.`, [sender]), true;
+    }
+    return false;
+}
+
+// المهام الدورية: تهنئة الميلاد + فتح الكبسولات + إنهاء المزادات
+async function gfTick(sock) {
+    const myId = jidDigits(sock.user?.id);
+    if (!myId) return;
+    const now = Date.now();
+    // أعياد الميلاد: بعد الثامنة صباحاً بتوقيت عمّان
+    if (ammanMinutesNow() >= 8 * 60) {
+        const today = gfToday();
+        for (const [gid, members] of Object.entries(groupFun.births)) {
+            for (const [jid, e] of Object.entries(members)) {
+                if (e.botId !== myId || e.last === today.key) continue;
+                const isToday = e.m === today.m && (e.d === today.d || (e.d === 29 && e.m === 2 && !gfLeap(today.y) && today.d === 28));
+                if (!isToday) continue;
+                e.last = today.key; saveGroupFun();
+                const age = e.y ? ` 🎈 وبلغت اليوم ${today.y - e.y} عاماً!` : '';
+                try { await sendBotMessage(sock, gid, { text: `🎂🎉 *كل عام وأنت بخير يا @${jid.split('@')[0]}!*${age}\n\nأسرة المجموعة كلها تتمنى لك عمراً مديداً وسنة مليئة بالسعادة 🥳💐`, mentions: [jid] }); } catch (err) {}
+            }
+        }
+    }
+    // كبسولات الزمن
+    const due = groupFun.capsules.filter((c) => c.botId === myId && c.at <= now);
+    for (const c of due) {
+        groupFun.capsules = groupFun.capsules.filter((x) => x !== c); saveGroupFun();
+        const daysAgo = Math.max(1, Math.round((now - c.created) / 86400000));
+        try { await sendBotMessage(sock, c.g, { text: `⏳📦 *انفتحت كبسولة الزمن!*\n\n👤 كتبها @${c.jid.split('@')[0]} قبل ${daysAgo} يوم:\n\n«${c.text}»`, mentions: [c.jid] }); } catch (err) {}
+    }
+    // المزادات
+    for (const [gid, a] of Object.entries(gfAuctions)) {
+        if (a.botId !== myId || a.endsAt > now) continue;
+        delete gfAuctions[gid];
+        if (!a.top) { try { await sendBotMessage(sock, gid, { text: `🔨 انتهى المزاد على لقب «${a.title}» بدون أي مزايدات.` }); } catch (err) {} continue; }
+        if (!groupTitles[gid]) groupTitles[gid] = {};
+        groupTitles[gid][a.top.jid] = a.title;
+        try { await sendBotMessage(sock, gid, { text: `🏆 *انتهى المزاد!*\n\nفاز @${a.top.jid.split('@')[0]} بلقب «${a.title}» مقابل ${gfN(a.top.amount)} نقطة 🎉`, mentions: [a.top.jid] }); } catch (err) {}
+    }
+}
+
+function setupGroupFun(sock) {
+    // خبرة المستويات وعدّاد الرسائل
+    sock.ev.on('messages.upsert', async (m) => {
+        try {
+            if (m.type !== 'notify') return;
+            for (const mm of m.messages || []) {
+                const gid = mm?.key?.remoteJid;
+                const user = mm?.key?.participant;
+                if (!gid || !gid.endsWith('@g.us') || mm.key.fromMe || !mm.message || !user) continue;
+                if (mm.message.protocolMessage || mm.message.reactionMessage) continue;
+                const mid = mm.key.id;
+                if (mid) { if (gfSeen.has(mid)) continue; gfSeen.add(mid); if (gfSeen.size > 1000) gfSeen.delete(gfSeen.values().next().value); }
+                const text = mm.message.conversation || mm.message.extendedTextMessage?.text || mm.message.imageMessage?.caption || mm.message.videoMessage?.caption || '';
+                if (text.trim().startsWith('.')) continue;
+                if (!groupFun.msgs[gid]) groupFun.msgs[gid] = {};
+                groupFun.msgs[gid][user] = (groupFun.msgs[gid][user] || 0) + 1;
+                groupFunDirty = true;
+                const k = gid + user;
+                if (Date.now() - (gfLastXp.get(k) || 0) < 30000) continue;
+                gfLastXp.set(k, Date.now());
+                if (!groupFun.xp[gid]) groupFun.xp[gid] = {};
+                const before = groupFun.xp[gid][user] || 0;
+                const after = before + 10 + Math.floor(Math.random() * 11);
+                groupFun.xp[gid][user] = after;
+                const lb = gfLevel(before), la = gfLevel(after);
+                if (la > lb) {
+                    const rankUp = gfRank(la) !== gfRank(lb) ? `\n🎊 رتبة جديدة ↞ *${gfRank(la)}*` : '';
+                    try { await sendBotMessage(sock, gid, { text: `🎉 *ترقية!* @${user.split('@')[0]} وصل إلى المستوى *${la}*${rankUp}`, mentions: [user] }); } catch (err) {}
+                }
+            }
+        } catch (e) {}
+    });
+    if (!groupFunFlusher) {
+        groupFunFlusher = setInterval(() => { if (groupFunDirty) saveGroupFun(); }, 30000);
+        if (groupFunFlusher.unref) groupFunFlusher.unref();
+    }
+    const timer = setInterval(() => { gfTick(sock).catch(() => {}); }, 20000);
+    sock.ev.on('connection.update', ({ connection }) => { if (connection === 'close') clearInterval(timer); });
+}
+
 // ===== كشف الرسائل المحذوفة والمعدّلة (لكل مجموعة على حدة) =====
 const DETECT_FILE = './group_detect.json';
 let detectStore = {};
@@ -920,6 +1275,7 @@ enableChannelForward(sock);
 sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
 setupGroupAutomation(sock);
+setupGroupFun(sock);
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
@@ -1287,6 +1643,7 @@ if (!trimmedBody.startsWith('.')) return;
 
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
 cmd = normalizeGroupExtraCmd(cmd);
+cmd = normalizeGroupFunCmd(cmd);
 let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n')[0] : cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
@@ -1314,6 +1671,7 @@ if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBod
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
 
 if (await handleGroupExtraCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev })) return;
+if (await handleGroupFunCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev })) return;
 
 if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
@@ -2561,7 +2919,17 @@ if (cmdBase === '6') {
 > 👑 .ملك_المجموعة ↞ ملك الجروب
 > 🧸 .كيوت_المجموعة ↞ كيوت الجروب
 > 📩 .رسائلي ↞ عدد رسائلك
-> 📊 .توب_التفاعل ↞ توب تفاعلات الجروب`;
+> 📊 .توب_التفاعل ↞ توب تفاعلات الجروب
+> 🏅 .مستواي ↞ مستواك ورتبتك
+> 📈 .توب_المستويات ↞ أعلى الأعضاء مستوى
+> 🐉 .تايتن ↞ استدعاء تايتن للمجموعة
+> ⚔️ .اهجم ↞ هاجم التايتن
+> 🗡️ .توب_المهاجمين ↞ أقوى المهاجمين
+> 🎂 .ميلادي 15/3 ↞ تسجيل ميلادك (تهنئة تلقائية)
+> 🎉 .اقرب_ميلاد ↞ أقرب أعياد الميلاد
+> 🪪 .بطاقتي ↞ بطاقة عضويتك
+> 🔨 .مزاد ↞ مزاد الألقاب (.زايد <المبلغ>)
+> 📦 .كبسولة <أيام> <النص> ↞ رسالة تصل المجموعة بعد مدة`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
