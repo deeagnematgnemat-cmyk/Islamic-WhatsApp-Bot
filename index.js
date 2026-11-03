@@ -12,6 +12,7 @@ import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedi
 import { sendFormWithButtons, sendDevInfoWithButton, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
+import { buildTopImage } from './topimage.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -203,6 +204,21 @@ let activeGames = {};
 let dailyRewards = {};
 let mutedUsers = {};
 let userMessagesCount = {};
+const USER_MSGS_FILE = './user_msgs.json';
+let userNames = {};
+let userMsgsDirty = false;
+try {
+    const d = JSON.parse(fs.readFileSync(USER_MSGS_FILE, 'utf8'));
+    if (d && d.counts) userMessagesCount = d.counts;
+    if (d && d.names) userNames = d.names;
+    const cutoff = new Date(Date.now() - 90 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' });
+    for (const g of Object.keys(userMessagesCount)) for (const k of Object.keys(userMessagesCount[g])) if (k < cutoff) delete userMessagesCount[g][k];
+} catch (e) {}
+setInterval(() => {
+    if (!userMsgsDirty) return;
+    userMsgsDirty = false;
+    try { fs.writeFileSync(USER_MSGS_FILE, JSON.stringify({ counts: userMessagesCount, names: userNames })); } catch (e) {}
+}, 30000);
 let groupSettings = {};
 const WELCOME_FILE = './group_welcome.json';
 let welcomeStore = {};
@@ -1417,6 +1433,8 @@ if (isGroup) {
     if (!userMessagesCount[from]) userMessagesCount[from] = {};    
     if (!userMessagesCount[from][todayKey]) userMessagesCount[from][todayKey] = {};    
     userMessagesCount[from][todayKey][sender] = (userMessagesCount[from][todayKey][sender] || 0) + 1;    
+    if (!isFromMe && msg.pushName) userNames[sender] = msg.pushName;    
+    userMsgsDirty = true;    
 }    
     
 let isSenderDev = isDeveloper(sender, sock);    
@@ -2295,16 +2313,30 @@ if (cmd === 'رسائلي') {
     return sendBotMessage(sock, from, { text: `📩 عدد رسائلك المسجلة اليوم يا @${sender.split('@')[0]} هو: *${count} رسالة*`, mentions: [sender] });    
 }
 
-if (cmd === 'توب_التفاعل') {    
-    const todayKey = getJordanDateKey();
-    const groupMsgs = userMessagesCount[from]?.[todayKey] || {};
+if (cmdBase === 'توب_التفاعل') {    
+    const reqDays = Math.min(90, Math.max(1, parseInt(toLatinDigits(cmd.split(' ')[1] || '1'), 10) || 1));
+    const dayKeys = [];
+    for (let i = 0; i < reqDays; i++) dayKeys.push(new Date(Date.now() - i * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Amman' }));
+    const todayKey = dayKeys[0];
+    const periodLabel = reqDays === 1 ? todayKey : `${dayKeys[reqDays - 1]} → ${todayKey}`;
+    const groupMsgs = {};
+    dayKeys.forEach(k => { const d = userMessagesCount[from]?.[k] || {}; Object.keys(d).forEach(j => { groupMsgs[j] = (groupMsgs[j] || 0) + d[j]; }); });
     try {
         const meta = await sock.groupMetadata(from);
         let totalGroupMessages = 0;
         Object.values(groupMsgs).forEach(val => totalGroupMessages += val);
 
         let sortedParticipants = meta.participants.sort((a, b) => (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0));
-        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ لِـلْيَوْمِ (${todayKey}):*\n💬 *إجمالي رسائل المجموعة اليوم:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
+
+        try {
+            const top50 = sortedParticipants.filter(p => (groupMsgs[p.id] || 0) > 0).slice(0, 50).map(p => ({ id: p.id, count: groupMsgs[p.id] }));
+            const names = {};
+            meta.participants.forEach(p => { names[p.id] = userNames[p.id] || p.name || p.notify || ''; });
+            const png = await buildTopImage({ entries: top50, names, totalMsgs: totalGroupMessages, periodTitle: reqDays === 1 ? 'TODAY' : `LAST ${reqDays} DAYS`, periodSub: periodLabel, memberCount: meta.participants.length });
+            await sendBotMessage(sock, from, { image: png });
+        } catch (e) {}
+
+        let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ ${reqDays === 1 ? `لِـلْيَوْمِ (${todayKey})` : `لِـآخِـرِ ${reqDays} أَيَّـامٍ (${periodLabel})`}:*\n💬 *إجمالي رسائل المجموعة ${reqDays === 1 ? 'اليوم' : 'خلال الفترة'}:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
         let mentions = [];
         sortedParticipants.forEach((p, idx) => {
             const msgCount = groupMsgs[p.id] || 0;
@@ -2313,8 +2345,7 @@ if (cmd === 'توب_التفاعل') {
             mentions.push(p.id);
         });
         text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
-        const userPp = await getUserProfilePic(sock, sender);
-        try { await sendBotMessage(sock, from, { image: { url: userPp }, caption: text, mentions }); } catch (e) { await sendBotMessage(sock, from, { text, mentions }); }
+        await sendBotMessage(sock, from, { text, mentions });
         return;
     } catch (e) { return sendBotMessage(sock, from, { text: `❌ تعذر جلب توب التفاعل.` }); }
 }
@@ -2919,7 +2950,7 @@ if (cmdBase === '6') {
 > 👑 .ملك_المجموعة ↞ ملك الجروب
 > 🧸 .كيوت_المجموعة ↞ كيوت الجروب
 > 📩 .رسائلي ↞ عدد رسائلك
-> 📊 .توب_التفاعل ↞ توب تفاعلات الجروب
+> 📊 .توب_التفاعل [عدد الأيام] ↞ توب تفاعلات الجروب (صورة + ترتيب)
 > 🏅 .مستواي ↞ مستواك ورتبتك
 > 📈 .توب_المستويات ↞ أعلى الأعضاء مستوى
 > 🐉 .تايتن ↞ استدعاء تايتن للمجموعة
