@@ -114,6 +114,7 @@ export async function cmdSurahInfo({ sock, from, send }, args) {
         lines.push('');
         lines.push(FOOT);
         await send(sock, from, { text: lines.join('\n') });
+        return true;
     }
 
     // ---------- التفسير
