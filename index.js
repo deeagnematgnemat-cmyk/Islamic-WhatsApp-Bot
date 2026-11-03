@@ -467,7 +467,7 @@ validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
-validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة');
+validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى');
 
 function isValidCmd(fullCmd) {
 const base = fullCmd.split(' ')[0];
@@ -877,7 +877,7 @@ function setupGroupAutomation(sock) {
 
 // ===== قسم المجموعات المميز: مستويات / تايتن / أعياد ميلاد / بطاقة / مزاد / كبسولة =====
 const GROUP_FUN_FILE = './group_fun.json';
-let groupFun = { xp: {}, msgs: {}, births: {}, capsules: [] };
+let groupFun = { xp: {}, msgs: {}, births: {}, capsules: [], levelNotice: {} };
 try { const d = JSON.parse(fs.readFileSync(GROUP_FUN_FILE, 'utf8')); if (d && typeof d === 'object') groupFun = { ...groupFun, ...d }; } catch (e) {}
 let groupFunDirty = false;
 let groupFunFlusher = null;
@@ -887,8 +887,10 @@ const gfBoss = {};
 const gfBossLast = {};
 const gfBossCd = {};
 const gfAuctions = {};
-const GF_CMDS = new Set(['مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة']);
+const GF_CMDS = new Set(['مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى']);
 const GF_ALIASES = [
+    [/^تفعيل[ _]ا[شس]عار[ _]المستوى(?=\s|$)/, 'تفعيل_اشعار_المستوى'],
+    [/^توقيف[ _]ا[شس]عار[ _]المستوى(?=\s|$)/, 'توقيف_اشعار_المستوى'],
     [/^توب[ _]المستويات(?=\s|$)/, 'توب_المستويات'],
     [/^توب[ _]المهاجمين(?=\s|$)/, 'توب_المهاجمين'],
     [/^اقرب[ _]ميلاد(?=\s|$)/, 'اقرب_ميلاد'],
@@ -962,6 +964,16 @@ async function handleGroupFunCommand({ sock, msg, from, sender, cmd, trimmedBody
     const isAdm = isSenderAdmin || isSenderDev;
     const reply = (text, mentions) => sendBotMessage(sock, from, mentions ? { text, mentions } : { text }).catch(() => {});
     const now = Date.now();
+
+    // ---------- تشغيل/إيقاف إشعار الترقية (مغلق افتراضياً) ----------
+    if (base === 'تفعيل_اشعار_المستوى' || base === 'توقيف_اشعار_المستوى') {
+        if (!isAdm) return reply('❌ متاح للمشرفين والمطور فقط!');
+        const on = base === 'تفعيل_اشعار_المستوى';
+        if (!groupFun.levelNotice) groupFun.levelNotice = {};
+        groupFun.levelNotice[from] = on;
+        saveGroupFun();
+        return reply(on ? '✅ تم تفعيل إشعار الترقية في هذه المجموعة.' : '⛔ تم إيقاف إشعار الترقية في هذه المجموعة.');
+    }
 
     // ---------- المستويات ----------
     if (base === 'مستواي') {
@@ -1216,7 +1228,7 @@ function setupGroupFun(sock) {
                 const after = before + 10 + Math.floor(Math.random() * 11);
                 groupFun.xp[gid][user] = after;
                 const lb = gfLevel(before), la = gfLevel(after);
-                if (la > lb) {
+                if (la > lb && groupFun.levelNotice?.[gid]) {
                     const rankUp = gfRank(la) !== gfRank(lb) ? `\n🎊 رتبة جديدة ↞ *${gfRank(la)}*` : '';
                     try { await sendBotMessage(sock, gid, { text: `🎉 *ترقية!* @${user.split('@')[0]} وصل إلى المستوى *${la}*${rankUp}`, mentions: [user] }); } catch (err) {}
                 }
@@ -3022,10 +3034,13 @@ if (cmdBase === '1') {
 📇 3. حماية جهات الاتصال: [${settings.antiContact ? '🟢 مفعلة' : '🔴 معطلة'}]
 > تفعيل: .حظر_جهات | سماح: .سماح_جهات
 
+🎉 4. إشعار الترقية: [${groupFun.levelNotice?.[from] ? '🟢 مفعل' : '🔴 معطل'}]
+> تفعيل: .تفعيل_اشعار_المستوى | إيقاف: .توقيف_اشعار_المستوى
+
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton(settings)]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton({ ...settings, levelNotice: !!groupFun.levelNotice?.[from] })]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: text1, mentions: [sender] });
     }
@@ -3148,6 +3163,7 @@ if (cmdBase === '6') {
 > 📊 .توب_التفاعل [عدد الأيام] ↞ توب تفاعلات الجروب (صورة + ترتيب)
 > 🏅 .مستواي ↞ مستواك ورتبتك
 > 📈 .توب_المستويات ↞ أعلى الأعضاء مستوى
+> 🎉 .تفعيل_اشعار_المستوى / .توقيف_اشعار_المستوى ↞ تشغيل أو إيقاف إشعار الترقية (للمشرفين)
 > 🐉 .تايتن ↞ استدعاء تايتن للمجموعة
 > ⚔️ .اهجم ↞ هاجم التايتن
 > 🗡️ .توب_المهاجمين ↞ أقوى المهاجمين
