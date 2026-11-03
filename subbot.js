@@ -5,7 +5,10 @@ import { sendSectionWithButtons } from './menu.js';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 
-const MAX_SUBBOTS = 10;
+const MAX_FILE = './subbots_max.json';
+let MAX_SUBBOTS = 10;
+try { const v = parseInt(JSON.parse(fs.readFileSync(MAX_FILE, 'utf8'))?.max, 10); if (v >= 0) MAX_SUBBOTS = v; } catch (e) {}
+function setMaxSubbots(n) { MAX_SUBBOTS = n; try { fs.writeFileSync(MAX_FILE, JSON.stringify({ max: n })); } catch (e) {} }
 const SESSIONS_DIR = './subbots_sessions';
 const LIST_FILE = './subbots.json';
 const PAIR_TIMEOUT_MS = 3 * 60 * 1000; // مهلة إدخال الكود: 3 دقائق
@@ -233,7 +236,7 @@ const SECTION_TEXT =
 3️⃣ واتساب ← الأجهزة المرتبطة ← ربط جهاز ← الربط برقم الهاتف
 4️⃣ أدخل الكود خلال 3 دقائق وانتظر رسالة النجاح
 
-⚠️ الحد الأقصى للبوتات المنصّبة: ${MAX_SUBBOTS}`;
+⚠️ الحد الأقصى للبوتات المنصّبة: __MAX__`;
 
 const SECTION16_TEXT =
 `🔧 *16. الفرعي (التحكم ببوتك المنصّب):*
@@ -411,15 +414,28 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
     const isCancel = cmdBase === 'الغاء_تنصيب';
     const isList = cmdBase === 'قائمة_التنصيب';
     const isSection = cmdBase === '12';
-    if (!isTansib && !isCancel && !isList && !isSection) return false;
+    const isSetMax = cmdBase === 'عدد_المنصبين';
+    if (!isTansib && !isCancel && !isList && !isSection && !isSetMax) return false;
 
     const reply = (text, mentions) => sock.sendMessage(from, { text, ...(mentions ? { mentions } : {}) }, { quoted: msg });
 
-    if (isSection) { if (!(await sendSectionWithButtons(sock, from, SECTION_TEXT, null, sender))) await reply(SECTION_TEXT); return true; }
+    if (isSection) { if (!(await sendSectionWithButtons(sock, from, SECTION_TEXT.replace('__MAX__', MAX_SUBBOTS), null, sender))) await reply(SECTION_TEXT.replace('__MAX__', MAX_SUBBOTS)); return true; }
 
     // التنصيب يعمل من البوت الرئيسي فقط (يمنع التنصيب المتسلسل)
     if (sock.isSubBot) {
         await reply('⚠️ التنصيب متاح من البوت الرئيسي فقط.');
+        return true;
+    }
+
+    if (isSetMax) {
+        if (!isDev) { await reply('❌ هذا الأمر مخصص للمطور فقط!'); return true; }
+        if (sock.isSubBot) { await reply('⚠️ هذا الأمر متاح من البوت الرئيسي فقط.'); return true; }
+        const arg = cmd.split(' ').slice(1).join('').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g, '');
+        if (!arg) { await reply(`📲 عدد المنصّبين الحالي: ${MAX_SUBBOTS}\n🟢 المنصّب فعلياً: ${subs.size}\n\nلتغييره اكتب: \`.عدد_المنصبين 20\``); return true; }
+        const n = parseInt(arg, 10);
+        if (n > 1000) { await reply('⚠️ الحد الأعلى المسموح 1000.'); return true; }
+        setMaxSubbots(n);
+        await reply(`✅ تم تغيير عدد الهواتف المنصّبة إلى: ${n}\n🟢 المنصّب حالياً: ${subs.size}`);
         return true;
     }
 
