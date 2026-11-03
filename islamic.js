@@ -287,7 +287,7 @@ async function cmdSurah(ctx, args) {
     const ayahs = await fetchSurah(s.n);
     if (!ayahs) { await send(sock, from, { text: '❌ تعذر جلب نص السورة حالياً، حاول بعد قليل.' }); return true; }
     if (!range) {
-        const chunks = chunkAyahs(ayahs);
+        const chunks = chunkAyahs(ayahs, 65000);
         const bism = (s.n !== 1 && s.n !== 9) ? 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ\n\n' : '';
         for (let i = 0; i < chunks.length; i++) {
             const head = i === 0 ? `📖 *سُورَةُ ${name}* (${toArabicNum(ayahs.length)} آية)\n\n${bism}` : '';
