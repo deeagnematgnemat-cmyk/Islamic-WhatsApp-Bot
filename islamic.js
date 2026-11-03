@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { sendSectionWithButtons } from './menu.js';
 import { resolveSurah, _internalMore } from './moredl.js';
+import { cmdSurahInfo, cmdHadith } from './islamic2.js';
 
 const SURAHS = _internalMore.SURAHS;
 const HEAD = '*╎أذكـار 🌙私╎*';
@@ -61,12 +62,13 @@ const ALIASES = [
     [/^تذكير[ _](?:ال)?اذكار(?=\s|$)/, 'تذكير_اذكار'],
     [/^الغاء[ _](?:ال)?تذكير(?=\s|$)/, 'الغاء_تذكير'],
     [/^قص[ةه][ _](?:نبي|صحابي)(?=\s|$)/, 'قصة_نبي'],
+    [/^معلومات[ _]سور[ةه](?=\s|$)/, 'معلومات_سورة'],
 ];
 export function normalizeIslamicCmd(cmd) {
     for (const [re, to] of ALIASES) { if (re.test(cmd)) return cmd.replace(re, to); }
     return cmd;
 }
-export const islamicCommandNames = ['اذكار_الوضوء', 'اذكار_الطعام', 'اذكار_السفر', 'دعاء_الاستخارة', 'دعاء_الكرب', 'اسماء_الله', 'تذكير_اذكار', 'الغاء_تذكير', 'قصة_نبي'];
+export const islamicCommandNames = ['اذكار_الوضوء', 'اذكار_الطعام', 'اذكار_السفر', 'دعاء_الاستخارة', 'دعاء_الكرب', 'اسماء_الله', 'تذكير_اذكار', 'الغاء_تذكير', 'قصة_نبي', 'معلومات_سورة'];
 
 // ------------------------------------------------------------ نصوص الأذكار الجديدة (بنفس نمط الأذكار الموجودة)
 const frame = (title, items) => `${HEAD}\n\n*${title}*\n\n${items.map((t) => `- ${t}`).join('\n\n')}\n\n${FOOT}`;
@@ -438,6 +440,8 @@ export async function handleIslamicCommand({ sock, from, sender, cmd, cmdBase, i
             await sendBotMessage(sock, from, { text: `📜 *قصة ${who}*\n\n${story}` });
             return true;
         }
+        case 'معلومات_سورة': return await cmdSurahInfo(ctx, args);
+        case 'حديث': return await cmdHadith(ctx, args);
         case 'تذكير_اذكار': return await cmdRemind(ctx, args);
         case 'الغاء_تذكير': return await cmdCancel(ctx, args);
         default: return false;
