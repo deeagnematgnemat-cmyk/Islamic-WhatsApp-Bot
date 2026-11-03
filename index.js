@@ -13,6 +13,7 @@ import { sendFormWithButtons, sendDevInfoWithButton, getButtonId, sendSectionWit
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
 import { buildTopImage } from './topimage.js';
+import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -130,6 +131,10 @@ const quotesList = [
     "لا تندم على ماضٍ علمك كيف تكون قويًا اليوم.",
     "القوة ليست في عدم السقوط، بل في القيام مجدداً في كل مرة تسقط فيها."
 ];
+
+jokesList.push(...jokesExtra);
+whatIfList.push(...whatIfExtra);
+quotesList.push(...quotesExtra);
 
 const duaList = [
     "اللَّهُمَّ إِنِّي أَسْأَلُكَ العَفْوَ وَالعَافِيَةَ فِي الدُّنْيَا وَالآخِرَةِ.",
@@ -285,7 +290,7 @@ const validCommands = [
 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة',
 'اساسي',
 'قران', 'قرآن', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'اذكار', 'اذكار_الصباح', 'اذكار_المساء', 'اذكار_الاستيقاظ', 'اذكار_الصلاة', 'اذكار_المسجد',
-'نكتة', 'ماذا_لو', 'قول',
+'نكتة', 'ماذا_لو', 'قول', 'شبيهك',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
@@ -2267,6 +2272,12 @@ if (cmd === 'أذكار' || cmd === 'اذكار') {
 if (cmd === 'نكتة') { return sendBotMessage(sock, from, { text: jokesList[Math.floor(Math.random() * jokesList.length)] }); }    
 if (cmd === 'ماذا_لو') { return sendBotMessage(sock, from, { text: whatIfList[Math.floor(Math.random() * whatIfList.length)] }); }    
 if (cmd === 'قول') { return sendBotMessage(sock, from, { text: `🗣️ *مقولة اليوم:* \n\n> "${quotesList[Math.floor(Math.random() * quotesList.length)]}"` }); }    
+if (cmdBase === 'شبيهك') {
+    const target = getTargetUser(msg) || sender;
+    const [likeName, likeNote] = lookAlikes[Math.floor(Math.random() * lookAlikes.length)];
+    const percent = 70 + Math.floor(Math.random() * 30);
+    return sendBotMessage(sock, from, { text: `🪞 *شبيهك:*\n\n@${target.split('@')[0]} شبيهك هو ↞ *${likeName}*\n> 📊 نسبة التشابه: \`${percent}%\`\n> 😂 ${likeNote}`, mentions: [target] });
+}
 
 if (cmd === 'غزل') {    
     const targetUser = getTargetUser(msg) || sender;
@@ -2922,7 +2933,7 @@ if (cmdBase === '5') {
 
 > 🤣 .نكتة ↞ نكتة مضحكة
 > 🤔 .ماذا_لو ↞ تساؤلات خيالية
-> 🗣️ .قول ↞ حكمة اليوم`;
+> 🗣️ .قول ↞ حكمة اليوم\n> 🪞 .شبيهك ↞ شبيهك بشخصية أو حيوان`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
@@ -2989,7 +3000,8 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
-            if (!(await sendSectionWithButtons(sock, from, devMenuText, null, sender))) await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] }); 
+            const devPp = await getUserProfilePic(sock, sender);
+            if (!(await sendSectionWithButtons(sock, from, devMenuText, devPp, sender))) await sendBotMessage(sock, from, { image: { url: devPp }, caption: devMenuText, mentions: [sender] }); 
         } catch (err) {
             await sendBotMessage(sock, from, { text: devMenuText, mentions: [sender] });
         }
