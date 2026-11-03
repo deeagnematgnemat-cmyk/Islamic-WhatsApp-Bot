@@ -223,7 +223,8 @@ export function protectionButton(settings = {}) {
             sections: [
                 item('🔗', 'حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
                 item('🤬', 'حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
-                item('📇', 'حماية الجهات', 'حظر_جهات', 'سماح_جهات', settings.antiContact)
+                item('📇', 'حماية الجهات', 'حظر_جهات', 'سماح_جهات', settings.antiContact),
+                item('🎉', 'إشعار الترقية', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى', settings.levelNotice)
             ]
         })
     };
