@@ -12,6 +12,7 @@ import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedi
 import { sendFormWithButtons, sendDevInfoWithButton, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
+import { handleIslamicCommand, normalizeIslamicCmd, islamicCommandNames, setupIslamicReminders } from './islamic.js';
 import { buildTopImage } from './topimage.js';
 import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
 
@@ -96,16 +97,6 @@ const animeQuotesList = [
     { quote: "الاستسلام هو ما يقتل الناس، عندما يستسلم الناس يمتنون لكونهم عاجزين.", character: "ألوكارد" },
     { quote: "في عالم القتلة، من يتردد يمت أولاً.", character: "كيلوا زولديك" },
     { quote: "العدالة ليست شيئاً يمكنك شراءه بالمال، العدالة هي القوة التي تحمي الضغفاء.", character: "رورونوا زورو" }
-];
-
-const quranDatabase = [
-    "﴿اللَّهُ لَا إِلٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ﴾ [البقرة: 255]",
-    "﴿إِنَّ مَعَ الْعُسْرِ يُسْرًا ۝ فَإِنَّ مَعَ الْعُسْرِ يُسْرًا﴾ [الشرح: 5-6]",
-    "﴿وَاصْبِرْ لِحُكْمِ رَبِّكَ فَإِنَّكَ بِأَعْيُنِنَا وَسَبِّحْ بِحَمْدِ رَبِّكَ حِينَ تَقُومُ﴾ [الطور: 48]",
-    "﴿وَقُل رَّبِّ زِدْنِي عِلْمًا﴾ [طه: 114]",
-    "﴿إِنَّ اللَّهَ مَعَ الصَّابِرِينَ﴾ [البقرة: 153]",
-    "﴿أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ﴾ [الرعد: 28]",
-    "﴿وَمَن يَتَّقِ اللَّهَ يَجْعَل لَّهُ مَخْرَجًا ۝ وَيَرْزُقْهُ مِنْ حَيْثُ لَا يَحْتَسِبُ﴾ [الطلاق: 2-3]"
 ];
 
 const ghazalsList = [
@@ -289,13 +280,14 @@ const validCommands = [
 'ايقاف_البوت', 'تفعيل_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل البوت',
 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة',
 'اساسي',
-'قران', 'قرآن', 'دعاء', 'ذكر', 'حديث', 'أذكار', 'اذكار', 'اذكار_الصباح', 'اذكار_المساء', 'اذكار_الاستيقاظ', 'اذكار_الصلاة', 'اذكار_المسجد', 'اذكار_النوم',
+'دعاء', 'ذكر', 'حديث', 'أذكار', 'اذكار', 'اذكار_الصباح', 'اذكار_المساء', 'اذكار_الاستيقاظ', 'اذكار_الصلاة', 'اذكار_المسجد', 'اذكار_النوم',
 'نكتة', 'ماذا_لو', 'قول', 'شبيهك',
 'تعطيل_البوتات', 'تعطيل بوتات',
 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب', 'قائمة_الالقاب', 'قائمة_الالقاب_المحجوزة', 'الالقاب',
 ];
 validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
+validCommands.push(...islamicCommandNames);
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة');
 
@@ -1299,6 +1291,7 @@ sock.ev.on('creds.update', saveCreds);
 sock.isSubBot = !!subInfo;
 setupGroupAutomation(sock);
 setupGroupFun(sock);
+setupIslamicReminders(sock, sendBotMessage);
 if (subInfo && subInfo.onSock) subInfo.onSock(sock);
 
 sock.ev.on('connection.update', async (u) => {
@@ -1669,6 +1662,7 @@ if (!trimmedBody.startsWith('.')) return;
 let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا');    
 cmd = normalizeGroupExtraCmd(cmd);
 cmd = normalizeGroupFunCmd(cmd);
+cmd = normalizeIslamicCmd(cmd);
 let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n')[0] : cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
@@ -1690,6 +1684,7 @@ if (!isGroup && cmdBase !== 'devinfo_form') {
     return sendBotMessage(sock, from, { text: `❌ عذراً، هذا الأمر مخصص للمجموعات فقط ولا يعمل في الشات الخاص!` });    
 }    
 
+if (await handleIslamicCommand({ sock, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 
@@ -2233,18 +2228,6 @@ if (cmdBase === 'حزورة' || cmdBase === 'لغز') {
     });
 }    
 
-if (cmd === 'قران' || cmd === 'قرآن') {    
-    let selectedAyat = [];
-    let tempDb = [...quranDatabase];
-    for (let i = 0; i < 5; i++) {
-        if (tempDb.length === 0) break;
-        let randIdx = Math.floor(Math.random() * tempDb.length);
-        selectedAyat.push(`🔹 ${tempDb[randIdx]}`);
-        tempDb.splice(randIdx, 1);
-    }
-    return sendBotMessage(sock, from, { text: `📖 *آيَاتٌ قُرْآنِيَّةٌ مُبَارَكَةٌ (5 آيات):*\n\n` + selectedAyat.join('\n\n') });    
-}    
-
 if (cmd === 'دعاء') {    
     const randomDua = duaList[Math.floor(Math.random() * duaList.length)];
     return sendBotMessage(sock, from, { text: `🤲 *دعاء مبارك:*\n\n${randomDua}` });    
@@ -2282,7 +2265,7 @@ if (cmd === 'اذكار_المسجد' || cmd === 'أذكار_المسجد') {
 }    
 
 if (cmd === 'أذكار' || cmd === 'اذكار') {    
-    return sendBotMessage(sock, from, { text: `🌙 *الأوامر المتاحة للأذكار:\n\n.اذكار_الصباح\n.اذكار_المساء\n.اذكار_الاستيقاظ\n.اذكار_النوم\n.اذكار_الصلاة\n.اذكار_المسجد` });    
+    return sendBotMessage(sock, from, { text: `🌙 *الأوامر المتاحة للأذكار:\n\n.اذكار_الصباح\n.اذكار_المساء\n.اذكار_الاستيقاظ\n.اذكار_النوم\n.اذكار_الصلاة\n.اذكار_المسجد\n.اذكار_الوضوء\n.اذكار_الطعام\n.اذكار_السفر` });    
 }    
 
 if (cmd === 'نكتة') { return sendBotMessage(sock, from, { text: jokesList[Math.floor(Math.random() * jokesList.length)] }); }    
@@ -2922,7 +2905,7 @@ return;
 if (cmdBase === '4') {
     const islamText = `🕌 *اسلامي:*
 
-> 📖 .قران ↞ جلب 5 آيات من القران الكريم
+> 📖 .سورة <اسم/رقم> [آية] ↞ سورة كاملة أو آية محددة (مثال: .سورة البقرة 255)
 > 🤲 .دعاء ↞ أدعية مباركة عشوائية
 > 📿 .ذكر ↞ أذكار عشوائية مباركة
 > ☪️ .حديث ↞ أحاديث نبوية شريفة
@@ -2931,7 +2914,16 @@ if (cmdBase === '4') {
 > 🥀 .اذكار_الاستيقاظ ↞ أذكار الاستيقاظ من النوم
 > 💤 .اذكار_النوم ↞ أذكار النوم
 > 🕌 .اذكار_الصلاة ↞ أذكار بعد الصلاة المفروضة
-> 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد`;
+> 🏛️ .اذكار_المسجد ↞ أذكار دخول وخروج المسجد
+> 💧 .اذكار_الوضوء ↞ أذكار قبل وبعد الوضوء
+> 🍽️ .اذكار_الطعام ↞ أذكار قبل وبعد الطعام
+> 🧳 .اذكار_السفر ↞ أذكار السفر
+> 🕋 .دعاء_الاستخارة ↞ صلاة ودعاء الاستخارة
+> 🤲 .دعاء_الكرب ↞ أدعية الكرب والهم
+> ✨ .اسماء_الله ↞ اسم من أسماء الله الحسنى مع معناه
+> 📜 .قصة_نبي ↞ قصة مختصرة عن نبي أو صحابي
+> 🔔 .تذكير_اذكار <النوع> <الوقت> ↞ إرسال الأذكار تلقائياً (مثال: .تذكير_اذكار الاستيقاظ 6:00ص)
+> 🔕 .الغاء_تذكير ↞ إلغاء تذكير الأذكار`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
