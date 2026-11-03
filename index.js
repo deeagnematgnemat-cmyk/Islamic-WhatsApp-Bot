@@ -149,7 +149,7 @@ const DEVELOPER_NUMBER = '962796163926';
 // ===== حماية أوامر المطور داخل البوتات الفرعية =====
 // البوت الفرعي لا يقبل أوامر المطور إلا من حساب المطور الأساسي أو حساب البوت الرئيسي
 const MAIN_BOT_NUMBER = String(global.botnumber || '962795106901').replace(/[^0-9]/g, '');
-const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات'];
+const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين'];
 function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
@@ -270,7 +270,7 @@ const validCommands = [
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
 'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
 'صفر', 'بوت', 'devinfo_form',
-'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب',
+'1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب', 'عدد_المنصبين',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
@@ -717,6 +717,8 @@ const GF_ALIASES = [
     [/^توب[ _]المستويات(?=\s|$)/, 'توب_المستويات'],
     [/^توب[ _]المهاجمين(?=\s|$)/, 'توب_المهاجمين'],
     [/^اقرب[ _]ميلاد(?=\s|$)/, 'اقرب_ميلاد'],
+    [/^توب[ _]التفاعل(?=\s|$)/, 'توب_التفاعل'],
+    [/^عدد[ _]المنصبين(?=\s|$)/, 'عدد_المنصبين'],
 ];
 function normalizeGroupFunCmd(cmd) {
     for (const [re, to] of GF_ALIASES) { if (re.test(cmd)) { cmd = cmd.replace(re, to); break; } }
@@ -1466,7 +1468,7 @@ if (isGroup && !isFromMe) {
     if (groupSt.antiOtherBots) {    
         const isBotMsg = (msg.key.id && (msg.key.id.startsWith('BAE5') || msg.key.id.length < 18)) ||     
                          (msg.message.botInvokeMessage || msg.message.templateButtonReplyMessage || msg.message.interactiveResponseMessage) ||    
-                         (body.startsWith('!') || body.startsWith('#') || body.startsWith('/') || body.startsWith('.') && !isValidCmd(body.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا').split(' ')[0]));    
+                         (body.startsWith('!') || body.startsWith('#') || body.startsWith('/') || body.startsWith('.') && !isValidCmd(normalizeGroupFunCmd(body.substring(1).toLowerCase().trim().replace(/[أإآا]/g, 'ا')).split(' ')[0]));    
             
         if (isBotMsg) {    
             try {    
@@ -2328,14 +2330,6 @@ if (cmdBase === 'توب_التفاعل') {
 
         let sortedParticipants = meta.participants.sort((a, b) => (groupMsgs[b.id] || 0) - (groupMsgs[a.id] || 0));
 
-        try {
-            const top50 = sortedParticipants.filter(p => (groupMsgs[p.id] || 0) > 0).slice(0, 50).map(p => ({ id: p.id, count: groupMsgs[p.id] }));
-            const names = {};
-            meta.participants.forEach(p => { names[p.id] = userNames[p.id] || p.name || p.notify || ''; });
-            const png = await buildTopImage({ entries: top50, names, totalMsgs: totalGroupMessages, periodTitle: reqDays === 1 ? 'TODAY' : `LAST ${reqDays} DAYS`, periodSub: periodLabel, memberCount: meta.participants.length });
-            await sendBotMessage(sock, from, { image: png });
-        } catch (e) {}
-
         let text = `📊 *إِحْـصَـائِـيَّـاتُ تـوبِ الـتَّـفَـاعُـلِ ${reqDays === 1 ? `لِـلْيَوْمِ (${todayKey})` : `لِـآخِـرِ ${reqDays} أَيَّـامٍ (${periodLabel})`}:*\n💬 *إجمالي رسائل المجموعة ${reqDays === 1 ? 'اليوم' : 'خلال الفترة'}:* \`${totalGroupMessages}\` رسالة\n*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*\n\n`;
         let mentions = [];
         sortedParticipants.forEach((p, idx) => {
@@ -2345,7 +2339,8 @@ if (cmdBase === 'توب_التفاعل') {
             mentions.push(p.id);
         });
         text += `*❐═━━━═╊⊰ 🍷 ⊱╉═━━━═❐*`;
-        await sendBotMessage(sock, from, { text, mentions });
+        const userPp = await getUserProfilePic(sock, sender);
+        try { await sendBotMessage(sock, from, { image: { url: userPp }, caption: text, mentions }); } catch (e) { await sendBotMessage(sock, from, { text, mentions }); }
         return;
     } catch (e) { return sendBotMessage(sock, from, { text: `❌ تعذر جلب توب التفاعل.` }); }
 }
@@ -2990,6 +2985,7 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 🧪 .اختبار ↞ فحص الأوامر
 > 📢 .إذاعة <النص> ↞ إذاعة عامة
 > 🎬 .اساسي ↞ تغيير فيديو استمارة .بوت (رد على فيديو أو أرسله مع الأمر)
+> 📲 .عدد_المنصبين <رقم> ↞ تغيير عدد الهواتف المنصّبة
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
