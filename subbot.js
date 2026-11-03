@@ -33,6 +33,10 @@ function getSettings(number) {
     return st;
 }
 
+async function ppOf(sock, jid) {
+    try { return await sock.profilePictureUrl(jid, 'image'); } catch (e) { return 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png'; }
+}
+
 const ownerOf = (sock) => (sock?.user?.id || '').split(':')[0].split('@')[0].replace(/[^0-9]/g, '');
 
 // يستخرج الرقم الحقيقي من معرّف (يدعم @lid)
@@ -275,7 +279,7 @@ async function handleSub16({ sock, msg, from, sender, cmd, cmdBase, isDev }) {
 
     if (cmdBase === '16' || cmdBase === 'الفرعي') {
         if (sock.isSubBot && !isOwner) { await reply('❌ هذا القسم لصاحب البوت والمطور فقط.'); return true; }
-        if (!(await sendSectionWithButtons(sock, from, SECTION16_TEXT, null, sender))) await reply(SECTION16_TEXT);
+        { const pp = await ppOf(sock, sender); if (!(await sendSectionWithButtons(sock, from, SECTION16_TEXT, pp, sender))) await sock.sendMessage(from, { image: { url: pp }, caption: SECTION16_TEXT, mentions: [sender] }, { quoted: msg }).catch(() => reply(SECTION16_TEXT)); }
         return true;
     }
 
@@ -419,7 +423,7 @@ export async function handleSubBotCommand({ sock, msg, from, sender, cmd, cmdBas
 
     const reply = (text, mentions) => sock.sendMessage(from, { text, ...(mentions ? { mentions } : {}) }, { quoted: msg });
 
-    if (isSection) { if (!(await sendSectionWithButtons(sock, from, SECTION_TEXT.replace('__MAX__', MAX_SUBBOTS), null, sender))) await reply(SECTION_TEXT.replace('__MAX__', MAX_SUBBOTS)); return true; }
+    if (isSection) { const secText = SECTION_TEXT.replace('__MAX__', MAX_SUBBOTS); const pp = await ppOf(sock, sender); if (!(await sendSectionWithButtons(sock, from, secText, pp, sender))) await sock.sendMessage(from, { image: { url: pp }, caption: secText, mentions: [sender] }, { quoted: msg }).catch(() => reply(secText)); return true; }
 
     // التنصيب يعمل من البوت الرئيسي فقط (يمنع التنصيب المتسلسل)
     if (sock.isSubBot) {
