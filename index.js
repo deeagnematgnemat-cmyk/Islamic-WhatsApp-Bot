@@ -59,21 +59,6 @@ const animeDatabase = [
     "ضوء", "L", "ميزا", "ملو", "ريوك", "ريم", "سويتشيرو", "ماتسودا", "تيروا"
 ];
 
-const sarahaQuestions = [
-    "ما هي الشفرة أو السر الذي تخفيه عن الجميع ولم تتجرأ على قوله لأي شخص؟",
-    "ما هو القرار الأشد صعوبة الذي اتخذته في حياتك وتغيرت بعده تماماً؟",
-    "لو أتيحت لك فرصة الاعتذار لشخص واحد فقط في هذا العالم، فمن سيكون وماذا ستقول له؟",
-    "ما هي الذكرى التي تحاول نسيانها بكل قوتك ولكنها تعود لك دائماً؟",
-    "ما هو العيب الوحيد في شخصيتك الذي تتمنى لو تستطيع تغييره بحزم؟",
-    "هل شعرت يوماً أنك تصنّعت شخصية أخرى فقط لتكسب إعجاب أو احترام الآخرين؟",
-    "ما هو الحلم الأكبر الذي تنازلت عنه مجبراً بسبب الظروف؟",
-    "من هو الشخص في المجموعة الذي تشعر أنك قريب منه دون أن تتحدث معه كثيراً؟",
-    "ما هو أعمق حزن مررت به ولم يلاحظه أي شخص من حولك؟",
-    "ما هو الموقف الذي جعلك تفقد الثقة في شخص كنت تعتبره سندك؟",
-    "لو خُيّرت بين استعادة الماضي أو قراءة المستقبل، ماذا ستختار ولماذا؟",
-    "ما هي الكلمة التي قيلت لك يوماً وما زالت تجرحك أو تؤثر فيك حتى الآن؟"
-];
-
 const khayrokQuestions = [
     "تكتشف مستقبل العالم كاملاً 🔮 أَم تعود بالزمن لتصحيح أكبر أخطائك؟ ⏳",
     "تعيش في عالم أنمي من اختيارك بشخصية جانبية 🗡️ أَم تعيش في العالم الحقيقي بثراء فاحش؟ 💎",
@@ -449,7 +434,7 @@ const validCommands = [
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
-'صراحة', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'انسحب',
+'اكمل', 'رتب', 'عكس', 'انسحب',
 'زواج', 'غزل', 'ثنائي', 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
 'رسائلي', 'توب_التفاعل',
 'المطور', 'مطور', 'الادارة', 'الاداره',
@@ -1769,17 +1754,10 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         const userClean = cleanTextForComparison(trimmedBody);
         const correctClean = cleanTextForComparison(game.answer);
         if (userClean === correctClean) isCorrect = true;
-    } else if (game.type === 'guess') {
-        if (trimmedBody.trim() === game.answer) isCorrect = true;
     } else if (game.type === 'riddles') {
         const userClean = cleanTextForComparison(trimmedBody);
         const correctClean = cleanTextForComparison(game.answer);
         if (userClean.includes(correctClean) || correctClean.includes(userClean)) isCorrect = true;
-    } else if (game.type === 'letter_characters') {
-        const charNames = trimmedBody.split(/[\n,|, /-]+/).map(s => s.trim()).filter(s => s.length > 0);
-        const reqLetter = game.requiredLetter.replace(/[أإآا]/g, 'ا');
-        const validChars = charNames.filter(c => c.replace(/[أإآا]/g, 'ا').startsWith(reqLetter));
-        if (validChars.length >= 3) isCorrect = true;
     }
 
     if (isCorrect) {
@@ -2199,7 +2177,7 @@ if (cmdBase === 'سماح_جهات' || cmdBase === 'سماح جهات') {
 }    
 
 if (activeGames[from]) {    
-    if (['صراحة', 'اكمل', 'رتب', 'خمن', 'حرف', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'زواج'].includes(cmdBase)) {    
+    if (['اكمل', 'رتب', 'عكس', 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'زواج'].includes(cmdBase)) {    
         return sendBotMessage(sock, from, { text: `⚠️ توجد فعالية قيد التشغيل حالياً في هذه المجموعة! قم بالإجابة عليها أو اكتب \`.انسحب\` أولاً.` });    
     }    
 }    
@@ -2222,9 +2200,6 @@ async function startFirstRound(sock, from, gameType) {
     } else if (gameType === 'arrange') {
         gameTitle = '𝐀𝐑𝐑𝐀𝐍𝐆𝐄 𝐆𝐀𝐌𝐄';
         arabicName = 'الترتيب';
-    } else if (gameType === 'guess') {
-        gameTitle = '𝐆𝐔𝐄𝐒𝐒 𝐆𝐀𝐌𝐄';
-        arabicName = 'التخمين';
     }
 
     const startMsg = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
@@ -2269,14 +2244,11 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
         actionInstruction = 'فكك الكلمة بشكل صحيح قبل الجميع!';
     } else if (gameType === 'arrange') {
         actionInstruction = 'رتب الحروف بشكل صحيح قبل الجميع!';
-    } else if (gameType === 'guess') {
-        actionInstruction = 'خمن الرقم الصحيح قبل الجميع!';
     }
 
     let displayContent = word;
     if (gameType === 'disassemble') displayContent = disassembleWord(word);
     if (gameType === 'arrange') displayContent = shuffleString(word);
-    if (gameType === 'guess') displayContent = Math.floor(Math.random() * 50) + 1;
 
     const timer = setTimeout(async () => {
         if (activeGames[from] && activeGames[from].type === gameType && !activeGames[from].isCompleted) {
@@ -2293,9 +2265,6 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
 
     『 *${displayContent}* 』
 
-> ╎ ⏳ الوقت المتاح: 15 ثانية
-> ╎ 🏆 الجائزة: نقطة واحدة
-
 *❐═━━━═╊⊰🍷⊱╉═━━━═❐*
 
 \`⚡ ${actionInstruction}\`
@@ -2305,7 +2274,7 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
     const sent = await sendBotMessage(sock, from, { text: challengeMsg });
     activeGames[from] = { 
         type: gameType, 
-        answer: gameType === 'guess' ? displayContent.toString() : word, 
+        answer: word, 
         timer: timer, 
         isCompleted: false, 
         msgId: sent.key.id,
@@ -2348,16 +2317,6 @@ if (cmd === 'زواج') {
     } catch (e) { return sendBotMessage(sock, from, { text: '❌ تعذر إتمام عقد الزواج.' }); }
 }    
 
-if (cmd === 'صراحة') {    
-    try {    
-        const meta = await sock.groupMetadata(from);    
-        const participants = meta.participants.map(p => p.id);    
-        const randomUser = participants[Math.floor(Math.random() * participants.length)];    
-        const q = sarahaQuestions[Math.floor(Math.random() * sarahaQuestions.length)];
-        return sendBotMessage(sock, from, { text: `💬 *سُـؤَالُ صَـرَاحَـةٍ مَـوَجَّـهٌ إِلَـى @${randomUser.split('@')[0]}:*\n\n> 🎯 ${q}`, mentions: [randomUser] });    
-    } catch (e) { return sendBotMessage(sock, from, { text: `💬 *سُـؤَالُ صَـرَاحَـة:* ${sarahaQuestions[0]}` }); }    
-}    
-
 if (cmd === 'خيروك' || cmd === 'لوخيروك') {    
     const q = khayrokQuestions[Math.floor(Math.random() * khayrokQuestions.length)];
     return sendBotMessage(sock, from, { text: `❓ *لَـعْـبَـةُ لَـوْ خَـيَّـرُوكَ:* \n\n> ${q}` });    
@@ -2378,36 +2337,10 @@ if (cmd === 'رتب') {
     return;
 }
 
-if (cmd === 'حرف') {    
-    if (activeGames[from]) {
-        clearTimeout(activeGames[from].timer);
-        delete activeGames[from];
-    }
-    const letters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ر', 'س', 'ش', 'ص', 'ع', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'هـ', 'و', 'ي'];    
-    const randomLetter = letters[Math.floor(Math.random() * letters.length)];    
-    
-    const timer = setTimeout(async () => {
-        if (activeGames[from] && activeGames[from].type === 'letter_characters' && !activeGames[from].isCompleted) {
-            delete activeGames[from];
-            await sendBotMessage(sock, from, { text: `⏰ *انتهى الوقت المحدد للفعالية!*` });
-        }
-    }, 45000);
-
-    const promptText = `🔠 *فَـعَـالِـيَّـةُ الـحَـرْفِ (الوقت: 45 ثانية):*\n\nالحرف المطلوب: [ *${randomLetter}* ]\n\n📌 *المطلوب:* اكتب 3 أسماء شخصيات أنمي تبدأ بهذا الحرف في رسالة واحدة!`;
-    return sendBotMessage(sock, from, { text: promptText }).then(sent => {
-        activeGames[from] = { type: 'letter_characters', requiredLetter: randomLetter, timer: timer, isCompleted: false, msgId: sent.key.id };
-    });
-}    
-
 if (cmd === 'حكمة') {    
     const item = animeQuotesList[Math.floor(Math.random() * animeQuotesList.length)];    
     const quoteFormatted = `📜 *مَوْسُوعَةُ حِكَمِ وَأَقْوَالِ الشَّخْصِيَّاتِ (الأنمي):*\n\n> "${item.quote}"\n\n👤 *الشَّخْصِيَّة:* \`${item.character}\``;
     return sendBotMessage(sock, from, { text: quoteFormatted });    
-}    
-
-if (cmd === 'خمن') { 
-    startFirstRound(sock, from, 'guess');
-    return;
 }    
 
 if (cmdBase === 'حزورة' || cmdBase === 'لغز') { 
@@ -3071,10 +3004,7 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 > 💍 .زواج ↞ إعلان زواج عشوائي / منشن
 > 🧩 .تفكيك ↞ تفكيك أنمي (+10 نقاط)
 > ✍️ .كتابه ↞ سرعة كتابة (+10 نقاط)
-> 💬 .صراحة ↞ صراحة وجمال الجمل
 > 🔤 .رتب ↞ ترتيب الحروف
-> 🎯 .خمن ↞ خمن الرقم
-> 🔠 .حرف ↞ كلمات بالحرف
 > 🥷 .مافيا ↞ مافيا الأكاتسكي (الأدوار في الخاص)
 > 🕶️ .برا_السالفة ↞ دخيل الأنمي
 > 🧠 .مسابقة ↞ أسئلة أنمي سريعة
