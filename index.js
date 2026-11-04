@@ -2264,11 +2264,7 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
 
     『 *${displayContent}* 』
 
-*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
-
-\`⚡ ${actionInstruction}\`
-
-*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*`;
 
     const sent = await sendBotMessage(sock, from, { text: challengeMsg });
     activeGames[from] = { 
