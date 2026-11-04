@@ -1,5 +1,6 @@
 // ============ anime.js : ألعاب وفعاليات الأنمي (مافيا، برا السالفة، مسابقات، صور...) ============
 import { QUIZ, EMOJI_PUZZLES, CHARACTERS, BARA_WORDS } from './animeData.js';
+import { sendImageWithQuickReply } from './menu.js';
 
 const SIG = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const LINE = '❐═━━━═╊⊰🍷⊱╉═━━━═❐';
@@ -178,10 +179,11 @@ async function pixelate(buf, blocks) {
     } catch (e) { return buf; }
 }
 async function sendImages(g, bufs, caption) {
-    for (let i = 0; i < bufs.length; i++) {
-        await g.sock.sendMessage(g.from, { image: bufs[i], caption: i === 0 ? caption : `🖼️ ${i + 1} / ${bufs.length}` }).catch(() => null);
-        await sleep(600);
-    }
+    // صورة واحدة فقط، ومعها زر «التالي» لبدء نفس الفعالية مرة أخرى
+    if (!bufs.length) return;
+    let sent = false;
+    if (g.nextCmd) sent = await sendImageWithQuickReply(g.sock, g.from, bufs[0], caption, 'التالي', g.nextCmd);
+    if (!sent) await g.sock.sendMessage(g.from, { image: bufs[0], caption }).catch(() => null);
 }
 
 // ================================================================ 1) لوبي مشترك (مافيا + برا السالفة + XO)
@@ -672,15 +674,18 @@ async function xoMove(g, ctx) {
 // ================================================================ 6) ألعاب الصور: خمن الشخصية / معرفة الشخصية / عين
 const MODES = {
     blur: { title: 'خَـمِّـنِ الـشَّـخْـصِـيَّـة', emoji: '🖼️', want: 1, suffix: ' anime', hint: 22000, end: 45000 },
-    album: { title: 'مَـعْـرِفَـةُ الـشَّـخْـصِـيَّـة', emoji: '🎴', want: 5, suffix: ' anime', hint: 30000, end: 60000 },
-    eyes: { title: 'خَـمِّـنْ صَـاحِـبَ الـعَـيْـن', emoji: '👁️', want: 4, suffix: ' anime eyes close up', hint: 25000, end: 50000 }
+    album: { title: 'مَـعْـرِفَـةُ الـشَّـخْـصِـيَّـة', emoji: '🎴', want: 1, suffix: ' anime', hint: 30000, end: 60000 },
+    eyes: { title: 'خَـمِّـنْ صَـاحِـبَ الـعَـيْـن', emoji: '👁️', want: 1, suffix: ' anime eyes close up', hint: 25000, end: 50000 }
 };
 async function charGame(ctx, mode) {
     const { sock, from } = ctx;
+    // ضغط زر «التالي» أثناء نفس اللعبة: ننهي الجولة الحالية ونبدأ جولة جديدة من نفس الفعالية
+    const curGame = games.get(from);
+    if (ctx.msg?.message?.interactiveResponseMessage && curGame && curGame.type === 'char' && curGame.mode === mode) endGame(curGame);
     if (games.has(from) || ctx.hasActiveGame?.()) return sock.sendMessage(from, { text: '⚠️ توجد لعبة قيد التشغيل! اكتبوا ' + bt('.انهاء_اللعبة') });
     const M = MODES[mode];
     const ch = rnd(CHARACTERS);
-    const g = { type: 'char', mode, sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: [...ch.ar, ...ch.en], solved: false };
+    const g = { type: 'char', mode, sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: [...ch.ar, ...ch.en], solved: false, nextCmd: mode === 'blur' ? '.خمن_الشخصية' : mode === 'album' ? '.معرفة_الشخصية' : '.عين' };
     games.set(from, g);
     await sock.sendMessage(from, { text: `${M.emoji} *جاري البحث عن الصور...* انتظر لحظات ⏳` });
     let imgs = [];
@@ -714,9 +719,9 @@ async function eyeBrowse(ctx, query) {
     const q = found ? found.q : query;
     await sock.sendMessage(from, { text: '👁️ *جاري البحث عن العيون...* ⏳' });
     let imgs = [];
-    try { imgs = await getImages(`${q} anime eyes close up`, 4, found ? found.q : query); } catch (e) { imgs = []; }
+    try { imgs = await getImages(`${q} anime eyes close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
     if (!imgs.length) return sock.sendMessage(from, { text: '❌ لم أجد صوراً لهذه الشخصية. جرّب اسماً آخر (مثال: .عين ايرين).' });
-    await sendImages({ sock, from }, imgs, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'));
+    await sendImages({ sock, from, nextCmd: `.عين ${query}` }, imgs, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'));
 }
 
 // ================================================================ المعالجات الرئيسية
