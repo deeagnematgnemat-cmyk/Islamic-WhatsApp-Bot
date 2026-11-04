@@ -277,6 +277,23 @@ export async function sendImageWithQuickReply(sock, jid, image, caption, buttonT
     }
 }
 
+// رسالة نصية مع زر قائمة منسدلة (single_select): rows = [{ header, title, description, id }]
+export async function sendSelectList(sock, jid, text, buttonTitle, rows) {
+    try {
+        await relayInteractive(sock, jid, {
+            header: { hasMediaAttachment: false },
+            body: { text: text || ' ' },
+            nativeFlowMessage: {
+                buttons: [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: buttonTitle, sections: [{ title: buttonTitle, rows }] }) }]
+            }
+        }, { noForward: true });
+        return true;
+    } catch (e) {
+        console.error('تعذر إرسال القائمة:', e?.message || e);
+        return false;
+    }
+}
+
 // يعرض قائمة الأقسام كاملة (زر الأقسام)
 export async function sendSectionsList(sock, jid, mentionJid) {
     await relayInteractive(sock, jid, {
