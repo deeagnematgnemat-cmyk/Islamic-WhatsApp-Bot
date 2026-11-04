@@ -195,11 +195,18 @@ async function cropEyes(buf) {
     } catch (e) { return buf; }
 }
 async function sendImages(g, bufs, caption) {
-    // صورة واحدة فقط، ومعها زر «التالي» لبدء نفس الفعالية مرة أخرى
+    // صورة واحدة فقط وبدون زر
     if (!bufs.length) return;
-    let sent = false;
-    if (g.nextCmd) sent = await sendImageWithQuickReply(g.sock, g.from, bufs[0], caption, 'التالي', g.nextCmd);
-    if (!sent) await g.sock.sendMessage(g.from, { image: bufs[0], caption }).catch(() => null);
+    await g.sock.sendMessage(g.from, { image: bufs[0], caption }).catch(() => null);
+}
+// منشن حقيقي: نفس رقم/معرّف المرسل (بدون رقم الجهاز) حتى يظهر المنشن قابلاً للضغط
+const realJid = (j) => { const [u, d] = String(j || '').split('@'); return u.split(':')[0] + '@' + (d || 's.whatsapp.net'); };
+// استمارة الإجابة (فوز / انتهاء الوقت): نص أو صورة + زر «التالي» لبدء نفس الفعالية مباشرة
+async function sendAnswerForm(g, text, image, mentions = []) {
+    const ments = mentions.map(realJid);
+    if (await sendImageWithQuickReply(g.sock, g.from, image || null, text, 'التالي', g.nextCmd, ments)) return;
+    if (image) await g.sock.sendMessage(g.from, { image, caption: text, mentions: ments }).catch(() => null);
+    else await g.sock.sendMessage(g.from, { text, mentions: ments }).catch(() => null);
 }
 
 // ================================================================ 1) لوبي مشترك (مافيا + برا السالفة + XO)
@@ -708,13 +715,10 @@ const MODES = {
 };
 async function charGame(ctx, mode) {
     const { sock, from } = ctx;
-    // ضغط زر «التالي» أثناء نفس اللعبة: ننهي الجولة الحالية ونبدأ جولة جديدة من نفس الفعالية
-    const curGame = games.get(from);
-    if (ctx.msg?.message?.interactiveResponseMessage && curGame && curGame.type === 'char' && curGame.mode === mode) endGame(curGame);
     if (games.has(from) || ctx.hasActiveGame?.()) return sock.sendMessage(from, { text: '⚠️ توجد لعبة قيد التشغيل! اكتبوا ' + bt('.انهاء_اللعبة') });
     const M = MODES[mode];
     const ch = rnd(CHARACTERS);
-    const g = { type: 'char', mode, sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: [...ch.ar, ...ch.en], solved: false, nextCmd: mode === 'blur' ? '.خمن_الشخصية' : mode === 'album' ? '.معرفة_الشخصية' : '.عين' };
+    const g = { type: 'char', mode, sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: [...ch.ar, ...ch.en], solved: false, nextCmd: (mode === 'blur' ? '.خمن_الشخصية' : mode === 'album' ? '.معرفة_الشخصية' : '.عين') + ' next' };
     games.set(from, g);
     await sock.sendMessage(from, { text: `${M.emoji} *جاري البحث عن الصور...* انتظر لحظات ⏳` });
     let imgs = [];
@@ -735,14 +739,14 @@ async function charGame(ctx, mode) {
     g.timer = setTimeout(async () => {
         if (games.get(from) !== g || g.solved) return;
         g.solved = true;
-        if (mode === 'blur') await sendImages(g, [imgs[0]], `⏰ *انتهى الوقت!*\n✅ الشخصية: ${ch.ar[0]} (${ch.anime})`);
-        else await say(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0])} من أنمي ${ch.anime}`);
         endGame(g);
+        if (mode === 'blur') await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${ch.ar[0]} (${ch.anime})`, imgs[0]);
+        else await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0])} من أنمي ${ch.anime}`, null);
     }, M.end);
 }
 async function eyeBrowse(ctx, query) {
     const { sock, from } = ctx;
-    const left = cooldown('eye:' + from, 12000);
+    const left = ctx.nextTap ? (cooldowns.set('eye:' + from, Date.now()), 0) : cooldown('eye:' + from, 12000);
     if (left) return sock.sendMessage(from, { text: `⏳ انتظر ${left} ثانية قبل البحث التالي.` });
     const found = CHARACTERS.find((c) => matches(query, [...c.ar, ...c.en], c.exact));
     const q = found ? found.q : query;
@@ -751,7 +755,7 @@ async function eyeBrowse(ctx, query) {
     try { imgs = await getImages(`${q} anime face close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
     if (!imgs.length) return sock.sendMessage(from, { text: '❌ لم أجد صوراً لهذه الشخصية. جرّب اسماً آخر (مثال: .عين ايرين).' });
     imgs = [await cropEyes(imgs[0])];
-    await sendImages({ sock, from, nextCmd: `.عين ${query}` }, imgs, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'));
+    await sendAnswerForm({ sock, from, nextCmd: `.عين ${query} next` }, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'), imgs[0]);
 }
 
 // ================================================================ المعالجات الرئيسية
@@ -781,9 +785,8 @@ export async function handleAnimeAnswer(ctx) {
         if (!matches(text, g.answers, g.ch.exact)) return false;
         g.solved = true; clearTimeout(g.timer); clearTimeout(g.timer2);
         await g.bank?.add(ctx.sender, 10);
-        if (g.mode === 'blur') await sendImages(g, [g.imgs[0]], box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(ctx.sender)}\n✅ الشخصية ↞ ${g.ch.ar[0]} (${g.ch.anime})\n🎁 +10 نقاط»`, 'عبقري أنمي!'));
-        else await say(g, box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(ctx.sender)}\n✅ الشخصية ↞ ${g.ch.ar[0]} (${g.ch.anime})\n🎁 +10 نقاط»`, 'عبقري أنمي!'), [ctx.sender]);
         endGame(g);
+        await sendAnswerForm(g, box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(ctx.sender)}\n✅ الشخصية ↞ ${g.ch.ar[0]} (${g.ch.anime})\n🎁 +10 نقاط»`, 'عبقري أنمي!'), g.mode === 'blur' ? g.imgs[0] : null, [ctx.sender]);
         return true;
     }
     return false;
@@ -815,7 +818,8 @@ export async function handleAnimeCommand(ctx) {
     const { sock, from, cmdBase: base } = ctx;
     if (!NAMES.includes(base)) return false;
     ctx.cmd = ctx.cmd || base;
-    const args = ctx.cmd.slice(base.length).trim();
+    let args = ctx.cmd.slice(base.length).trim();
+    if (/(^|\s)next$/i.test(args)) { ctx.nextTap = true; args = args.replace(/(^|\s)next$/i, '').trim(); }
     try {
         switch (base) {
             case 'مافيا': await openLobby(ctx, 'mafia'); return true;
