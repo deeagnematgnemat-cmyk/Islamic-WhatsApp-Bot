@@ -1,6 +1,6 @@
 // ============ anime.js : ألعاب وفعاليات الأنمي (مافيا، برا السالفة، مسابقات، صور...) ============
 import { QUIZ, EMOJI_PUZZLES, CHARACTERS, BARA_WORDS } from './animeData.js';
-import { sendImageWithQuickReply } from './menu.js';
+import { sendImageWithQuickReply, sendSelectList } from './menu.js';
 
 const SIG = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const LINE = '❐═━━━═╊⊰🍷⊱╉═━━━═❐';
@@ -84,6 +84,10 @@ function mkPlayer(ctx) {
     const pn = [k.participantAlt, ctx.sender].find((j) => String(j || '').endsWith('@s.whatsapp.net'));
     return { jid: ctx.sender, ids: idsOf(ctx), dm: pn || ctx.sender, alive: true, got: false, n: 0 };
 }
+// لقب اللاعب (يُعرض بدل المنشن في مافيا وبرا السالفة)
+const nm = (p) => p.nick || tag(p.jid);
+const parseNick = (ctx) => String(ctx.trimmedBody || '').replace(/^\S+\s*/, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+const nickTaken = (g, nick, except) => g.players.some((q) => q !== except && q.nick && norm(q.nick) === norm(nick));
 function cooldown(key, ms) {
     const now = Date.now();
     const left = (cooldowns.get(key) || 0) + ms - now;
@@ -212,16 +216,18 @@ async function openLobby(ctx, type) {
         return sock.sendMessage(from, { text: '⚠️ توجد لعبة أو فعالية قيد التشغيل في هذه المجموعة! أنهوها أو اكتبوا ' + bt('.انهاء_اللعبة') });
     }
     const host = mkPlayer(ctx);
+    const hostNick = parseNick(ctx);
+    if (hostNick && norm(hostNick)) host.nick = hostNick;
     const g = { type, phase: 'lobby', sock, from, bank: ctx.bank, host: host.jid, hostIds: host.ids, players: [host], min: type === 'mafia' ? 5 : 3 };
     games.set(from, g);
     g.timer = setTimeout(() => { if (games.get(from) === g && g.phase === 'lobby') { endGame(g); say(g, '⌛ أُلغيت اللعبة لعدم اكتمال اللاعبين.'); } }, 5 * 60 * 1000);
     const isMafia = type === 'mafia';
     const text = box(isMafia ? '🥷' : '🕶️', isMafia ? 'مَـافِـيَـا الأَكَـاتْـسُـكِـي' : 'بَـرَّا الـسَّـالِـفَـة (أَنْـمِـي)',
-        `«👑 ⌯ المضيف ↞ ${tag(host.jid)}\n👥 ⌯ اللاعبون ↞ 1 / ${MAX_PLAYERS}\n🎯 ⌯ الحد الأدنى ↞ ${g.min} لاعبين»\n\n` +
+        `«👑 ⌯ المضيف ↞ ${nm(host)}\n👥 ⌯ اللاعبون ↞ 1 / ${MAX_PLAYERS}\n🎯 ⌯ الحد الأدنى ↞ ${g.min} لاعبين»\n\n` +
         (isMafia
             ? '🥷 الأكاتسكي يتخفّون بين أهل كونوها.. والطبيبة والمحقق يحاولان إنقاذ القرية!\n📩 الأدوار تصل في *الخاص* — تأكد أن خاصّك مفتوح للبوت.'
             : '🎌 الجميع يعرف اسم الأنمي إلا واحد منكم (برا السالفة)!\nتكلموا عن الأنمي دون ذكر اسمه، ثم صوّتوا على من تظنونه الدخيل.\n📩 الكلمة تصل في *الخاص*.'),
-        'اكتبوا .انضم للدخول — والمضيف يكتب .ابدا للبدء');
+        'اكتبوا .انضم <لقبكم> للدخول — والمضيف يكتب .ابدا للبدء');
     await sock.sendMessage(from, { text, mentions: [host.jid] });
 }
 
@@ -230,21 +236,27 @@ async function joinCommand(ctx) {
     const g = games.get(from);
     if (!g || g.phase !== 'lobby') return sock.sendMessage(from, { text: '📌 لا توجد لعبة مفتوحة للانضمام حالياً.' });
     const ids = idsOf(ctx);
-    if (g.players.some((p) => hasId(p, ids))) return sock.sendMessage(from, { text: '✅ أنت منضم بالفعل!' });
-    if (g.type === 'xo') {
-        if (g.targetNum && !ids.has(g.targetNum)) return sock.sendMessage(from, { text: `⚠️ هذا التحدي موجّه إلى @${g.targetNum} فقط.`, mentions: [g.targetJid] });
-        g.players.push(mkPlayer(ctx));
-        return xoStart(g);
+    const me = g.players.find((p) => hasId(p, ids));
+    if (g.type !== 'xo') {   // مافيا / برا السالفة: التسجيل باللقب
+        const nick = parseNick(ctx);
+        if (me && me.nick) return sock.sendMessage(from, { text: `✅ أنت منضم بالفعل بلقب «${me.nick}»` });
+        if (!nick || !norm(nick)) return sock.sendMessage(from, { text: '📌 اكتب لقبك بعد الأمر، مثال: ' + bt('.انضم ناروتو') });
+        if (nickTaken(g, nick, me)) return sock.sendMessage(from, { text: '⚠️ هذا اللقب مستخدم، اختر لقباً آخر.' });
+        if (me) { me.nick = nick; return sock.sendMessage(from, { text: `✅ تم تسجيل لقبك: «${nick}»` }); }
+        if (g.players.length >= MAX_PLAYERS) return sock.sendMessage(from, { text: '⚠️ اكتمل عدد اللاعبين.' });
+        const np = mkPlayer(ctx); np.nick = nick; g.players.push(np);
+        return sock.sendMessage(from, { text: `✅ «${nick}» انضم إلى اللعبة  ⟦ ${g.players.length} / ${MAX_PLAYERS} ⟧` });
     }
-    if (g.players.length >= MAX_PLAYERS) return sock.sendMessage(from, { text: '⚠️ اكتمل عدد اللاعبين.' });
+    if (me) return sock.sendMessage(from, { text: '✅ أنت منضم بالفعل!' });
+    if (g.targetNum && !ids.has(g.targetNum)) return sock.sendMessage(from, { text: `⚠️ هذا التحدي موجّه إلى @${g.targetNum} فقط.`, mentions: [g.targetJid] });
     g.players.push(mkPlayer(ctx));
-    await sock.sendMessage(from, { text: `✅ ${tag(ctx.sender)} انضم إلى اللعبة  ⟦ ${g.players.length} / ${MAX_PLAYERS} ⟧`, mentions: [ctx.sender] });
+    return xoStart(g);
 }
 
 async function playersCommand(ctx) {
     const g = games.get(ctx.from);
     if (!g || !g.players) return ctx.sock.sendMessage(ctx.from, { text: '📌 لا توجد لعبة فيها لاعبون الآن.' });
-    const lines = g.players.map((p, i) => `🔹 ${p.n || i + 1} ↞ ${tag(p.jid)}${g.phase !== 'lobby' && !p.alive ? ' 💀' : ''}`).join('\n');
+    const lines = g.players.map((p, i) => `🔹 ${p.n || i + 1} ↞ ${nm(p)}${g.phase !== 'lobby' && !p.alive ? ' 💀' : ''}`).join('\n');
     return ctx.sock.sendMessage(ctx.from, { text: box('👥', 'قَـائِـمَـةُ الـلَّاعِـبِـيـن', lines, 'اللعبة: ' + g.type), mentions: g.players.map((p) => p.jid) });
 }
 
@@ -256,6 +268,8 @@ async function startCommand(ctx) {
     if (g.phase !== 'lobby') return ctx.sock.sendMessage(ctx.from, { text: '⚠️ اللعبة بدأت بالفعل.' });
     if (g.type === 'xo') return ctx.sock.sendMessage(ctx.from, { text: '⏳ بانتظار انضمام الخصم بكتابة .انضم' });
     if (g.players.length < g.min) return ctx.sock.sendMessage(ctx.from, { text: `⚠️ العدد غير كافٍ! الحد الأدنى ${g.min} لاعبين (الآن ${g.players.length}).` });
+    const noNick = g.players.filter((p) => !p.nick);
+    if (noNick.length) return ctx.sock.sendMessage(ctx.from, { text: `⚠️ لا يمكن البدء — لاعبون لم يسجلوا لقباً:\n${noNick.map((p) => '🔹 ' + tag(p.jid)).join('\n')}\n\nيكتب كلٌّ منهم: ${bt('.انضم <اللقب>')}`, mentions: noNick.map((p) => p.jid) });
     clearTimeout(g.timer);
     g.players.forEach((p, i) => { p.n = i + 1; });
     return g.type === 'mafia' ? mafiaBegin(g) : baraBegin(g);
@@ -275,7 +289,7 @@ async function deliverAll(g, onReady) {
     if (!failed.length) return onReady();
     g.phase = 'verify'; g.onReady = onReady;
     await say(g, box('📨', 'تَـعَـذَّرَ إِرْسَـالُ الأَدْوَار',
-        `«لم تصل الرسالة إلى:\n${failed.map((p) => '🔹 ' + tag(p.jid)).join('\n')}»\n\nراسلوا البوت في *الخاص* واكتبوا ${bt('.دوري')} ليصلكم دوركم.\n⏳ ننتظر حتى 90 ثانية قبل بدء الليل.`, 'لا تبدأ اللعبة قبل استلام الجميع لأدوارهم'), failed.map((p) => p.jid));
+        `«لم تصل الرسالة إلى:\n${failed.map((p) => '🔹 ' + nm(p)).join('\n')}»\n\nراسلوا البوت في *الخاص* واكتبوا ${bt('.دوري')} ليصلكم دوركم.\n⏳ ننتظر حتى 90 ثانية قبل بدء الليل.`, 'لا تبدأ اللعبة قبل استلام الجميع لأدوارهم'), failed.map((p) => p.jid));
     g.verifyTimer = setTimeout(async () => {
         if (games.get(g.from) !== g || g.phase !== 'verify') return;
         await say(g, '⏭️ تجاوزنا الانتظار — من لم يستلم دوره يكتب .دوري في الخاص في أي وقت.');
@@ -304,13 +318,13 @@ function roleText(g, p) {
     let extra = '';
     if (p.role === 'mafia') {
         const mates = g.players.filter((x) => x.role === 'mafia' && x !== p);
-        extra = `\n🤝 زملاؤك: ${mates.length ? mates.map((x) => `${x.n}) ${tag(x.jid)}`).join('، ') : 'لا أحد — أنت وحدك!'}`;
+        extra = `\n🤝 زملاؤك: ${mates.length ? mates.map((x) => `${x.n}) ${nm(x)}`).join('، ') : 'لا أحد — أنت وحدك!'}`;
     }
     return box(r.e, 'دَوْرُكَ فِي الـلُّـعْـبَـة', `«${r.e} ⌯ دورك ↞ ${r.n}\n📜 ⌯ مهمتك ↞ ${r.d}»${extra}\n\n🔢 رقمك في اللعبة: *${p.n}*`, 'لا تُخبر أحداً بدورك!');
 }
 
 const aliveOf = (g) => g.players.filter((p) => p.alive);
-const listOf = (g, onlyAlive = true) => (onlyAlive ? aliveOf(g) : g.players).map((p) => `🔹 ${p.n} ↞ ${tag(p.jid)}${p.alive ? '' : ' 💀'}`).join('\n');
+const listOf = (g, onlyAlive = true) => (onlyAlive ? aliveOf(g) : g.players).map((p) => `🔹 ${p.n} ↞ ${nm(p)}${p.alive ? '' : ' 💀'}`).join('\n');
 
 // ---------------------------------------------------------------- مافيا
 async function mafiaBegin(g) {
@@ -355,7 +369,7 @@ async function mafiaNightAction(ctx, g, p, kind) {
     if (need === 'doctor') g.night.protect = target.n;
     if (need === 'detective') {
         g.night.check = target.n;
-        await reply(box('🕵️', 'نَـتِـيـجَـةُ الـفَـحْـص', `«👤 اللاعب ${target.n} ↞ ${tag(target.jid)}\n🔎 النتيجة ↞ ${target.role === 'mafia' ? '🥷 من الأكاتسكي!' : '🍃 ليس من الأكاتسكي'}»`, 'استخدم المعلومة بحكمة'));
+        await reply(box('🕵️', 'نَـتِـيـجَـةُ الـفَـحْـص', `«👤 اللاعب ${target.n} ↞ ${nm(target)}\n🔎 النتيجة ↞ ${target.role === 'mafia' ? '🥷 من الأكاتسكي!' : '🍃 ليس من الأكاتسكي'}»`, 'استخدم المعلومة بحكمة'));
     } else {
         await reply(`✅ تم تسجيل اختيارك: اللاعب ${target.n}.`);
     }
@@ -376,7 +390,7 @@ async function mafiaDawn(g) {
     else {
         const v = g.players.find((p) => p.n === targetN);
         v.alive = false; mentions.push(v.jid);
-        text = `🌅 أشرقت الشمس على جريمة!\n💀 قُتل ${tag(v.jid)} الليلة.\n🎭 كان دوره: ${M_ROLES[v.role].e} ${M_ROLES[v.role].n}`;
+        text = `🌅 أشرقت الشمس على جريمة!\n💀 قُتل ${nm(v)} الليلة.\n🎭 كان دوره: ${M_ROLES[v.role].e} ${M_ROLES[v.role].n}`;
     }
     await say(g, box('☀️', 'الـصَّـبَـاح', text, 'ناقشوا من تشكّون به'), mentions);
     if (await mafiaCheckWin(g)) return;
@@ -391,7 +405,7 @@ async function mafiaCheckWin(g) {
     else if (m >= o) { winners = g.players.filter((p) => p.role === 'mafia'); title = '🥷 فاز الأكاتسكي! سيطروا على القرية.'; }
     if (!winners) return false;
     for (const w of winners) await g.bank?.add(w.jid, 40);
-    const roles = g.players.map((p) => `${M_ROLES[p.role].e} ${p.n} ↞ ${tag(p.jid)} (${M_ROLES[p.role].n})`).join('\n');
+    const roles = g.players.map((p) => `${M_ROLES[p.role].e} ${p.n} ↞ ${nm(p)} (${M_ROLES[p.role].n})`).join('\n');
     await say(g, box('🏆', 'نِـهَـايَـةُ الـمَـافِـيَـا', `«${title}\n🎁 مكافأة الفائزين: +40 نقطة»\n\n📜 الأدوار:\n${roles}`, 'شكراً للعب!'), g.players.map((p) => p.jid));
     endGame(g);
     return true;
@@ -401,7 +415,10 @@ async function mafiaCheckWin(g) {
 async function votePhase(g) {
     if (games.get(g.from) !== g) return;
     g.phase = 'vote'; g.votes = new Map(); clearTimeout(g.timer);
-    await say(g, box('🗳️', 'وَقْـتُ الـتَّـصْـوِيـت', `«👥 اللاعبون:\n${listOf(g)}»\n\nصوّتوا بالأمر ${bt('.صوت <الرقم>')}\n⏳ المدة: 45 ثانية`, 'من يحصل على أكثر الأصوات يُطرد'), aliveOf(g).map((p) => p.jid));
+    const text = box('🗳️', 'وَقْـتُ الـتَّـصْـوِيـت', `«👥 اللاعبون:\n${listOf(g)}»\n\nاضغط زر ${bt('تصويت')} واختر اللقب\n⏳ المدة: 45 ثانية`, 'من يحصل على أكثر الأصوات يُطرد');
+    const rows = aliveOf(g).map((p) => ({ header: '', title: p.nick || ('لاعب ' + p.n), description: 'اختيار هذا اللقب', id: `.صوت ${p.n}` }));
+    const ok = await sendSelectList(g.sock, g.from, text, 'تصويت', rows);
+    if (!ok) await say(g, text + `\n\nأو اكتبوا ${bt('.صوت <الرقم>')}`);
     g.timer = setTimeout(() => tallyVotes(g), 45000);
 }
 const baraVote = (g) => votePhase(g);
@@ -415,7 +432,7 @@ async function voteCommand(ctx) {
     const target = aliveOf(g).find((p) => p.n === n);
     if (!target) return ctx.sock.sendMessage(ctx.from, { text: '⚠️ رقم غير صحيح — اكتب .صوت ورقم اللاعب.' });
     g.votes.set(voter.n, target.n);
-    await ctx.sock.sendMessage(ctx.from, { text: `🗳️ ${tag(voter.jid)} صوّت (${g.votes.size} / ${aliveOf(g).length})`, mentions: [voter.jid] });
+    await ctx.sock.sendMessage(ctx.from, { text: `🗳️ ${nm(voter)} صوّت (${g.votes.size} / ${aliveOf(g).length})`, mentions: [voter.jid] });
     if (g.votes.size >= aliveOf(g).length) { clearTimeout(g.timer); tallyVotes(g); }
 }
 async function tallyVotes(g) {
@@ -435,12 +452,12 @@ async function tallyVotes(g) {
     if (g.type === 'bara') {
         if (!out.outsider) return baraResult(g, 'wrong', g.players.find((p) => p.outsider), out);
         g.phase = 'guess'; g.guessBy = out;
-        await say(g, box('🎯', 'تَـمَّ كَـشْـفُـه!', `«${summary}»\n\n🕶️ ${tag(out.jid)} هو برا السالفة فعلاً!\n🎬 لديه 30 ثانية ليخمّن اسم الأنمي — اكتب إجابتك في الشات.`, 'فرصته الأخيرة!'), [out.jid]);
+        await say(g, box('🎯', 'تَـمَّ كَـشْـفُـه!', `«${summary}»\n\n🕶️ ${nm(out)} هو برا السالفة فعلاً!\n🎬 لديه 30 ثانية ليخمّن اسم الأنمي — اكتب إجابتك في الشات.`, 'فرصته الأخيرة!'), [out.jid]);
         g.timer = setTimeout(() => { if (games.get(g.from) === g && g.phase === 'guess') baraResult(g, 'caught', out); }, 30000);
         return;
     }
     out.alive = false;
-    await say(g, box('⚔️', 'نَـتِـيـجَـةُ الـتَّـصْـوِيـت', `«${summary}»\n\n💀 تم طرد ${tag(out.jid)}\n🎭 كان دوره: ${M_ROLES[out.role].e} ${M_ROLES[out.role].n}`, 'القرار الجماعي نُفّذ'), [out.jid]);
+    await say(g, box('⚔️', 'نَـتِـيـجَـةُ الـتَّـصْـوِيـت', `«${summary}»\n\n💀 تم طرد ${nm(out)}\n🎭 كان دوره: ${M_ROLES[out.role].e} ${M_ROLES[out.role].n}`, 'القرار الجماعي نُفّذ'), [out.jid]);
     if (await mafiaCheckWin(g)) return;
     return mafiaNight(g);
 }
@@ -455,7 +472,7 @@ async function baraBegin(g) {
     await deliverAll(g, async () => {
         if (games.get(g.from) !== g) return;
         g.phase = 'talk';
-        const order = shuffle(g.players).map((p, i) => `🔹 ${i + 1} ↞ ${tag(p.jid)}`).join('\n');
+        const order = shuffle(g.players).map((p, i) => `🔹 ${i + 1} ↞ ${nm(p)}`).join('\n');
         await say(g, box('💬', 'جَـوْلَـةُ الـوَصْـف', `«كل لاعب يكتب جملة قصيرة يصف بها الأنمي دون ذكر اسمه، بالترتيب التالي:»\n\n${order}\n\n⏳ بعد دقيقتين يبدأ التصويت تلقائياً\n(المضيف يكتب ${bt('.ابدا')} للتصويت المبكر)`, 'اكشفوا الدخيل بذكائكم'), g.players.map((p) => p.jid));
         g.timer = setTimeout(() => baraVote(g), 120000);
     });
@@ -463,10 +480,10 @@ async function baraBegin(g) {
 async function baraResult(g, kind, outsider, voted) {
     const crew = g.players.filter((p) => !p.outsider);
     let text, winners;
-    if (kind === 'guessed') { winners = [outsider]; text = `🕶️ ${tag(outsider.jid)} خمّن الأنمي بنجاح ونجا!`; }
-    else if (kind === 'wrong') { winners = [outsider]; text = `🕶️ طردتم ${tag(voted.jid)} خطأً! الدخيل الحقيقي هو ${tag(outsider.jid)} وقد فاز.`; }
-    else if (kind === 'tie') { winners = [outsider]; text = `⚖️ تعادلت الأصوات فنجا الدخيل ${tag(outsider.jid)} وفاز!`; }
-    else { winners = crew; text = `🎌 فاز اللاعبون! كُشف الدخيل ${tag(outsider.jid)} ولم يستطع تخمين الأنمي.`; }
+    if (kind === 'guessed') { winners = [outsider]; text = `🕶️ ${nm(outsider)} خمّن الأنمي بنجاح ونجا!`; }
+    else if (kind === 'wrong') { winners = [outsider]; text = `🕶️ طردتم ${nm(voted)} خطأً! الدخيل الحقيقي هو ${nm(outsider)} وقد فاز.`; }
+    else if (kind === 'tie') { winners = [outsider]; text = `⚖️ تعادلت الأصوات فنجا الدخيل ${nm(outsider)} وفاز!`; }
+    else { winners = crew; text = `🎌 فاز اللاعبون! كُشف الدخيل ${nm(outsider)} ولم يستطع تخمين الأنمي.`; }
     const pts = kind === 'caught' ? 30 : 50;
     for (const w of winners) await g.bank?.add(w.jid, pts);
     await say(g, box('🏆', 'نِـهَـايَـةُ بَـرَّا الـسَّـالِـفَـة', `«${text}\n🎬 الأنمي كان ↞ ${g.word.w}\n🎁 المكافأة: +${pts} نقطة للفائزين»`, 'جولة أخرى؟ اكتبوا .برا_السالفة'), g.players.map((p) => p.jid));
