@@ -1745,9 +1745,9 @@ if (activeGames[from] && !trimmedBody.startsWith('.')) {
         const correctClean = cleanTextForComparison(game.answer);
         if (userClean === correctClean) isCorrect = true;
     } else if (game.type === 'disassemble') {
-        const expectedDisassembled = disassembleWord(game.answer).replace(/[أإآاىئؤة]/g, 'ا').toLowerCase();
-        const userDisassembledInput = trimmedBody.split('').join(' ').replace(/\s+/g, ' ').trim().replace(/[أإآاىئؤة]/g, 'ا').toLowerCase();
-        if (userDisassembledInput === expectedDisassembled || cleanTextForComparison(trimmedBody) === cleanTextForComparison(game.answer)) {
+        const expectedDisassembled = disassembleWord(game.answer).replace(/[أإآاىئؤة]/g, 'ا').replace(/\s+/g, ' ').trim().toLowerCase();
+        const userDisassembledInput = trimmedBody.replace(/[أإآاىئؤة]/g, 'ا').replace(/\s+/g, ' ').trim().toLowerCase();
+        if (userDisassembledInput === expectedDisassembled) {
             isCorrect = true;
         }
     } else if (game.type === 'arrange') {
@@ -2247,7 +2247,6 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
     }
 
     let displayContent = word;
-    if (gameType === 'disassemble') displayContent = disassembleWord(word);
     if (gameType === 'arrange') displayContent = shuffleString(word);
 
     const timer = setTimeout(async () => {
