@@ -178,6 +178,18 @@ async function pixelate(buf, blocks) {
         return await sharp(small).resize(W, H, { kernel: 'nearest' }).jpeg({ quality: 85 }).toBuffer();
     } catch (e) { return buf; }
 }
+// يقصّ الصورة ويُبقي شريط العيون فقط (تقدير بحسب موضع العيون المعتاد في وجوه الأنمي)
+async function cropEyes(buf) {
+    try {
+        const sharp = (await import('sharp')).default;
+        const base = await sharp(buf, { failOn: 'none' }).rotate().toBuffer();
+        const meta = await sharp(base).metadata();
+        const W = meta.width, H = meta.height;
+        const left = Math.round(W * 0.12), width = Math.round(W * 0.76);
+        const top = Math.round(H * 0.27), height = Math.max(1, Math.round(H * 0.28));
+        return await sharp(base).extract({ left, top, width, height }).resize({ width: 900, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
+    } catch (e) { return buf; }
+}
 async function sendImages(g, bufs, caption) {
     // صورة واحدة فقط، ومعها زر «التالي» لبدء نفس الفعالية مرة أخرى
     if (!bufs.length) return;
@@ -719,8 +731,9 @@ async function eyeBrowse(ctx, query) {
     const q = found ? found.q : query;
     await sock.sendMessage(from, { text: '👁️ *جاري البحث عن العيون...* ⏳' });
     let imgs = [];
-    try { imgs = await getImages(`${q} anime eyes close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
+    try { imgs = await getImages(`${q} anime face close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
     if (!imgs.length) return sock.sendMessage(from, { text: '❌ لم أجد صوراً لهذه الشخصية. جرّب اسماً آخر (مثال: .عين ايرين).' });
+    imgs = [await cropEyes(imgs[0])];
     await sendImages({ sock, from, nextCmd: `.عين ${query}` }, imgs, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'));
 }
 
