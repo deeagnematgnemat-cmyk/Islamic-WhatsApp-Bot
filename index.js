@@ -14,7 +14,7 @@ import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collec
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
 import { handleIslamicCommand, normalizeIslamicCmd, islamicCommandNames, setupIslamicReminders } from './islamic.js';
 import { buildTopImage } from './topimage.js';
-import { handleAnimeCommand, handleAnimeAnswer, handleAnimePrivate, animeCommandNames } from './anime.js';
+import { handleAnimeCommand, handleAnimeAnswer, handleAnimePrivate, animeCommandNames, withdrawAnime } from './anime.js';
 import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
 
 const PORT = process.env.PORT || 8080;
@@ -1728,6 +1728,8 @@ if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {
     if (activeGames[from]) {    
         clearTimeout(activeGames[from].timer);    
         delete activeGames[from];    
+        return sendBotMessage(sock, from, { text: `🚪 *تم إلغاء الفعالية بنجاح!*`, mentions: [sender] });    
+    } else if (isGroup && withdrawAnime(from)) {    
         return sendBotMessage(sock, from, { text: `🚪 *تم إلغاء الفعالية بنجاح!*`, mentions: [sender] });    
     } else {    
         return sendBotMessage(sock, from, { text: `📌 لا توجد فعالية قيد التشغيل حالياً لإلغائها.` });    
