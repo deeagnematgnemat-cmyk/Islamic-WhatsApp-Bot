@@ -213,10 +213,24 @@ async function sendImages(g, bufs, caption) {
 }
 // منشن حقيقي: نفس رقم/معرّف المرسل (بدون رقم الجهاز) حتى يظهر المنشن قابلاً للضغط
 const realJid = (j) => { const [u, d] = String(j || '').split('@'); return u.split(':')[0] + '@' + (d || 's.whatsapp.net'); };
+// رقم الفائز الحقيقي (s.whatsapp.net) بدل المعرّف المخفي (lid) حتى يظهر المنشن باسم العضو وليس رقماً وهمياً
+async function realMentionJid(ctx) {
+    const k = ctx.msg?.key || {};
+    const isPn = (j) => String(j || '').endsWith('@s.whatsapp.net');
+    const pn = [k.participantAlt, k.remoteJidAlt, ctx.sender].find(isPn);
+    if (pn) return realJid(pn);
+    try {
+        const meta = await ctx.sock.groupMetadata(ctx.from);
+        const me = (meta.participants || []).find((p) => [p.id, p.lid, p.jid].some((x) => x && num(x) === num(ctx.sender)));
+        const alt = [me?.phoneNumber, me?.jid, me?.id].find(isPn);
+        if (alt) return realJid(alt);
+    } catch (e) { /* نكتفي بالمعرّف الأصلي */ }
+    return ctx.sender;
+}
 // استمارة الإجابة (فوز / انتهاء الوقت): نص أو صورة + زر «التالي» لبدء نفس الفعالية مباشرة
-async function sendAnswerForm(g, text, image, mentions = []) {
+async function sendAnswerForm(g, text, image, mentions = [], withButton = true) {
     const ments = mentions.map(realJid);
-    if (await sendImageWithQuickReply(g.sock, g.from, image || null, text, 'التالي', g.nextCmd, ments)) return;
+    if (withButton && await sendImageWithQuickReply(g.sock, g.from, image || null, text, 'التالي', g.nextCmd, ments)) return;
     if (image) await g.sock.sendMessage(g.from, { image, caption: text, mentions: ments }).catch(() => null);
     else await g.sock.sendMessage(g.from, { text, mentions: ments }).catch(() => null);
 }
@@ -762,8 +776,8 @@ async function charGame(ctx, mode) {
         if (games.get(from) !== g || g.solved) return;
         g.solved = true;
         endGame(g);
-        if (mode === 'blur') await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${ch.ar[0]} (${ch.anime})`, imgs[0]);
-        else await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0])} من أنمي ${ch.anime}`, null);
+        if (mode === 'blur') await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${ch.ar[0]} (${ch.anime})`, imgs[0], [], false);
+        else await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0])} من أنمي ${ch.anime}`, null, [], false);
     }, M.end);
 }
 async function eyeBrowse(ctx, query) {
@@ -792,7 +806,8 @@ export async function handleAnimeAnswer(ctx) {
         g.solved = true; clearTimeout(g.timer);
         g.scores[ctx.sender] = (g.scores[ctx.sender] || 0) + 1;
         await g.bank?.add(ctx.sender, 2);
-        await say(g, box('✅', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(ctx.sender)}\n💡 الإجابة ↞ ${g.cur.a[0]}\n🎁 +2 نقطة»`, `رصيد الجولات: ${g.scores[ctx.sender]}`), [ctx.sender]);
+        const wj = await realMentionJid(ctx);
+        await say(g, box('✅', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(wj)}\n💡 الإجابة ↞ ${g.cur.a[0]}\n🎁 +2 نقطة»`, `رصيد الجولات: ${g.scores[ctx.sender]}`), [wj]);
         g.timer2 = setTimeout(() => nextRound(g), 2500);
         return true;
     }
@@ -801,7 +816,8 @@ export async function handleAnimeAnswer(ctx) {
         g.solved = true; clearTimeout(g.timer); clearTimeout(g.timer2);
         await g.bank?.add(ctx.sender, 10);
         endGame(g);
-        await sendAnswerForm(g, box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(ctx.sender)}\n✅ الشخصية ↞ ${g.ch.ar[0]} (${g.ch.anime})\n🎁 +10 نقاط»`, 'عبقري أنمي!'), g.mode === 'blur' ? g.imgs[0] : null, [ctx.sender]);
+        const wj = await realMentionJid(ctx);
+        await sendAnswerForm(g, box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(wj)}\n✅ الشخصية ↞ ${g.ch.ar[0]} (${g.ch.anime})\n🎁 +10 نقاط»`, 'عبقري أنمي!'), g.mode === 'blur' ? g.imgs[0] : null, [wj]);
         return true;
     }
     return false;
