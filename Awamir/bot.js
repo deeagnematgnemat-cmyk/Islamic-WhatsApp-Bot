@@ -49,7 +49,7 @@ let handler = async (m, { conn, usedPrefix }) => {
                                 title: "الأقسام الرئيسية للبوت",
                                 rows: [
                                     { title: "🛡️ 1. الحماية", description: "أوامر الحظر، منع الروابط، وتصفير الإنذارات", id: `${usedPrefix}1` },
-                                    { title: "🎉 2. الترفيه والألعاب", description: "ألعاب التفكيك، الترتيب، التخمين والزواج", id: `${usedPrefix}2` },
+                                    { title: "🎉 2. الترفيه والألعاب", description: "ألعاب التفكيك، الترتيب والزواج", id: `${usedPrefix}2` },
                                     { title: "💳 3. البنك والنقاط", description: "كشف الحساب، التحويل، والمكافآت اليومية", id: `${usedPrefix}3` },
                                     { title: "🕌 4. القسم الإسلامي", description: "قرآن، أدعية، أذكار وأحاديث نبوية", id: `${usedPrefix}4` },
                                     { title: "😂 5. قسم الضحك", description: "نكت، تساؤلات خيالية ومقولات", id: `${usedPrefix}5` },
