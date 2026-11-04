@@ -274,6 +274,23 @@ export async function sendImageWithQuickReply(sock, jid, image, caption, buttonT
     }
 }
 
+// رسالة فيها زر واحد يفتح قائمة تحديد (single_select): rows = [{ header, title, description, id }]
+export async function sendSelectList(sock, jid, text, buttonTitle, rows) {
+    try {
+        const sections = [];
+        for (let i = 0; i < rows.length; i += 10) sections.push({ title: rows.length > 10 ? `الألقاب ${Math.floor(i / 10) + 1}` : 'الألقاب', rows: rows.slice(i, i + 10) });
+        await relayInteractive(sock, jid, {
+            header: { hasMediaAttachment: false },
+            body: { text },
+            nativeFlowMessage: { buttons: [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: buttonTitle, sections }) }] }
+        }, { noForward: true });
+        return true;
+    } catch (e) {
+        console.error('تعذر إرسال قائمة التحديد:', e?.message || e);
+        return false;
+    }
+}
+
 // يعرض قائمة الأقسام كاملة (زر الأقسام)
 export async function sendSectionsList(sock, jid, mentionJid) {
     await relayInteractive(sock, jid, {
