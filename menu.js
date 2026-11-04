@@ -256,6 +256,24 @@ export async function sendImageCarousel(sock, jid, cards, { text = '', footer = 
     }, { noForward: true });
 }
 
+// صورة واحدة + زر تفاعلي واحد تحتها (يُرسل id الزر كأنه أمر كتبه العضو)
+export async function sendImageWithQuickReply(sock, jid, image, caption, buttonText, buttonId) {
+    try {
+        let header = { hasMediaAttachment: false };
+        const media = await prepareWAMessageMedia({ image: Buffer.isBuffer(image) ? image : { url: image } }, { upload: sock.waUploadToServer });
+        if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+        await relayInteractive(sock, jid, {
+            header,
+            body: { text: caption || ' ' },
+            nativeFlowMessage: { buttons: [{ name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: buttonText, id: buttonId }) }] }
+        }, { noForward: true });
+        return true;
+    } catch (e) {
+        console.error('تعذر إرسال الصورة مع الزر:', e?.message || e);
+        return false;
+    }
+}
+
 // يعرض قائمة الأقسام كاملة (زر الأقسام)
 export async function sendSectionsList(sock, jid, mentionJid) {
     await relayInteractive(sock, jid, {
