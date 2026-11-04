@@ -102,6 +102,16 @@ function clearGame(g) {
 function endGame(g) { clearGame(g); if (games.get(g.from) === g) games.delete(g.from); }
 const isHostOrAdmin = (ctx, g) => ctx.isSenderAdmin || ctx.isSenderDev || (g.hostIds && [...g.hostIds].some((x) => idsOf(ctx).has(x)));
 
+// الانسحاب من أي فعالية أنمي جارية في المجموعة (لعبة أو تحدي حجر/ورقة/مقص): يرجع true إن أُلغيت فعالية
+export function withdrawAnime(from) {
+    let done = false;
+    const g = games.get(from);
+    if (g) { endGame(g); done = true; }
+    const d = duels.get(from);
+    if (d) { clearTimeout(d.timer); duels.delete(from); done = true; }
+    return done;
+}
+
 // ---------------------------------------------------------------- جلب الصور (Pinterest ثم Bing ثم Jikan)
 async function axiosLib() { return (await import('axios')).default; }
 async function pinUrls(q) {
@@ -189,6 +199,8 @@ async function cropEyes(buf) {
         const base = await sharp(buf, { failOn: 'none' }).rotate().toBuffer();
         const meta = await sharp(base).metadata();
         const W = meta.width, H = meta.height;
+        // الصورة أصلاً شريط عيون عريض (لقطة عيون مقرّبة): تُترك كما هي بدون قص حتى لا تضيع العيون
+        if (W / H >= 1.6) return await sharp(base).resize({ width: 900, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
         const left = Math.round(W * 0.12), width = Math.round(W * 0.76);
         const top = Math.round(H * 0.27), height = Math.max(1, Math.round(H * 0.28));
         return await sharp(base).extract({ left, top, width, height }).resize({ width: 900, withoutEnlargement: false }).jpeg({ quality: 90 }).toBuffer();
@@ -739,11 +751,11 @@ async function charGame(ctx, mode) {
     const head = box(M.emoji, M.title, mode === 'blur'
         ? `«🕵️ من هي هذه الشخصية؟ (الصورة مموّهة)\n⏳ الوقت: ${M.end / 1000} ثانية»`
         : `«🔎 من صاحب ${mode === 'eyes' ? 'هذه العيون' : 'هذه الصور'}؟\n🖼️ عدد الصور: ${imgs.length}\n⏳ الوقت: ${M.end / 1000} ثانية»`, 'اكتب اسم الشخصية في الشات — الأسرع يفوز');
-    const first = mode === 'blur' ? [await pixelate(imgs[0], 12)] : imgs;
+    const first = mode === 'blur' ? [await pixelate(imgs[0], 18)] : mode === 'eyes' ? [await cropEyes(imgs[0])] : imgs;
     await sendImages(g, first, head);
     g.timer2 = setTimeout(async () => {
         if (games.get(from) !== g || g.solved) return;
-        if (mode === 'blur') await sendImages(g, [await pixelate(imgs[0], 36)], `💡 *تلميح:* الأنمي ↞ ${ch.anime}\n(الصورة أوضح الآن)`);
+        if (mode === 'blur') await sendImages(g, [await pixelate(imgs[0], 54)], `💡 *تلميح:* الأنمي ↞ ${ch.anime}\n(الصورة أوضح الآن)`);
         else await say(g, `💡 *تلميح:* الأنمي ↞ ${bt(ch.anime)}`);
     }, M.hint);
     g.timer = setTimeout(async () => {
@@ -762,7 +774,7 @@ async function eyeBrowse(ctx, query) {
     const q = found ? found.q : query;
     await sock.sendMessage(from, { text: '👁️ *جاري البحث عن العيون...* ⏳' });
     let imgs = [];
-    try { imgs = await getImages(`${q} anime face close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
+    try { imgs = await getImages(`${q} anime eyes close up`, 1, found ? found.q : query); } catch (e) { imgs = []; }
     if (!imgs.length) return sock.sendMessage(from, { text: '❌ لم أجد صوراً لهذه الشخصية. جرّب اسماً آخر (مثال: .عين ايرين).' });
     imgs = [await cropEyes(imgs[0])];
     await sendAnswerForm({ sock, from, nextCmd: `.عين ${query} next` }, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'), imgs[0]);
