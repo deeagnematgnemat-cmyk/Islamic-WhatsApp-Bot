@@ -15,7 +15,7 @@ const NAMES = [
     'حجر', 'ورقة', 'ورقه', 'مقص',
     'اكس_او', 'xo', 'خمن_ايموجي', 'خمن_الايموجي',
     'خمن_الشخصية', 'خمن_الشخصيه', 'معرفة_الشخصية', 'معرفه_الشخصيه', 'عين',
-    'انضم', 'ابدا', 'لاعبين', 'صوت', 'قتل', 'حماية', 'حمايه', 'فحص', 'دوري',
+    'سالفة', 'انضم', 'ابدا', 'لاعبين', 'صوت', 'قتل', 'حماية', 'حمايه', 'فحص', 'دوري',
     'انهاء_اللعبة', 'انهاء_لعبة', 'انهاء_اللعبه'
 ];
 export const animeCommandNames = NAMES;
@@ -227,7 +227,6 @@ async function openLobby(ctx, type) {
     if (hostNick && norm(hostNick)) host.nick = hostNick;
     const g = { type, phase: 'lobby', sock, from, bank: ctx.bank, host: host.jid, hostIds: host.ids, players: [host], min: type === 'mafia' ? 5 : 3 };
     games.set(from, g);
-    g.timer = setTimeout(() => { if (games.get(from) === g && g.phase === 'lobby') { endGame(g); say(g, '⌛ أُلغيت اللعبة لعدم اكتمال اللاعبين.'); } }, 5 * 60 * 1000);
     const isMafia = type === 'mafia';
     const text = box(isMafia ? '🥷' : '🕶️', isMafia ? 'مَـافِـيَـا الأَكَـاتْـسُـكِـي' : 'بَـرَّا الـسَّـالِـفَـة (أَنْـمِـي)',
         `«👑 ⌯ المضيف ↞ ${nm(host)}\n👥 ⌯ اللاعبون ↞ 1 / ${MAX_PLAYERS}\n🎯 ⌯ الحد الأدنى ↞ ${g.min} لاعبين»\n\n` +
@@ -271,7 +270,12 @@ async function startCommand(ctx) {
     const g = games.get(ctx.from);
     if (!g) return ctx.sock.sendMessage(ctx.from, { text: '📌 لا توجد لعبة مفتوحة للبدء.' });
     if (!isHostOrAdmin(ctx, g)) return ctx.sock.sendMessage(ctx.from, { text: '❌ البدء للمضيف أو المشرفين فقط!' });
-    if (g.type === 'bara' && g.phase === 'talk') { clearTimeout(g.timer); return baraVote(g); }
+    // المضيف هو من يدير الفعالية بـ .ابدا (لا توجد مدة زمنية)
+    if (g.phase === 'talk') return votePhase(g);
+    if (g.phase === 'vote') return tallyVotes(g);
+    if (g.type === 'mafia' && g.phase === 'night') return mafiaDawn(g);
+    if (g.phase === 'verify') return g.onReady();
+    if (g.phase === 'guess') return ctx.sock.sendMessage(ctx.from, { text: '⏳ بانتظار اختيار الدخيل للأنمي من القائمة.' });
     if (g.phase !== 'lobby') return ctx.sock.sendMessage(ctx.from, { text: '⚠️ اللعبة بدأت بالفعل.' });
     if (g.type === 'xo') return ctx.sock.sendMessage(ctx.from, { text: '⏳ بانتظار انضمام الخصم بكتابة .انضم' });
     if (g.players.length < g.min) return ctx.sock.sendMessage(ctx.from, { text: `⚠️ العدد غير كافٍ! الحد الأدنى ${g.min} لاعبين (الآن ${g.players.length}).` });
@@ -296,12 +300,7 @@ async function deliverAll(g, onReady) {
     if (!failed.length) return onReady();
     g.phase = 'verify'; g.onReady = onReady;
     await say(g, box('📨', 'تَـعَـذَّرَ إِرْسَـالُ الأَدْوَار',
-        `«لم تصل الرسالة إلى:\n${failed.map((p) => '🔹 ' + nm(p)).join('\n')}»\n\nراسلوا البوت في *الخاص* واكتبوا ${bt('.دوري')} ليصلكم دوركم.\n⏳ ننتظر حتى 90 ثانية قبل بدء الليل.`, 'لا تبدأ اللعبة قبل استلام الجميع لأدوارهم'), failed.map((p) => p.jid));
-    g.verifyTimer = setTimeout(async () => {
-        if (games.get(g.from) !== g || g.phase !== 'verify') return;
-        await say(g, '⏭️ تجاوزنا الانتظار — من لم يستلم دوره يكتب .دوري في الخاص في أي وقت.');
-        g.onReady();
-    }, 90000);
+        `«لم تصل الرسالة إلى:\n${failed.map((p) => '🔹 ' + nm(p)).join('\n')}»\n\nراسلوا البوت في *الخاص* واكتبوا ${bt('.دوري')} ليصلكم دوركم.\n⏭️ المضيف يكتب ${bt('.ابدا')} للمتابعة دون انتظارهم.`, 'لا تبدأ اللعبة قبل استلام الجميع لأدوارهم'), failed.map((p) => p.jid));
 }
 async function myRoleCommand(ctx) {
     const ids = idsOf(ctx);
@@ -352,15 +351,14 @@ async function mafiaNight(g) {
     const actors = aliveOf(g).filter((p) => ['mafia', 'doctor', 'detective'].includes(p.role));
     g.actorCount = actors.length;
     await say(g, box('🌙', `الـلَّـيْـل — الـلَّـيْـلَـةُ ${g.round}`,
-        `«🌑 القرية تنام والظلام يسدل ستاره...\n🥷 الأكاتسكي يختارون ضحيتهم\n🩺 الطبيبة تحمي أحدهم\n🕵️ المحقق يفحص مشتبهاً به»\n\n👥 الأحياء:\n${listOf(g)}\n\n⏳ الوقت: 60 ثانية (الأدوار تُنفّذ في الخاص)`, 'التصرف الليلي يكون في الخاص فقط'), aliveOf(g).map((p) => p.jid));
+        `«🌑 القرية تنام والظلام يسدل ستاره...\n🥷 الأكاتسكي يختارون ضحيتهم\n🩺 الطبيبة تحمي أحدهم\n🕵️ المحقق يفحص مشتبهاً به»\n\n👥 الأحياء:\n${listOf(g)}\n\n📩 الأدوار تُنفّذ في الخاص — المضيف يكتب ${bt('.ابدا')} لإنهاء الليل`, 'التصرف الليلي يكون في الخاص فقط'), aliveOf(g).map((p) => p.jid));
     const list = listOf(g);
     for (const p of actors) {
         const cmd = p.role === 'mafia' ? '.قتل' : p.role === 'doctor' ? '.حماية' : '.فحص';
         const act = p.role === 'mafia' ? 'اختر ضحية الليلة' : p.role === 'doctor' ? 'اختر من تحميه الليلة' : 'اختر من تفحصه الليلة';
-        await sendDm(g, p, box(M_ROLES[p.role].e, 'مُـهِـمَّـةُ الـلَّـيْـل', `«${act}»\n\n${list}\n\nأرسل: ${bt(cmd + ' <الرقم>')}`, '60 ثانية فقط!'), aliveOf(g).map((x) => x.jid));
+        await sendDm(g, p, box(M_ROLES[p.role].e, 'مُـهِـمَّـةُ الـلَّـيْـل', `«${act}»\n\n${list}\n\nأرسل: ${bt(cmd + ' <الرقم>')}`, 'اختر بحكمة!'), aliveOf(g).map((x) => x.jid));
         await sleep(400);
     }
-    g.timer = setTimeout(() => mafiaDawn(g), 60000);
 }
 async function mafiaNightAction(ctx, g, p, kind) {
     const reply = (t) => ctx.sock.sendMessage(ctx.from, { text: t });
@@ -402,8 +400,7 @@ async function mafiaDawn(g) {
     await say(g, box('☀️', 'الـصَّـبَـاح', text, 'ناقشوا من تشكّون به'), mentions);
     if (await mafiaCheckWin(g)) return;
     g.phase = 'talk';
-    await say(g, box('💬', 'وَقْـتُ الـنِّـقَـاش', `«👥 الأحياء:\n${listOf(g)}»\n\n⏳ التصويت يبدأ بعد 45 ثانية.`, 'ناقشوا وحاولوا كشف الأكاتسكي'), aliveOf(g).map((p) => p.jid));
-    g.timer = setTimeout(() => votePhase(g), 45000);
+    await say(g, box('💬', 'وَقْـتُ الـنِّـقَـاش', `«👥 الأحياء:\n${listOf(g)}»\n\n🗳️ المضيف يكتب ${bt('.ابدا')} لبدء التصويت.`, 'ناقشوا وحاولوا كشف الأكاتسكي'), aliveOf(g).map((p) => p.jid));
 }
 async function mafiaCheckWin(g) {
     const al = aliveOf(g), m = al.filter((p) => p.role === 'mafia').length, o = al.length - m;
@@ -422,11 +419,10 @@ async function mafiaCheckWin(g) {
 async function votePhase(g) {
     if (games.get(g.from) !== g) return;
     g.phase = 'vote'; g.votes = new Map(); clearTimeout(g.timer);
-    const text = box('🗳️', 'وَقْـتُ الـتَّـصْـوِيـت', `«👥 اللاعبون:\n${listOf(g)}»\n\nاضغط زر ${bt('تصويت')} واختر اللقب\n⏳ المدة: 45 ثانية`, 'من يحصل على أكثر الأصوات يُطرد');
+    const text = box('🗳️', 'وَقْـتُ الـتَّـصْـوِيـت', `«👥 اللاعبون:\n${listOf(g)}»\n\nاضغط زر ${bt('تصويت')} واختر اللقب\n🏁 المضيف يكتب ${bt('.ابدا')} لإنهاء التصويت`, 'من يحصل على أكثر الأصوات يُطرد');
     const rows = aliveOf(g).map((p) => ({ header: '', title: p.nick || ('لاعب ' + p.n), description: 'اختيار هذا اللقب', id: `.صوت ${p.n}` }));
     const ok = await sendSelectList(g.sock, g.from, text, 'تصويت', rows);
     if (!ok) await say(g, text + `\n\nأو اكتبوا ${bt('.صوت <الرقم>')}`);
-    g.timer = setTimeout(() => tallyVotes(g), 45000);
 }
 const baraVote = (g) => votePhase(g);
 async function voteCommand(ctx) {
@@ -438,9 +434,21 @@ async function voteCommand(ctx) {
     const n = parseInt(toEn(ctx.cmd.split(' ')[1] || ''), 10);
     const target = aliveOf(g).find((p) => p.n === n);
     if (!target) return ctx.sock.sendMessage(ctx.from, { text: '⚠️ رقم غير صحيح — اكتب .صوت ورقم اللاعب.' });
+    if (g.votes.has(voter.n)) return ctx.sock.sendMessage(ctx.from, { text: `⚠️ ${nm(voter)} صوّتَّ بالفعل — لا يمكن التصويت أكثر من مرة.`, mentions: [voter.jid] });
     g.votes.set(voter.n, target.n);
     await ctx.sock.sendMessage(ctx.from, { text: `🗳️ ${nm(voter)} صوّت (${g.votes.size} / ${aliveOf(g).length})`, mentions: [voter.jid] });
     if (g.votes.size >= aliveOf(g).length) { clearTimeout(g.timer); tallyVotes(g); }
+}
+// اختيار الدخيل لاسم الأنمي من القائمة: صح = فوزه، خطأ = خسارته
+async function baraPick(ctx, args) {
+    const g = games.get(ctx.from);
+    if (!g || g.type !== 'bara' || g.phase !== 'guess') return ctx.sock.sendMessage(ctx.from, { text: '📌 لا يوجد اختيار جارٍ الآن.' });
+    if (!hasId(g.guessBy, idsOf(ctx))) return ctx.sock.sendMessage(ctx.from, { text: '❌ الاختيار للدخيل فقط!' });
+    const n = parseInt(toEn(args || ''), 10);
+    const opt = g.options[n - 1];
+    if (!opt) return ctx.sock.sendMessage(ctx.from, { text: '⚠️ اختيار غير صحيح — اختر من القائمة.' });
+    g.phase = 'done';
+    return baraResult(g, opt === g.word ? 'guessed' : 'caught', g.guessBy);
 }
 async function tallyVotes(g) {
     if (games.get(g.from) !== g || g.phase !== 'vote') return;
@@ -449,7 +457,7 @@ async function tallyVotes(g) {
     for (const t of g.votes.values()) counts[t] = (counts[t] || 0) + 1;
     const top = Math.max(0, ...Object.values(counts));
     const tops = Object.keys(counts).filter((k) => counts[k] === top).map(Number);
-    const summary = Object.entries(counts).map(([k, v]) => `🔹 ${k} ↞ ${v} صوت`).join('\n') || 'لا أصوات';
+    const summary = Object.entries(counts).map(([k, v]) => `🔹 ${nm(g.players.find((p) => p.n === Number(k)) || { jid: '' })} ↞ ${v} صوت`).join('\n') || 'لا أصوات';
     if (!top || tops.length > 1) {
         await say(g, box('⚖️', 'تَـعَـادُل', `«${summary}»\n\nتعادلت الأصوات — لا أحد يُطرد!`, 'ننتقل للمرحلة التالية'));
         if (g.type === 'mafia') return mafiaNight(g);
@@ -459,8 +467,11 @@ async function tallyVotes(g) {
     if (g.type === 'bara') {
         if (!out.outsider) return baraResult(g, 'wrong', g.players.find((p) => p.outsider), out);
         g.phase = 'guess'; g.guessBy = out;
-        await say(g, box('🎯', 'تَـمَّ كَـشْـفُـه!', `«${summary}»\n\n🕶️ ${nm(out)} هو برا السالفة فعلاً!\n🎬 لديه 30 ثانية ليخمّن اسم الأنمي — اكتب إجابتك في الشات.`, 'فرصته الأخيرة!'), [out.jid]);
-        g.timer = setTimeout(() => { if (games.get(g.from) === g && g.phase === 'guess') baraResult(g, 'caught', out); }, 30000);
+        g.options = shuffle([g.word, ...shuffle(BARA_WORDS.filter((w) => w !== g.word)).slice(0, 5)]);
+        const gtext = box('🎯', 'تَـمَّ كَـشْـفُـه!', `«${summary}»\n\n🕶️ ${nm(out)} هو برا السالفة فعلاً!\n🎬 على الدخيل أن يختار اسم الأنمي الصحيح من القائمة — إن أصاب فاز وإن أخطأ خسر!`, 'فرصته الأخيرة!');
+        const grows = g.options.map((o, i) => ({ header: '', title: o.w, description: 'اختيار هذا الأنمي', id: `.سالفة ${i + 1}` }));
+        const gok = await sendSelectList(g.sock, g.from, gtext, 'اختر الأنمي', grows);
+        if (!gok) await say(g, gtext + `\n\n${g.options.map((o, i) => `🔹 ${i + 1} ↞ ${o.w}`).join('\n')}\n\nاكتب ${bt('.سالفة <الرقم>')}`, [out.jid]);
         return;
     }
     out.alive = false;
@@ -480,8 +491,7 @@ async function baraBegin(g) {
         if (games.get(g.from) !== g) return;
         g.phase = 'talk';
         const order = shuffle(g.players).map((p, i) => `🔹 ${i + 1} ↞ ${nm(p)}`).join('\n');
-        await say(g, box('💬', 'جَـوْلَـةُ الـوَصْـف', `«كل لاعب يكتب جملة قصيرة يصف بها الأنمي دون ذكر اسمه، بالترتيب التالي:»\n\n${order}\n\n⏳ بعد دقيقتين يبدأ التصويت تلقائياً\n(المضيف يكتب ${bt('.ابدا')} للتصويت المبكر)`, 'اكشفوا الدخيل بذكائكم'), g.players.map((p) => p.jid));
-        g.timer = setTimeout(() => baraVote(g), 120000);
+        await say(g, box('💬', 'جَـوْلَـةُ الـوَصْـف', `«كل لاعب يكتب جملة قصيرة يصف بها الأنمي دون ذكر اسمه، بالترتيب التالي:»\n\n${order}\n\n🗳️ المضيف يكتب ${bt('.ابدا')} عندما تنتهون لبدء التصويت`, 'اكشفوا الدخيل بذكائكم'), g.players.map((p) => p.jid));
     });
 }
 async function baraResult(g, kind, outsider, voted) {
@@ -765,13 +775,6 @@ export async function handleAnimeAnswer(ctx) {
     if (!g) return false;
     const text = ctx.trimmedBody;
     if (g.type === 'xo' && g.phase === 'play') return xoMove(g, ctx);
-    if (g.type === 'bara' && g.phase === 'guess') {
-        if (!hasId(g.guessBy, idsOf(ctx))) return false;
-        clearTimeout(g.timer);
-        const ok = matches(text, g.word.a);
-        await baraResult(g, ok ? 'guessed' : 'caught', g.guessBy);
-        return true;
-    }
     if ((g.type === 'quiz' || g.type === 'emoji') && g.cur && !g.solved) {
         if (!matches(text, g.cur.a)) return false;
         g.solved = true; clearTimeout(g.timer);
@@ -824,6 +827,7 @@ export async function handleAnimeCommand(ctx) {
         switch (base) {
             case 'مافيا': await openLobby(ctx, 'mafia'); return true;
             case 'برا': case 'برا_السالفة': case 'برا_السالفه': await openLobby(ctx, 'bara'); return true;
+            case 'سالفة': await baraPick(ctx, args); return true;
             case 'انضم': await joinCommand(ctx); return true;
             case 'ابدا': await startCommand(ctx); return true;
             case 'لاعبين': await playersCommand(ctx); return true;
