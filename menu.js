@@ -256,37 +256,23 @@ export async function sendImageCarousel(sock, jid, cards, { text = '', footer = 
     }, { noForward: true });
 }
 
-// صورة واحدة + زر تفاعلي واحد تحتها (يُرسل id الزر كأنه أمر كتبه العضو)
-export async function sendImageWithQuickReply(sock, jid, image, caption, buttonText, buttonId) {
+// رسالة (صورة اختيارية + نص) ومعها زر تفاعلي واحد تحتها؛ id الزر يُرسَل كأنه أمر كتبه العضو
+export async function sendImageWithQuickReply(sock, jid, image, caption, buttonText, buttonId, mentions = []) {
     try {
         let header = { hasMediaAttachment: false };
-        const media = await prepareWAMessageMedia({ image: Buffer.isBuffer(image) ? image : { url: image } }, { upload: sock.waUploadToServer });
-        if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+        if (image) {
+            const media = await prepareWAMessageMedia({ image: Buffer.isBuffer(image) ? image : { url: image } }, { upload: sock.waUploadToServer });
+            if (media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
+        }
         await relayInteractive(sock, jid, {
             header,
             body: { text: caption || ' ' },
+            ...(mentions && mentions.length ? { contextInfo: { mentionedJid: mentions } } : {}),
             nativeFlowMessage: { buttons: [{ name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: buttonText, id: buttonId }) }] }
         }, { noForward: true });
         return true;
     } catch (e) {
-        console.error('تعذر إرسال الصورة مع الزر:', e?.message || e);
-        return false;
-    }
-}
-
-// رسالة فيها زر واحد يفتح قائمة تحديد (single_select): rows = [{ header, title, description, id }]
-export async function sendSelectList(sock, jid, text, buttonTitle, rows) {
-    try {
-        const sections = [];
-        for (let i = 0; i < rows.length; i += 10) sections.push({ title: rows.length > 10 ? `الألقاب ${Math.floor(i / 10) + 1}` : 'الألقاب', rows: rows.slice(i, i + 10) });
-        await relayInteractive(sock, jid, {
-            header: { hasMediaAttachment: false },
-            body: { text },
-            nativeFlowMessage: { buttons: [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: buttonTitle, sections }) }] }
-        }, { noForward: true });
-        return true;
-    } catch (e) {
-        console.error('تعذر إرسال قائمة التحديد:', e?.message || e);
+        console.error('تعذر إرسال الرسالة مع الزر:', e?.message || e);
         return false;
     }
 }
