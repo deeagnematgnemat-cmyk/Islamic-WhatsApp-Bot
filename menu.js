@@ -143,9 +143,23 @@ export async function sendDevInfoWithButton(sock, jid, text, videoUrl, devUrl) {
 
 // يقرأ رقم الصف الذي اختاره العضو من القائمة (مثل ".4") ليعالجه البوت كأنه كتب الأمر
 export function getButtonId(message) {
-    const r = message?.interactiveResponseMessage?.nativeFlowResponseMessage;
-    if (!r || !r.paramsJson) return '';
-    try { return JSON.parse(r.paramsJson).id || ''; } catch (e) { return ''; }
+    // فكّ الأغلفة (رسائل مؤقتة / عرض لمرة واحدة) ليُقرأ الرد داخلها
+    let m = message;
+    for (let i = 0; i < 4 && m; i++) {
+        const inner = m.ephemeralMessage?.message || m.viewOnceMessage?.message || m.viewOnceMessageV2?.message || m.documentWithCaptionMessage?.message;
+        if (!inner) break;
+        m = inner;
+    }
+    const ir = m?.interactiveResponseMessage;
+    const r = ir?.nativeFlowResponseMessage;
+    if (r && r.paramsJson) {
+        try {
+            const p = JSON.parse(r.paramsJson);
+            const id = p.id || p.selectedId || p.selected_id || p.row_id;
+            if (id) return String(id);
+        } catch (e) { /* ننتقل للصيغ الأخرى */ }
+    }
+    return m?.buttonsResponseMessage?.selectedButtonId || m?.templateButtonReplyMessage?.selectedId || '';
 }
 
 // ===== زر تحت كل قسم: [قائمة الأقسام] =====
