@@ -34,7 +34,7 @@ const norm = (s) => s.replace(/[أإآا]/g, 'ا');
 const COMMANDS = {
     // الملصقات
     'ملصق': ['s', 'ستكر'], 'دائري': ['round'], 'سرقة': ['steal'], 'لصورة': ['toimage', 'img'], 'ايموجي': ['emoji'],
-    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'ملصقات': [],
+    'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'متحرك': [], 'ملصقات': [],
     // الصور
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
     'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تحسين_4k': [], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
@@ -75,6 +75,7 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > ⭕ .دائري ↞ ملصق دائري
 > 🗂️ .باك [اسم] ↞ صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
 > 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
+> 🎞️ .متحرك <اسم الشخصية> ↞ حزمة ملصقات متحركة (30 ملصق) للشخصية من tenor
 
 💡 أرسل الأمر مع الصورة أو رد على صورة/فيديو/ملصق.`;
 
@@ -494,7 +495,7 @@ async function packThumb(stickers) {
 }
 
 // يبني رسالة الحزمة: ZIP فيه كل الملصقات + أيقونة الحزمة، مشفّراً ومرفوعاً، ثم بياناته
-async function buildPackMessage(sock, { title, author, stickers }) {
+async function buildPackMessage(sock, { title, author, stickers, animated = false }) {
     const sharp = await getSharp();
     const packId = crypto.randomUUID();
     const entries = stickers.map((b, i) => ({ buf: b, fileName: `${String(i).padStart(2, '0')}_${sha256(b).toString('base64url')}.webp` }));
@@ -511,7 +512,7 @@ async function buildPackMessage(sock, { title, author, stickers }) {
         name: title,
         publisher: author || AUTHOR,
         packDescription: `${title} • ${AUTHOR}`,
-        stickers: entries.map((e) => ({ fileName: e.fileName, isAnimated: false, isLottie: false, emojis: ['🍷'], accessibilityLabel: '', mimetype: 'image/webp' })),
+        stickers: entries.map((e) => ({ fileName: e.fileName, isAnimated: !!animated, isLottie: false, emojis: ['🍷'], accessibilityLabel: '', mimetype: 'image/webp' })),
         fileLength: zip.length,
         fileSha256: sha256(zip),
         fileEncSha256: up.encSha,
@@ -535,10 +536,10 @@ async function buildPackMessage(sock, { title, author, stickers }) {
 }
 
 // يرسل حزمة واتساب الأصلية (بطاقة «عرض مجموعة الملصقات»)؛ يعيد false إذا لم يمكن ذلك فتُرسل الملصقات واحداً واحداً
-async function sendNativePack(c, { title, author, stickers }) {
+async function sendNativePack(c, { title, author, stickers, animated = false }) {
     if (!nativePackSupported()) { console.error('[حزمة-أصلية] نسخة Baileys المثبّتة لا تدعم stickerPackMessage، حدّث المكتبة في package.json'); return false; }
     try {
-        const msg = await buildPackMessage(c.sock, { title, author, stickers });
+        const msg = await buildPackMessage(c.sock, { title, author, stickers, animated });
         const gen = BaileysNs.generateWAMessageFromContent || BaileysNs.default?.generateWAMessageFromContent;
         let full;
         try { full = gen(c.from, { stickerPackMessage: msg }, { userJid: c.sock.user?.id, quoted: c.msg }); }
@@ -551,7 +552,7 @@ async function sendNativePack(c, { title, author, stickers }) {
         await c.sock.sendMessage(c.from, {
             stickerPack: {
                 name: title, publisher: author || AUTHOR, description: `${title} • ${AUTHOR}`, cover: stickers[0],
-                stickers: stickers.map((b) => ({ sticker: b, data: b, emojis: ['🍷'], isAnimated: false }))
+                stickers: stickers.map((b) => ({ sticker: b, data: b, emojis: ['🍷'], isAnimated: !!animated }))
             }
         }, { quoted: c.msg });
         return true;
@@ -864,6 +865,113 @@ async function cmdCharPack(c) {
         if (stickers.length < PACK_MIN) return await c.reply(`❌ لم أجد ملصقات كافية للشخصية (${name}). جرّب كتابة الاسم بالإنجليزية أو اسماً آخر.`);
         await c.reply(`〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق\n〔 📤 〕 جاري إرسال الحزمة...`);
         if (await sendNativePack(c, { title, author: AUTHOR, animated: false, stickers })) return;
+        let sent = 0;
+        for (const st of stickers) {
+            try { await c.sock.sendMessage(c.from, { sticker: st }); sent++; } catch (e) { logErr('إرسال-ملصق', e); }
+            await sleep(700);
+        }
+        if (!sent) return await c.reply('❌ تعذر إرسال الحزمة، حاول مرة أخرى.');
+        await c.reply(`✅ تم إرسال ${sent} ملصق من حزمة (${title}).`);
+    } finally { PACK_BUSY.delete(c.from); }
+}
+
+// ----- .متحرك <اسم الشخصية> : نفس تنفيذ .حزمة لكن بملصقات متحركة (GIF الشخصية من tenor.com تُحوَّل إلى ملصقات متحركة)
+const ANIM_MAX_BYTES = 500 * 1024;                  // حد حجم الملصق المتحرك في واتساب
+const ANIM_FALLBACK_BYTES = 900 * 1024;
+const TENOR_V1_KEY = process.env.TENOR_API_KEY || 'LIVDSRZULELA';
+
+// تحويل رابط tenor إلى صيغة GIF كاملة الحجم (آخر حرف بعد AAAA يحدد الصيغة: C = gif كامل)
+const tenorFullGif = (u) => u.replace(/(AAAA)[A-Za-z0-9](\/)/, '$1C$2');
+const tenorId = (u) => (u.match(/tenor\.com\/(?:m\/)?([A-Za-z0-9_-]+?)AAAA[A-Za-z0-9]\//) || [])[1] || u;
+
+// المصدر الأول: واجهة tenor (نتائج منظمة وأكثر عدداً)
+async function tenorApiSearch(q, limit = 50) {
+    const j = await httpJson(`https://g.tenor.com/v1/search?q=${encodeURIComponent(q)}&key=${encodeURIComponent(TENOR_V1_KEY)}&limit=${limit}&contentfilter=medium&media_filter=minimal`, { timeout: 25000 });
+    const out = [];
+    for (const r of (j?.results || [])) {
+        const m = r?.media?.[0] || {};
+        const urls = [m.mp4?.url, m.gif?.url, m.tinygif?.url].filter(Boolean);
+        if (urls.length) out.push({ id: r.id || urls[0], urls });
+    }
+    return out;
+}
+// المصدر الاحتياطي: قراءة روابط GIF من صفحة البحث في tenor.com نفسها
+async function tenorPageSearch(q) {
+    const slug = q.trim().toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, '-').replace(/^-+|-+$/g, '');
+    const html = (await (await http(`https://tenor.com/search/${encodeURIComponent(slug)}-gifs`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).text()).replace(/\\\//g, '/');
+    const out = [], seen = new Set();
+    for (const m of html.matchAll(/https:\/\/media\d*\.tenor\.com\/[^"'\s<>\\]+?\.gif/g)) {
+        const id = tenorId(m[0]);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push({ id, urls: [tenorFullGif(m[0]), m[0]] });
+    }
+    return out;
+}
+
+// تحويل ملف GIF/MP4 إلى ملصق متحرك بحجم مناسب (يقلّل الجودة/المدة تلقائياً حتى يدخل في حد الحجم)
+async function animToSticker(buf, title) {
+    const id = uid();
+    const inp = path.join(TMP, `an_in_${id}.bin`), mid = path.join(TMP, `an_mid_${id}.mp4`);
+    fs.writeFileSync(inp, buf);
+    let best = null;
+    try {
+        for (const { q, t, fps } of [{ q: 50, t: 5, fps: 15 }, { q: 35, t: 4, fps: 12 }, { q: 20, t: 3, fps: 10 }]) {
+            rm(mid);
+            await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-t', String(t), '-an', '-vf', `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '23', mid], 60000);
+            const st = await makeSticker(fs.readFileSync(mid), StickerTypes.FULL, { pack: title, author: AUTHOR, quality: q });
+            if (!isWebp(st)) continue;
+            if (st.length <= ANIM_MAX_BYTES) return st;
+            if (!best || st.length < best.length) best = st;
+        }
+    } finally { rm(inp, mid); }
+    return best && best.length <= ANIM_FALLBACK_BYTES ? best : null;
+}
+
+async function charAnimFromTenor(keywords, title) {
+    const items = [], seen = new Set();
+    const add = (list) => { for (const it of list) { if (it && !seen.has(it.id)) { seen.add(it.id); items.push(it); } } };
+    for (const kw of keywords) {
+        try { add(await tenorApiSearch(kw)); } catch (e) { logErr('متحرك-tenor-api', e); }
+        if (items.length < CHAR_PACK_SIZE * 2) { try { add(await tenorPageSearch(kw)); } catch (e) { logErr('متحرك-tenor-صفحة', e); } }
+        if (items.length >= CHAR_PACK_SIZE * 2) break;
+    }
+    const out = [];
+    for (let i = 0; i < items.length && out.length < CHAR_PACK_SIZE; i += 6) {
+        const got = await mapLimit(items.slice(i, i + 6), 3, async (it) => {
+            for (const u of it.urls) {
+                try {
+                    const { buf } = await httpBuffer(u, 8 * 1024 * 1024, { timeout: 30000 });
+                    const st = await animToSticker(buf, title);
+                    if (st) return st;
+                } catch (e) { /* نجرب الرابط التالي */ }
+            }
+            return null;
+        });
+        for (const st of got) { if (st && out.length < CHAR_PACK_SIZE) out.push(st); }
+    }
+    return out;
+}
+
+async function cmdAnimPack(c) {
+    const name = c.args.replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.متحرك ايرين` أو `.متحرك Eren Yeager`');
+    if (PACK_BUSY.has(c.from)) return c.reply('⏳ توجد حزمة قيد الإرسال في هذه المحادثة، انتظر حتى تنتهي.');
+    PACK_BUSY.add(c.from);
+    try {
+        await c.reply(`╭━━━〔 🎞️ 〕━━━╮\n『 ${name} 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n〔 🔎 〕 جاري البحث عن ملصقات متحركة للشخصية وتجهيز الحزمة...`);
+        // الأسماء العربية تُترجم للإنجليزية لأن tenor يبحث بالإنجليزية غالباً
+        const keywords = [name];
+        if (/[\u0600-\u06FF]/.test(name)) {
+            try { const en = (await gtranslate(name, 'en')).text.trim(); if (en && en.toLowerCase() !== name.toLowerCase()) keywords.unshift(en); } catch (e) { /* نكمل بالاسم الأصلي */ }
+        }
+        const title = (keywords[0] || name).slice(0, 60);
+        let stickers = [];
+        try { stickers = await charAnimFromTenor(keywords, title); } catch (e) { logErr('متحرك-Tenor', e); }
+        console.error(`[متحرك] المصدر Tenor: ${stickers.length} ملصق للبحث (${keywords.join(' | ')})`);
+        if (stickers.length < PACK_MIN) return await c.reply(`❌ لم أجد ملصقات متحركة كافية للشخصية (${name}). جرّب كتابة الاسم بالإنجليزية أو اسماً آخر.`);
+        await c.reply(`〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق متحرك\n〔 📤 〕 جاري إرسال الحزمة...`);
+        if (await sendNativePack(c, { title, author: AUTHOR, animated: true, stickers })) return;
         let sent = 0;
         for (const st of stickers) {
             try { await c.sock.sendMessage(c.from, { sticker: st }); sent++; } catch (e) { logErr('إرسال-ملصق', e); }
@@ -1367,7 +1475,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'تحسين_4k', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'متحرك', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'تحسين_4k', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
@@ -1384,7 +1492,7 @@ async function sendSection(c, text) {
 const HANDLERS = {
     'صور': (c) => sendSection(c, IMAGE_SECTION), 'ملصقات': (c) => sendSection(c, STICKER_SECTION), 'تحميل': (c) => sendSection(c, DOWNLOAD_SECTION), 'بحث_يوت': dlSafe((c) => cmdYtSearch(c, quotedText(c))), 'ذكاء': (c) => sendSection(c, AI_SECTION),
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
-    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
+    'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 'متحرك': cmdAnimPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
     'انمي': cmdAnimeImg, 'تحسين': cmdEnhance, 'تحسين_4k': cmdEnhance4k, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
     'قراءة': cmdOCR, 'ترجمة_صورة': cmdOCRTranslate, 'صورتي': cmdMyAvatar, 'صورته': cmdAvatar,
