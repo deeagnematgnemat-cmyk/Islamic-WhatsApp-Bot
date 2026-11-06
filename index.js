@@ -327,6 +327,9 @@ const BOT_PROFILE_IMAGE_URL = 'https://i.ibb.co/3Y7vn8zZ/1001256689-1.png';
 
 let extraDevelopers = []; 
 let vipUsers = []; 
+// المعرّف الحقيقي (JID) لكل مطور/نخبة كما وصل من المنشن، حتى تكون المنشنات في القوائم حقيقية
+let devJids = {};
+let vipJids = {};
 let botLogs = [];
 
 function getJordanTime() {
@@ -2637,6 +2640,7 @@ if (cmdBase === 'اضافة_مطور') {
     if (!targetUser) return sendBotMessage(sock, from, { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐' });    
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!extraDevelopers.includes(cleanNum)) extraDevelopers.push(cleanNum);
+    devJids[cleanNum] = targetUser;
     
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِضَـافَـةُ مُـطَـوِّرٍ جَـدِيـد 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🛡️ ⌯ الصلاحية ↞ مطور\n✅ ⌯ الحالة ↞ تمت إضافة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [targetUser] });    
@@ -2648,6 +2652,7 @@ if (cmdBase === 'حذف_مطور') {
     if (targetUser) {
         const cleanNum = targetUser.replace(/[^0-9]/g, '');
         extraDevelopers = extraDevelopers.filter(d => d !== cleanNum);
+        delete devJids[cleanNum];
     }
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 إِزَالَـةُ صَـلَاحِـيَـاتِ مُـطَـوِّر 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ الحساب ↞ @${targetUser ? targetUser.split('@')[0] : 'المستخدم'}\n👑 ⌯ المسؤول ↞ المطور الأساسي\n🔓 ⌯ الإجراء ↞ إزالة صلاحيات المطور\n✅ ⌯ الحالة ↞ تمت إزالة المطور بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: targetUser ? [targetUser] : [] });    
@@ -2659,6 +2664,7 @@ if (cmdBase === 'اضف_نخبة') {
     if (!targetUser) return sendBotMessage(sock, from, { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐' });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     if (!vipUsers.includes(cleanNum)) vipUsers.push(cleanNum);
+    vipJids[cleanNum] = targetUser;
 
     const text = `╭━━━〔 👑 〕━━━╮\n『 إِضَـافَـةُ عُـضْـوٍ إِلَـى الـنُّـخْـبَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n✨ ⌯ الرتبة ↞ نُخبة\n🛡️ ⌯ الصلاحية ↞ عضو نخبة\n✅ ⌯ الحالة ↞ تمت الإضافة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [targetUser, sender] });
@@ -2670,18 +2676,20 @@ if (cmdBase === 'ازل_نخبة') {
     if (!targetUser) return sendBotMessage(sock, from, { text: '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n📌 تَـنْـبِـيـه\n\n╎ يرجى عمل منشن للشخص المطلوب.\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐' });
     const cleanNum = targetUser.replace(/[^0-9]/g, '');
     vipUsers = vipUsers.filter(v => v !== cleanNum);
+    delete vipJids[cleanNum];
 
     const text = `╭━━━〔 ♟️ 〕━━━╮\n『 إِزَالَـةُ عُـضْـوٍ مِنَ الـنُّـخْـبَـة 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👤 ⌯ العضو ↞ @${cleanNum}\n👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📉 ⌯ الرتبة السابقة ↞ نُخبة\n🔓 ⌯ الإجراء ↞ سحب رتبة النخبة\n✅ ⌯ الحالة ↞ تمت الإزالة بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [targetUser, sender] });
 }
 
 if (cmdBase === 'عرض_نخبة') {
+    vipUsers = vipUsers.filter(v => vipJids[v]);
     if (vipUsers.length === 0) return sendBotMessage(sock, from, { text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!' });
     let text = `👑 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
     let mentions = [];
     vipUsers.forEach((v, idx) => {
-        text += `${idx + 1}. @${v}\n`;
-        mentions.push(v + '@s.whatsapp.net');
+        text += `${idx + 1}. @${jidDigits(vipJids[v])}\n`;
+        mentions.push(vipJids[v]);
     });
     return sendBotMessage(sock, from, { text, mentions });
 }
@@ -2825,10 +2833,11 @@ if (cmdBase === 'قائمة_المطورين') {
     let text = `👑 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:*\n\n> @${DEVELOPER_NUMBER}\n`;
     let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
 
+    extraDevelopers = extraDevelopers.filter(d => devJids[d]);
     if (extraDevelopers.length > 0) {
         extraDevelopers.forEach((dev) => {
-            text += `> @${dev}\n`;
-            mentions.push(dev + '@s.whatsapp.net');
+            text += `> @${jidDigits(devJids[dev])}\n`;
+            mentions.push(devJids[dev]);
         });
     }
     return sendBotMessage(sock, from, { text, mentions });    
