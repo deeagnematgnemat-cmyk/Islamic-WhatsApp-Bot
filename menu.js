@@ -339,6 +339,18 @@ export async function sendPackCard(sock, jid, { image, text, url, buttonText = '
     });
 }
 
+// صورة (Buffer أو رابط) مع نص وأزرار رد سريع تحتها: buttons = [{ text, id }]
+export async function sendImageWithButtons(sock, jid, { image, text, buttons = [], mentionJid }) {
+    const media = await prepareWAMessageMedia({ image: typeof image === 'string' ? { url: image } : image }, { upload: sock.waUploadToServer });
+    if (!media || !media.imageMessage) throw new Error('IMAGE_UPLOAD_FAILED');
+    await relayInteractive(sock, jid, {
+        header: { hasMediaAttachment: true, imageMessage: media.imageMessage },
+        body: { text: text || ' ' },
+        ...(mentionJid ? { contextInfo: { mentionedJid: [mentionJid] } } : {}),
+        nativeFlowMessage: { buttons: buttons.map((b) => ({ name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: b.text, id: b.id }) })) }
+    }, { noForward: true });
+}
+
 // ============ كاروسيل فيديوهات أفقي (كل فيديو في بطاقة) ============
 export async function sendVideoCarousel(sock, jid, cards, { text = '', footer = '' } = {}) {
     const built = [];
