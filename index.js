@@ -428,7 +428,7 @@ const validCommands = [
 'خاص', 'عام', 'وضع_خاص', 'وضع_عام', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل',
 'قفل', 'غلق', 'فتح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'بوم',
 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط',
-'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال',
+'حظر_رابط', 'سماح_رابط', 'حظر_شتم', 'سماح_شتم', 'حظر_جهات', 'حظر_جهات_الاتصال', 'سماح_جهات', 'سماح_جهات_الاتصال', 'حظر_توجيه', 'سماح_توجيه',
 'صفر', 'بوت', 'devinfo_form',
 '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '16', 'الفرعي', 'حالة_بوتي', 'حذف_بوتي', 'مشرف_بوتي', 'اسم_البوت', 'صورة_البوت', 'تنصيب', 'الغاء_تنصيب', 'قائمة_التنصيب', 'عدد_المنصبين',
 'الترفيه', 'العاب', 'فعاليات', 'bank', 'البنك', 'النقاط',
@@ -523,6 +523,18 @@ const animeBank = {
     add: async (jid, n) => { getBankAccount(jid); userPoints[jid] = Math.max(0, (userPoints[jid] || 0) + n); return userPoints[jid]; }
 };
 
+// هل الرسالة معاد توجيهها من قناة واتساب؟ (تفحص الرسالة حتى لو كانت داخل غلاف مؤقت/عرض لمرة واحدة)
+function isForwardedFromChannel(message, depth = 0) {
+    if (!message || typeof message !== 'object' || depth > 4) return false;
+    for (const key of Object.keys(message)) {
+        const part = message[key];
+        if (!part || typeof part !== 'object') continue;
+        if (part.contextInfo && part.contextInfo.forwardedNewsletterMessageInfo) return true;
+        if (part.message && isForwardedFromChannel(part.message, depth + 1)) return true;
+    }
+    return false;
+}
+
 function getGroupSetting(groupId) {
 if (!groupSettings[groupId]) {
 groupSettings[groupId] = {
@@ -530,6 +542,7 @@ adminOnly: false,
 antiLink: true,
 antiBadWords: true,
 antiContact: true,
+antiForward: true,
 welcome: false,
 goodbye: false,
 botMode: 'public',
@@ -1694,6 +1707,10 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
         violationDetected = true;    
         violationType = 'الروابط';    
         shouldLockChat = true;
+    } else if (settings.antiForward !== false && !isFromMe && isForwardedFromChannel(msg.message)) {    
+        violationDetected = true;    
+        violationType = 'إعادة توجيه من قناة';    
+        shouldLockChat = true;
     } else if (settings.antiBadWords && hasBadWord) {    
         violationDetected = true;    
         violationType = 'الشتم والسب القوي';    
@@ -2153,6 +2170,18 @@ if (cmdBase === 'سماح_رابط' || cmdBase === 'سماح رابط') {
     const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 تَـعْـطِـيـلُ مَـانِـعِ الروابط 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n🔗 ⌯ الخاصية ↞ الروابط\n⛔ ⌯ الحالة ↞ تم تعطيل الحماية»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
     return sendBotMessage(sock, from, { text, mentions: [sender] });    
 }    
+if (cmdBase === 'حظر_توجيه' || cmdBase === 'حظر توجيه') {    
+    if (!isSenderAdmin && !isSenderDev) return sendBotMessage(sock, from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
+    getGroupSetting(from).antiForward = true;    
+    const text = `╭━━━〔 🛡️ 〕━━━╮\n『 تَـفْـعِـيـلُ مَـانِـعِ توجيه القنوات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📢 ⌯ الخاصية ↞ منع إعادة توجيه رسائل القنوات\n✅ ⌯ الحالة ↞ تم تفعيل الحماية بنجاح»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    return sendBotMessage(sock, from, { text, mentions: [sender] });    
+}
+if (cmdBase === 'سماح_توجيه' || cmdBase === 'سماح توجيه') {    
+    if (!isSenderAdmin && !isSenderDev) return sendBotMessage(sock, from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
+    getGroupSetting(from).antiForward = false;    
+    const text = `╭━━━〔 ⚠️ 〕━━━╮\n『 تَـعْـطِـيـلُ مَـانِـعِ توجيه القنوات 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n📢 ⌯ الخاصية ↞ توجيه رسائل القنوات\n⛔ ⌯ الحالة ↞ تم تعطيل الحماية»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+    return sendBotMessage(sock, from, { text, mentions: [sender] });    
+}
 if (cmdBase === 'حظر_شتم' || cmdBase === 'حظر شتم' || cmdBase === 'حظر_سب') {    
     if (!isSenderAdmin && !isSenderDev) return sendBotMessage(sock, from, { text: '❌ متاح للمشرفين والمطور فقط!' });    
     getGroupSetting(from).antiBadWords = true;    
@@ -2977,13 +3006,13 @@ if (cmdBase === '1') {
 📇 3. حماية جهات الاتصال: [${settings.antiContact ? '🟢 مفعلة' : '🔴 معطلة'}]
 > تفعيل: .حظر_جهات | سماح: .سماح_جهات
 
-🎉 4. إشعار الترقية: [${groupFun.levelNotice?.[from] ? '🟢 مفعل' : '🔴 معطل'}]
-> تفعيل: .تفعيل_اشعار_المستوى | إيقاف: .توقيف_اشعار_المستوى
+📢 4. حماية توجيه القنوات: [${settings.antiForward !== false ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_توجيه | سماح: .سماح_توجيه
 
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton({ ...settings, levelNotice: !!groupFun.levelNotice?.[from] })]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton({ ...settings, antiForward: settings.antiForward !== false })]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: text1, mentions: [sender] });
     }
