@@ -319,6 +319,12 @@ const BOT_COMMANDS_VIDEO_URL = 'https://videotourl.com/videos/1792370059642-b3c5
 const BOT_VIDEO_FILE = './bot_commands_video.mp4';
 const DEV_INFO_VIDEO_URL = 'https://videotourl.com/videos/1793411909499-fceac088-929e-4d67-890d-f9a40165767e.mp4';
 // الفيديو الظاهر فوق استمارة .بوت: الملف المحفوظ بأمر .اساسي إن وُجد، وإلا الرابط الافتراضي
+const BOT_IMAGE_FILE = './bot_commands_image.jpg';
+// ميديا استمارة .بوت: آخر ما حُفظ بأمر .اساسي (صورة أو فيديو)، وإلا الفيديو الافتراضي
+function getBotFormMedia() {
+    try { if (fs.existsSync(BOT_IMAGE_FILE) && fs.statSync(BOT_IMAGE_FILE).size > 0) return { file: BOT_IMAGE_FILE, isImage: true }; } catch (e) {}
+    return { file: getBotCommandsVideo(), isImage: false };
+}
 function getBotCommandsVideo() {
     try { if (fs.existsSync(BOT_VIDEO_FILE) && fs.statSync(BOT_VIDEO_FILE).size > 0) return BOT_VIDEO_FILE; } catch (e) {}
     return BOT_COMMANDS_VIDEO_URL;
@@ -2954,15 +2960,22 @@ if (cmdBase === 'اساسي') {
     try {
         const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
         const isVid = (m) => !!(m?.videoMessage || (m?.documentMessage && (m.documentMessage.mimetype || '').startsWith('video/')));
+        const isImg = (m) => !!m?.imageMessage;
         let vidMsg = unwrap(quotedMsg);
-        if (!isVid(vidMsg)) vidMsg = unwrap(msg.message);
-        if (!isVid(vidMsg)) {
-            return sendBotMessage(sock, from, { text: '📌 رد على فيديو بكلمة `.اساسي` أو أرسل الفيديو وفي وصفه `.اساسي` لتغيير فيديو استمارة .بوت.' });
+        if (!isVid(vidMsg) && !isImg(vidMsg)) vidMsg = unwrap(msg.message);
+        if (!isVid(vidMsg) && !isImg(vidMsg)) {
+            return sendBotMessage(sock, from, { text: '📌 رد على صورة أو فيديو بكلمة `.اساسي` أو أرسل الصورة/الفيديو وفي وصفه `.اساسي` لتغيير ميديا استمارة .بوت.' });
         }
         const videoBuffer = await downloadMediaMessage({ key: msg.key, message: vidMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
-        if (!videoBuffer || !videoBuffer.length) throw new Error('empty video');
-        fs.writeFileSync(BOT_VIDEO_FILE, videoBuffer);
-        const okText = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*🎬 تَـمَّ تَـغْـيِـيـرُ الـفِـيـدْيُـو*\n\n> ╎ ✅ الحالة: تم حفظ الفيديو الجديد بنجاح.\n> ╎ 📌 سيظهر الآن فوق استمارة \`.بوت\`.\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
+        if (!videoBuffer || !videoBuffer.length) throw new Error('empty media');
+        if (isImg(vidMsg)) {
+            fs.writeFileSync(BOT_IMAGE_FILE, videoBuffer);
+            try { if (fs.existsSync(BOT_VIDEO_FILE)) fs.unlinkSync(BOT_VIDEO_FILE); } catch (e) {}
+        } else {
+            fs.writeFileSync(BOT_VIDEO_FILE, videoBuffer);
+            try { if (fs.existsSync(BOT_IMAGE_FILE)) fs.unlinkSync(BOT_IMAGE_FILE); } catch (e) {}
+        }
+        const okText = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*🎬 تَـمَّ تَـغْـيِـيـرُ الـفِـيـدْيُـو*\n\n> ╎ ✅ الحالة: تم حفظ ${isImg(vidMsg) ? 'الصورة' : 'الفيديو'} الجديد بنجاح.\n> ╎ 📌 سيظهر الآن فوق استمارة \`.بوت\`.\n\n*❐═━━━═╊⊰🍷⊱╉═━━━═❐*\n\n*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
         return sendBotMessage(sock, from, { text: okText }, { quoted: msg });
     } catch (e) {
         console.error('خطأ تغيير فيديو الاستمارة:', e?.message || e);
@@ -3037,13 +3050,15 @@ if (cmdBase === 'بوت') {
 
     // الاستمارة والأزرار في رسالة واحدة: [الأقسام] [قناة المطور] [جروب التنصيب]
     const subMedia = getSubBotMedia(sock);
+    const formMedia = getBotFormMedia();
+    const formIsImage = subMedia ? subMedia.type === 'image' : formMedia.isImage;
     try {
-        await sendFormWithButtons(sock, from, botWelcomeText, subMedia ? subMedia.file : getBotCommandsVideo(), sender, !!subMedia && subMedia.type === 'image');
+        await sendFormWithButtons(sock, from, botWelcomeText, subMedia ? subMedia.file : formMedia.file, sender, formIsImage);
     } catch (e) {
         console.error('تعذر إرسال استمارة .بوت مع الأزرار:', e);
         try { 
             await sendBotMessage(sock, from, { 
-                ...(subMedia && subMedia.type === 'image' ? { image: { url: subMedia.file } } : { video: { url: subMedia ? subMedia.file : getBotCommandsVideo() } }), 
+                ...(formIsImage ? { image: { url: subMedia ? subMedia.file : formMedia.file } } : { video: { url: subMedia ? subMedia.file : formMedia.file }, gifPlayback: true, mimetype: 'video/mp4' }), 
                 caption: botWelcomeText,
                 mentions: [sender]
             }); 
