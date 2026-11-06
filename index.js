@@ -332,6 +332,13 @@ let devJids = {};
 let vipJids = {};
 let botLogs = [];
 
+// ===== صورة/فيديو إعلان الزواج (لكل مجموعة) =====
+const MARRIAGE_MEDIA_FILE = './marriage_media.json';
+const MARRIAGE_MEDIA_DIR = './marriage_media';
+let marriageMedia = {};
+try { marriageMedia = JSON.parse(fs.readFileSync(MARRIAGE_MEDIA_FILE, 'utf8')) || {}; } catch (e) { marriageMedia = {}; }
+function saveMarriageMedia() { try { fs.writeFileSync(MARRIAGE_MEDIA_FILE, JSON.stringify(marriageMedia)); } catch (e) {} }
+
 function getJordanTime() {
     return new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Amman', hour: '2-digit', minute: '2-digit', hour12: true });
 }
@@ -438,7 +445,7 @@ const validCommands = [
 'حسابي', 'بنك', 'تحويل', 'توب_نقاط', 'الاغنياء', 'الأغنياء', 'مكافأة', 'هدية',
 'تفكيك', 'كتابه', 'كتابة', 'حزورة', 'لغز', 'خيروك', 'لوخيروك', 'حكمة',
 'اكمل', 'رتب', 'عكس', 'انسحب',
-'زواج', 'غزل', 'ثنائي', 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
+'زواج', 'صورة_الزواج', 'غزل', 'ثنائي', 'ملك_المجموعة', 'ملكة_المجموعة', 'محبوب_المجموعة', 'مضحك_المجموعة', 'مشاغب_المجموعة', 'غامض_المجموعة', 'مميز_المجموعة', 'كيوت_المجموعة',
 'رسائلي', 'توب_التفاعل',
 'المطور', 'مطور', 'الادارة', 'الاداره',
 'اضافة_مطور', 'حذف_مطور', 'قائمة_المطورين', 'سجل_البوت', 'اختبار',
@@ -2311,6 +2318,36 @@ async function startNextRound(sock, from, gameType, existingScores = {}) {
     };
 }
 
+if (cmd === 'صورة_الزواج') {
+    if (!isGroup) return sendBotMessage(sock, from, { text: '❌ هذا الأمر يعمل داخل المجموعات فقط!' });
+    if (!isSenderAdmin && !isSenderDev) return sendBotMessage(sock, from, { text: '❌ متاح للمشرفين وأصحاب البوت فقط!' });
+    try {
+        const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
+        const kindOf = (m) => m?.imageMessage ? 'image' : (m?.videoMessage ? 'video' : null);
+        let mediaMsg = unwrap(quotedMsg);
+        if (!kindOf(mediaMsg)) mediaMsg = unwrap(msg.message);
+        const kind = kindOf(mediaMsg);
+        if (!kind) {
+            return sendBotMessage(sock, from, { text: '📌 رد على صورة أو فيديو بكلمة `.صورة_الزواج` أو أرسل الصورة/الفيديو وفي وصفه `.صورة_الزواج` لوضعها فوق استمارة إعلان الزواج.' });
+        }
+        const buffer = await downloadMediaMessage({ key: msg.key, message: mediaMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        if (!buffer || !buffer.length) throw new Error('empty media');
+        if (!fs.existsSync(MARRIAGE_MEDIA_DIR)) fs.mkdirSync(MARRIAGE_MEDIA_DIR, { recursive: true });
+        const safeId = String(from).replace(/[^0-9a-zA-Z_-]/g, '_');
+        const old = marriageMedia[from];
+        if (old?.file && fs.existsSync(old.file)) { try { fs.unlinkSync(old.file); } catch (e) {} }
+        const file = `${MARRIAGE_MEDIA_DIR}/${safeId}.${kind === 'image' ? 'jpg' : 'mp4'}`;
+        fs.writeFileSync(file, buffer);
+        marriageMedia[from] = { type: kind, file };
+        saveMarriageMedia();
+        const okText = `╭━━━〔 💍 〕━━━╮\n『 تَـحْـدِيـثُ مِـيـدْيَـا الـزَّوَاج 』\n╰━━━〔 ⚜️ 〕━━━╯\n\n«👑 ⌯ المسؤول ↞ @${sender.split('@')[0]}\n${kind === 'image' ? '🖼️ ⌯ النوع ↞ صورة' : '🎬 ⌯ النوع ↞ فيديو'}\n✅ ⌯ الحالة ↞ ستظهر الآن فوق استمارة إعلان الزواج»\n\n❐═━━━═╊⊰🍷⊱╉═━━━═❐\n\n『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
+        return sendBotMessage(sock, from, { text: okText, mentions: [sender] }, { quoted: msg });
+    } catch (e) {
+        console.error('خطأ حفظ ميديا الزواج:', e?.message || e);
+        return sendBotMessage(sock, from, { text: '❌ فشل حفظ الصورة/الفيديو، تأكد أنها صالحة وأعد المحاولة.' });
+    }
+}
+
 if (cmd === 'زواج') {    
     try {
         const meta = await sock.groupMetadata(from);
@@ -2327,21 +2364,37 @@ if (cmd === 'زواج') {
             }
         }
 
-        const marriageText = `╭━━〔 💍 𝑴𝑨𝑹𝑹𝑰𝑨𝑮𝑬 👑 〕━━⬣
+        const marriageText = `✧━━━━━━━━━━━━━━━━━━✧
+        💍 ﴾ إِعْـلَانُ زَوَاجٍ مَـلَـكِـيّ ﴿ 💍
+✧━━━━━━━━━━━━━━━━━━✧
 
-│ 🕊️ بِـفَـرْمَـانٍ رَسْـمِـيٍّ مِـنْ نِـقَـابَـةِ ڤِـيـنْـلاَنْـد 🗡️
-│ يُـعْـلَـنُ الـآنَ عَـقْـدُ الـقِـرَانِ الأُسْـطُـورِيّ بَـيْـنَ:
+🕊️ بِـفَـرْمَـانٍ رَسْـمِـيٍّ مِـنْ نِـقَـابَـةِ ڤِـيـنْـلاَنْـد 🗡️
+يُـعْـلَـنُ الـآنَ عَـقْـدُ الـقِـرَانِ الأُسْـطُـورِيّ بَـيْـنَ:
 
-│ 🤵🏻 ⇢ الـعَـرِيـسُ الـمُـحَـارِب:
-│ 👑 ⇢ @${groom.split('@')[0]}
+╭─────────⟡─────────╮
+│ 🤵🏻 الـعَـرِيـسُ الـمُـحَـارِب
+│ 👑 ⟡ @${groom.split('@')[0]}
+╰─────────⟡─────────╯
+                 💞 ✦ 💞
+╭─────────⟡─────────╮
+│ 👰🏻 الـعَـرُوسُ الـفَـاتِـنَـة
+│ 👑 ⟡ @${bride.split('@')[0]}
+╰─────────⟡─────────╯
 
-│ 👰🏻 ⇢ الـعَـرُوسُ الـفَـاتِـنَـة:
-│ 👑 ⇢ @${bride.split('@')[0]}
+🥂 نَـتَـمَـنَّـى لَـهُـمَـا حَـيَـاةً مَـلِـيئَـةً
+بِـالـمَـجْـدِ وَالـسَّـعَـادَةِ الدَّائِـمَـة ❤️
 
-├────────────⬣
-│ ✨ نَـتَـمَـنَّـى لَـهُـمَـا حَـيَـاةً مَـلِـيئَـةً بِـالـمَـجْـدِ وَالـسَّـعَـادَةِ الدَّائِـمَـة! 🥂❤️
-╰━━〔 🍷 『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』 〕━━⬣`;
+✧━━━━━━━━━━━━━━━━━━✧
+『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』`;
 
+        const mm = marriageMedia[from];
+        if (mm?.file && fs.existsSync(mm.file)) {
+            try {
+                const data = fs.readFileSync(mm.file);
+                const payload = mm.type === 'video' ? { video: data, caption: marriageText, mentions: [groom, bride] } : { image: data, caption: marriageText, mentions: [groom, bride] };
+                return await sendBotMessage(sock, from, payload);
+            } catch (e) { console.error('تعذر إرسال ميديا الزواج:', e?.message || e); }
+        }
         return sendBotMessage(sock, from, { text: marriageText, mentions: [groom, bride] });
     } catch (e) { return sendBotMessage(sock, from, { text: '❌ تعذر إتمام عقد الزواج.' }); }
 }    
@@ -3147,6 +3200,7 @@ if (cmdBase === '6') {
     const groupExtText = `👥 *المجموعات:*
 
 > 💍 .زواج ↞ زواج عشوائي للجروب
+> 🖼️ .صورة_الزواج ↞ صورة/فيديو فوق إعلان الزواج (للمشرفين)
 > 🌹 .غزل @منشن ↞ بيت غزل
 > 💞 .ثنائي ↞ ثنائي عشوائي
 > 👑 .ملك_المجموعة ↞ ملك الجروب
