@@ -42,7 +42,7 @@ const SECTIONS = [
             row(royal('الحماية'), 'أوامر الحماية والإنذارات', 1),
             row(royal('الترفيه والألعاب'), 'أوامر الألعاب والفعاليات', 2),
             row(royal('البنك والنقاط'), 'الحساب والتحويل والمكافآت', 3),
-            row(royal('القسم الإسلامي'), 'القرآن والأدعية والأذكار', 4),
+            row(royal('الإسلامي'), 'القرآن والأدعية والأذكار', 4),
             row(royal('الضحك'), 'النكت والتساؤلات والمقولات', 5),
             row(royal('المجموعات'), 'أوامر وتفاعلات المجموعة', 6)
         ]
@@ -110,9 +110,9 @@ export async function sendFormWithButtons(sock, jid, text, videoUrl, mentionJid,
     let header = { hasMediaAttachment: false };
     if (videoUrl) {
         try {
-            const media = await prepareWAMessageMedia(isImage ? { image: { url: videoUrl } } : { video: { url: videoUrl } }, { upload: sock.waUploadToServer });
+            const media = await prepareWAMessageMedia(isImage ? { image: { url: videoUrl } } : { video: { url: videoUrl }, mimetype: 'video/mp4', gifPlayback: true }, { upload: sock.waUploadToServer });
             if (isImage && media && media.imageMessage) header = { hasMediaAttachment: true, imageMessage: media.imageMessage };
-            else if (!isImage && media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: media.videoMessage };
+            else if (!isImage && media && media.videoMessage) header = { hasMediaAttachment: true, videoMessage: { ...media.videoMessage, gifPlayback: true } };
         } catch (e) {
             console.error('تعذر رفع فيديو الاستمارة، سيُرسل النص مع الأزرار:', e?.message || e);
         }
