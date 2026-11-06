@@ -10,7 +10,7 @@ import { pipeline } from 'stream/promises';
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import * as BaileysNs from '@whiskeysockets/baileys';
-import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel } from './menu.js';
+import { sendSectionWithButtons, sendPackCard, sendImageCarousel, sendVideoCarousel, sendImageWithButtons } from './menu.js';
 import { DlError, warmupYtdlp } from './lib/dl.js';
 import { buildMoreDownloadHandlers, MORE_COMMANDS, MORE_LINK_COMMANDS, MORE_HEAVY } from './moredl.js';
 import { cmdYtSearch } from './ytsearch.js';
@@ -37,7 +37,7 @@ const COMMANDS = {
     'كتابة': ['ttp'], 'باك': ['stickerpack'], 'حزمة': ['pack'], 'ملصقات': [],
     // الصور
     'صور': [], 'صورة': ['image'], 'خلفية': ['wallpaper'], 'بنتريست': ['pinterest'], 'بروفايل': ['pfp'], 'انمي': ['anime'],
-    'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
+    'تحسين': ['enhance', 'تحسين_الصورة', 'جودة'], 'تحسين_4k': [], 'تغبيش': ['blur'], 'ابيض_اسود': ['bw'], 'ضغط': ['compress'], 'صيغة': ['convert'],
     'قراءة': ['ocr'], 'ترجمة_صورة': ['trimg'], 'صورتي': ['myavatar'], 'صورته': ['avatar'],
     // التنزيل: أمر واحد فقط (.بحث_يوت) والباقي أزرار تفاعلية
     'تحميل': [], 'بحث_يوت': [],
@@ -85,7 +85,7 @@ export const IMAGE_SECTION = `🖼️ *قِـسْـمُ الـصُّـوَرِ:*
 > 📱 .خلفية [عدد] <بحث> ↞ خلفيات جوال عالية الجودة
 > 🧑‍🎤 .بروفايل [عدد] <اسم> ↞ صور شخصية (pfp)
 > 🎌 .انمي [اسم] ↞ صورة أنمي عشوائية أو باسم
-> ✨ .تحسين ↞ رفع وضوح الصورة وجودتها
+> ✨ .تحسين ↞ رفع جودة الصورة إلى 1080p مع زر 4K تحتها
 > 🌫️ .تغبيش [1-60] ↞ تغبيش الصورة
 > ⚫ .ابيض_اسود ↞ تحويل الصورة لأبيض وأسود
 > 🗜️ .ضغط [5-90] ↞ تصغير حجم الصورة
@@ -1074,24 +1074,64 @@ async function cmdCompress(c) {
     const out = await sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: q, mozjpeg: true }).toBuffer();
     await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'compressed.jpg', caption: `🗜️ الحجم: ${fmtSize(buf.length)} ← ${fmtSize(out.length)} (الجودة ${q}%)\nللتحكم: \`.ضغط 20\`` });
 }
+// ---- تحسين الجودة الفعلي: تكبير تدريجي (Lanczos) + إزالة تشويش + استعادة حدّة + تباين موضعي
+// المرحلة الأولى: Full HD (1080p = الضلع الأطول 1920)، ثم زر «4K» تحت الصورة يرفعها إلى 3840 من الصورة الأصلية
+const ENH_TARGETS = { hd: { long: 1920, label: '1080p Full HD' }, '4k': { long: 3840, label: '4K Ultra HD' } };
+const ENH_CACHE = new Map();   // token -> { buf, at } لزر 4K (تُحفظ الصورة الأصلية مؤقتاً)
+function enhCachePut(buf) {
+    const now = Date.now();
+    for (const [k, v] of ENH_CACHE) if (now - v.at > 30 * 60 * 1000) ENH_CACHE.delete(k);
+    while (ENH_CACHE.size >= 20) ENH_CACHE.delete(ENH_CACHE.keys().next().value);
+    const token = Math.random().toString(36).slice(2, 10);
+    ENH_CACHE.set(token, { buf, at: now });
+    return token;
+}
+async function enhanceImage(buf, mode) {
+    const sharp = await sharpOrFail();
+    const target = ENH_TARGETS[mode].long;
+    let cur = await sharp(buf, { failOn: 'none' }).rotate().flatten({ background: '#ffffff' }).toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
+    let w = cur.info.width, h = cur.info.height, ch = cur.info.channels;
+    if (!w || !h) throw new Error('BAD_IMAGE');
+    const ow = w, oh = h;
+    let data = cur.data;
+    if (Math.max(w, h) < 1000) {      // صور صغيرة/ضعيفة: تخفيف التشويش وحبيبات الضغط قبل التكبير
+        const d = await sharp(data, { raw: { width: w, height: h, channels: ch } }).median(3).raw().toBuffer({ resolveWithObject: true });
+        data = d.data;
+    }
+    while (Math.max(w, h) < target) {   // تكبير تدريجي (حتى ×2 في كل خطوة) مع استعادة حدّة خفيفة بعد كل خطوة
+        const step = Math.min(2, target / Math.max(w, h));
+        const nw = Math.round(w * step), nh = Math.round(h * step);
+        const r = await sharp(data, { raw: { width: w, height: h, channels: ch } })
+            .resize(nw, nh, { kernel: 'lanczos3' }).sharpen({ sigma: 0.7, m1: 0.5, m2: 1.5 }).raw().toBuffer({ resolveWithObject: true });
+        data = r.data; w = r.info.width; h = r.info.height; ch = r.info.channels;
+    }
+    let p = sharp(data, { raw: { width: w, height: h, channels: ch } });
+    try { p = p.clahe({ width: Math.max(16, Math.round(w / 8)), height: Math.max(16, Math.round(h / 8)), maxSlope: 2 }); } catch (e) { /* نسخة sharp لا تدعمها */ }
+    const out = await p.modulate({ saturation: 1.08, brightness: 1.02 }).sharpen({ sigma: 1.0, m1: 0.8, m2: 2.0 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4', mozjpeg: true }).toBuffer();
+    return { out, ow, oh, W: w, H: h };
+}
 async function cmdEnhance(c) {
     const buf = await getInputImage(c); if (!buf) return;
-    const sharp = await sharpOrFail();
     const asFile = /ملف|file|doc/i.test(c.args);
-    const o = await sharp(buf, { failOn: 'none' }).rotate().toBuffer({ resolveWithObject: true });   // يثبّت اتجاه الصورة ويعطي أبعادها الحقيقية
-    const w = o.info.width, h = o.info.height, long = Math.max(w, h);
-    if (!w || !h) throw new Error('BAD_IMAGE');
-    let f = long < 1000 ? Math.min(3, 2048 / long) : Math.min(2, 2560 / long);   // الصور الصغيرة تُكبَّر أكثر
-    if (f < 1.05) f = 1;
-    const W = Math.round(w * f), H = Math.round(h * f);
-    let p = sharp(o.data, { failOn: 'none' }).flatten({ background: '#ffffff' });
-    if (long < 900) p = p.median(3);                                  // تخفيف التشويش والحبيبات في الصور الصغيرة
-    p = p.resize(W, H, { kernel: 'lanczos3' });                        // تكبير عالي الجودة
-    try { p = p.clahe({ width: Math.max(16, Math.round(W / 8)), height: Math.max(16, Math.round(H / 8)), maxSlope: 2 }); } catch (e) { /* نسخة sharp لا تدعمها */ }
-    const out = await p.modulate({ saturation: 1.12, brightness: 1.02 }).sharpen({ sigma: 1.3, m1: 0.8, m2: 2.5 }).jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
-    const cap = `✨ تم تحسين الصورة (${w}×${h} ← ${W}×${H}).`;
-    if (asFile) await c.media({ document: out, mimetype: 'image/jpeg', fileName: 'enhanced.jpg', caption: cap });
-    else await c.media({ image: out, caption: cap + '\n💡 للحصول على الملف بأعلى دقة اكتب `.تحسين ملف`' });
+    const mode = /4k|٤k|4ك/i.test(c.args) ? '4k' : 'hd';
+    const r = await enhanceImage(buf, mode);
+    const cap = `✨ تم تحسين الصورة إلى ${ENH_TARGETS[mode].label}\n📐 الدقة: ${r.ow}×${r.oh} ← ${r.W}×${r.H}`;
+    if (asFile) return await c.media({ document: r.out, mimetype: 'image/jpeg', fileName: `enhanced_${mode}.jpg`, caption: cap });
+    if (mode === 'hd') {
+        const token = enhCachePut(buf);
+        try {
+            return await sendImageWithButtons(c.sock, c.from, { image: r.out, text: cap + '\n\n⬇️ اضغط الزر لرفعها إلى 4K', buttons: [{ text: '✨ 4K', id: `.تحسين_4k ${token}` }], mentionJid: c.sender });
+        } catch (e) { logErr('تحسين-زر', e); }
+        return await c.media({ image: r.out, caption: cap + '\n💡 لرفعها إلى 4K: أرسل الصورة مع `.تحسين 4k`' });
+    }
+    await c.media({ image: r.out, caption: cap });
+}
+async function cmdEnhance4k(c) {
+    const token = String(c.args || '').trim().split(/\s+/)[0];
+    const entry = token ? ENH_CACHE.get(token) : null;
+    if (!entry) return c.reply('⌛ انتهت صلاحية هذه الصورة، أرسلها مرة أخرى مع `.تحسين`.');
+    const r = await enhanceImage(entry.buf, '4k');
+    await c.media({ image: r.out, caption: `✨ تم تحسين الصورة إلى ${ENH_TARGETS['4k'].label}\n📐 الدقة: ${r.ow}×${r.oh} ← ${r.W}×${r.H}` });
 }
 async function cmdFormat(c) {
     const buf = await getInputImage(c); if (!buf) return;
@@ -1327,7 +1367,7 @@ setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجه
 
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'تحسين_4k', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
@@ -1346,7 +1386,7 @@ const HANDLERS = {
     'ملصق': (c) => cmdSticker(c, 'ملصق'), 'دائري': (c) => cmdSticker(c, 'دائري'),
     'سرقة': cmdSteal, 'لصورة': cmdToImage, 'ايموجي': cmdEmoji, 'كتابة': cmdText, 'باك': cmdPackImages, 'حزمة': cmdCharPack, 
     'صورة': (c) => cmdImageSearch(c, 'صورة'), 'بنتريست': (c) => cmdImageSearch(c, 'بنتريست'), 'خلفية': (c) => cmdImageSearch(c, 'خلفية'), 'بروفايل': (c) => cmdImageSearch(c, 'بروفايل'),
-    'انمي': cmdAnimeImg, 'تحسين': cmdEnhance, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
+    'انمي': cmdAnimeImg, 'تحسين': cmdEnhance, 'تحسين_4k': cmdEnhance4k, 'تغبيش': cmdBlur, 'ابيض_اسود': cmdBW, 'ضغط': cmdCompress, 'صيغة': cmdFormat,
     'قراءة': cmdOCR, 'ترجمة_صورة': cmdOCRTranslate, 'صورتي': cmdMyAvatar, 'صورته': cmdAvatar,
     'اسأل': cmdAsk, 'تخيل': cmdImagine, 'تلخيص': cmdSummarize, 'ترجمة': cmdTranslate,
     'صحح': (c) => cmdSimpleAI(c, SYSTEM + ' صحّح الإملاء والنحو في النص التالي وأعد النص المصحّح فقط ثم سطراً قصيراً بأهم التعديلات.', '📌 اكتب النص المراد تصحيحه بعد الأمر.'),
