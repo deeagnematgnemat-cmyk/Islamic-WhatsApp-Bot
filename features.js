@@ -953,6 +953,98 @@ async function charAnimFromTenor(keywords, title) {
     return out;
 }
 
+// المصدر الثاني: Sticker.ly (حزم ملصقات متحركة جاهزة بصيغة واتساب webp - الأجمل والأسرع)
+async function stickerlyAnimSearch(keyword) {
+    const res = await http('https://api.sticker.ly/v4/stickerPack/smartSearch', {
+        method: 'POST', timeout: 25000,
+        headers: { 'User-Agent': STICKERLY_UA, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, enabledKeywordSearch: true, filter: { extendSearchResult: false, onlyAnimated: true, onlyStatic: false } })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    return (j?.result?.stickerPacks || []).filter((p) => p && p.isAnimated && p.resourceUrlPrefix && Array.isArray(p.resourceFiles) && p.resourceFiles.length);
+}
+const isAnimWebp = (b) => isWebp(b) && b.includes('ANIM');
+async function charAnimFromStickerly(keywords) {
+    const seenPacks = new Set(), packs = [];
+    for (const kw of keywords) {
+        try {
+            for (const p of await stickerlyAnimSearch(kw)) { if (!seenPacks.has(p.packId)) { seenPacks.add(p.packId); packs.push(p); } }
+        } catch (e) { logErr('متحرك-stickerly', e); }
+        if (packs.length >= 6) break;
+    }
+    const toks = keywords.flatMap((k) => k.toLowerCase().split(/\s+/)).filter((t) => t.length >= 3 && !/[\u0600-\u06FF]/.test(t));
+    let list = packs;
+    if (toks.length) list = packs.filter((p) => { const hay = `${p.name || ''} ${p.authorName || ''} ${(p.tags || []).join(' ')}`.toLowerCase(); return toks.some((t) => hay.includes(t)); });
+    if (!list.length) return [];
+    list.sort((a, b) => (Math.min(b.resourceFiles.length, CHAR_PACK_SIZE) - Math.min(a.resourceFiles.length, CHAR_PACK_SIZE)) || ((b.exportCount || b.viewCount || 0) - (a.exportCount || a.viewCount || 0)));
+    const urls = [], seen = new Set();
+    for (const p of list.slice(0, 4)) {
+        for (const f of p.resourceFiles) {
+            const u = p.resourceUrlPrefix + f;
+            if (!seen.has(u)) { seen.add(u); urls.push(u); }
+        }
+        if (urls.length >= CHAR_PACK_SIZE + 10) break;
+    }
+    const got = await mapLimit(urls.slice(0, CHAR_PACK_SIZE + 10), 6, async (u) => {
+        const { buf } = await httpBuffer(u, ANIM_MAX_BYTES, { timeout: 30000 });
+        return isAnimWebp(buf) ? buf : null;
+    });
+    return got.filter(Boolean).slice(0, CHAR_PACK_SIZE);
+}
+
+// المصدر الثالث: Giphy (GIF وملصقات الشخصية - تحويلها إلى ملصقات متحركة)
+const GIPHY_KEY = process.env.GIPHY_API_KEY || 'dc6zaTOxFJmzC';
+async function giphyApiSearch(q) {
+    const out = [];
+    for (const kind of ['gifs', 'stickers']) {
+        try {
+            const j = await httpJson(`https://api.giphy.com/v1/${kind}/search?api_key=${encodeURIComponent(GIPHY_KEY)}&q=${encodeURIComponent(q)}&limit=50&rating=pg-13`, { timeout: 25000 });
+            for (const r of (j?.data || [])) {
+                const im = r.images || {};
+                const urls = [im.original_mp4?.mp4, im.fixed_height?.mp4, im.original?.url, im.fixed_height?.url].filter(Boolean);
+                if (urls.length) out.push({ id: r.id, urls });
+            }
+        } catch (e) { logErr('متحرك-giphy-api', e); }
+    }
+    return out;
+}
+async function giphyPageSearch(q) {
+    const slug = q.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const html = (await (await http(`https://giphy.com/search/${encodeURIComponent(slug)}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).text()).replace(/\\\//g, '/');
+    const out = [], seen = new Set();
+    for (const m of html.matchAll(/https:\/\/media\d*\.giphy\.com\/media\/(?:v1\.[A-Za-z0-9=_-]+\/)?([A-Za-z0-9]+)\//g)) {
+        if (seen.has(m[1])) continue;
+        seen.add(m[1]);
+        out.push({ id: m[1], urls: [`https://media.giphy.com/media/${m[1]}/giphy.mp4`, `https://media.giphy.com/media/${m[1]}/giphy.gif`] });
+    }
+    return out;
+}
+async function charAnimFromGiphy(keywords, title) {
+    const items = [], seen = new Set();
+    const add = (list) => { for (const it of list) { if (it && !seen.has(it.id)) { seen.add(it.id); items.push(it); } } };
+    for (const kw of keywords) {
+        try { add(await giphyApiSearch(kw)); } catch (e) { logErr('متحرك-giphy', e); }
+        if (items.length < CHAR_PACK_SIZE * 2) { try { add(await giphyPageSearch(kw)); } catch (e) { logErr('متحرك-giphy-صفحة', e); } }
+        if (items.length >= CHAR_PACK_SIZE * 2) break;
+    }
+    const out = [];
+    for (let i = 0; i < items.length && out.length < CHAR_PACK_SIZE; i += 6) {
+        const got = await mapLimit(items.slice(i, i + 6), 3, async (it) => {
+            for (const u of it.urls) {
+                try {
+                    const { buf } = await httpBuffer(u, 8 * 1024 * 1024, { timeout: 30000 });
+                    const st = await animToSticker(buf, title);
+                    if (st) return st;
+                } catch (e) { /* نجرب الرابط التالي */ }
+            }
+            return null;
+        });
+        for (const st of got) { if (st && out.length < CHAR_PACK_SIZE) out.push(st); }
+    }
+    return out;
+}
+
 async function cmdAnimPack(c) {
     const name = c.args.replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.متحرك ايرين` أو `.متحرك Eren Yeager`');
@@ -966,9 +1058,20 @@ async function cmdAnimPack(c) {
             try { const en = (await gtranslate(name, 'en')).text.trim(); if (en && en.toLowerCase() !== name.toLowerCase()) keywords.unshift(en); } catch (e) { /* نكمل بالاسم الأصلي */ }
         }
         const title = (keywords[0] || name).slice(0, 60);
+        // نجرب المصادر بالترتيب: أول مصدر يعطي 20 ملصقاً متحركاً أو أكثر نعتمده، وإلا نحتفظ بأفضل نتيجة
+        const ANIM_SOURCES = [
+            ['Sticker.ly', () => charAnimFromStickerly(keywords)],
+            ['Tenor', () => charAnimFromTenor(keywords, title)],
+            ['Giphy', () => charAnimFromGiphy(keywords, title)]
+        ];
         let stickers = [];
-        try { stickers = await charAnimFromTenor(keywords, title); } catch (e) { logErr('متحرك-Tenor', e); }
-        console.error(`[متحرك] المصدر Tenor: ${stickers.length} ملصق للبحث (${keywords.join(' | ')})`);
+        for (const [label, fn] of ANIM_SOURCES) {
+            let r = [];
+            try { r = await fn(); } catch (e) { logErr('متحرك-' + label, e); }
+            console.error(`[متحرك] المصدر ${label}: ${r.length} ملصق للبحث (${keywords.join(' | ')})`);
+            if (r.length > stickers.length) stickers = r;
+            if (stickers.length >= 20) break;
+        }
         if (stickers.length < PACK_MIN) return await c.reply(`❌ لم أجد ملصقات متحركة كافية للشخصية (${name}). جرّب كتابة الاسم بالإنجليزية أو اسماً آخر.`);
         await c.reply(`〔 ✅ 〕 تم تجهيز ${stickers.length} ملصق متحرك\n〔 📤 〕 جاري إرسال الحزمة...`);
         if (await sendNativePack(c, { title, author: AUTHOR, animated: true, stickers })) return;
