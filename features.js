@@ -916,7 +916,7 @@ async function animToSticker(buf, title) {
     fs.writeFileSync(inp, buf);
     let best = null;
     try {
-        for (const { q, t, fps } of [{ q: 50, t: 5, fps: 15 }, { q: 35, t: 4, fps: 12 }, { q: 20, t: 3, fps: 10 }]) {
+        for (const { q, t, fps } of [{ q: 50, t: 5, fps: 15 }, { q: 35, t: 4, fps: 12 }, { q: 20, t: 3, fps: 10 }, { q: 10, t: 3, fps: 8 }]) {
             rm(mid);
             await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-t', String(t), '-an', '-vf', `fps=${fps},scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,scale=trunc(iw/2)*2:trunc(ih/2)*2`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '23', mid], 60000);
             const st = await makeSticker(fs.readFileSync(mid), StickerTypes.FULL, { pack: title, author: AUTHOR, quality: q });
@@ -1045,6 +1045,68 @@ async function charAnimFromGiphy(keywords, title) {
     return out;
 }
 
+// ---- مصادر إضافية للملصقات المتحركة (أي موقع يعطي GIF يصلح: نحمّله ثم نحوّله لملصق متحرك)
+async function animFromItems(items, title, label) {
+    const out = [];
+    let tried = 0, failed = 0, lastErr = '';
+    for (let i = 0; i < items.length && out.length < CHAR_PACK_SIZE; i += 6) {
+        const got = await mapLimit(items.slice(i, i + 6), 3, async (it) => {
+            tried++;
+            for (const u of it.urls) {
+                try {
+                    const { buf } = await httpBuffer(u, 10 * 1024 * 1024, { timeout: 30000, headers: { Referer: new URL(u).origin + '/' } });
+                    const st = await animToSticker(buf, title);
+                    if (st) return st;
+                } catch (e) { lastErr = e?.message || String(e); }
+            }
+            failed++;
+            return null;
+        });
+        for (const st of got) { if (st && out.length < CHAR_PACK_SIZE) out.push(st); }
+    }
+    console.error(`[متحرك] ${label}: روابط=${items.length} جُرّب=${tried} فشل=${failed} نجح=${out.length}${lastErr ? ' آخر خطأ: ' + lastErr : ''}`);
+    return out;
+}
+
+// Tenor v2 (مفتاح عام) كبديل لواجهة v1 المتوقفة
+const TENOR_V2_KEY = process.env.TENOR_V2_KEY || 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ';
+async function charAnimFromTenorV2(keywords, title) {
+    const items = [], seen = new Set();
+    for (const kw of keywords) {
+        try {
+            const j = await httpJson(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(kw)}&key=${encodeURIComponent(TENOR_V2_KEY)}&client_key=islamic_bot&limit=50&media_filter=gif,tinygif,mp4`, { timeout: 25000 });
+            for (const r of (j?.results || [])) {
+                const f = r.media_formats || {};
+                const urls = [f.mp4?.url, f.gif?.url, f.tinygif?.url].filter(Boolean);
+                if (urls.length && !seen.has(r.id)) { seen.add(r.id); items.push({ id: r.id, urls }); }
+            }
+        } catch (e) { logErr('متحرك-tenor-v2', e); }
+        if (items.length >= CHAR_PACK_SIZE * 2) break;
+    }
+    return items.length ? await animFromItems(items, title, 'TenorV2') : [];
+}
+
+// Bing: بحث صور GIF المتحركة فقط (يعمل مع أي موقع، ولا يحتاج مفتاحاً)
+async function charAnimFromBing(keywords, title) {
+    const urls = [], seen = new Set();
+    for (const kw of keywords) {
+        for (const q of [`${kw} gif`, `${kw} anime gif`, `${kw} animated`]) {
+            try {
+                const res = await http(`https://www.bing.com/images/async?q=${encodeURIComponent(q)}&first=0&count=50&mmasync=1&adlt=off&qft=${encodeURIComponent('+filterui:photo-animatedgif')}`, { timeout: 25000, headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const html = await res.text();
+                for (const m of html.matchAll(/murl&quot;:&quot;(https?:.+?)&quot;/g)) {
+                    const u = m[1].replace(/&amp;/g, '&');
+                    if (/\.gif(\?|$)/i.test(u) && !seen.has(u)) { seen.add(u); urls.push(u); }
+                }
+            } catch (e) { logErr('متحرك-bing', e); }
+            if (urls.length >= CHAR_PACK_SIZE * 3) break;
+        }
+        if (urls.length >= CHAR_PACK_SIZE * 3) break;
+    }
+    return urls.length ? await animFromItems(urls.map((u) => ({ id: u, urls: [u] })), title, 'Bing') : [];
+}
+
 async function cmdAnimPack(c) {
     const name = c.args.replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) return c.reply('📌 اكتب اسم الشخصية بعد الأمر.\nمثال: `.متحرك ايرين` أو `.متحرك Eren Yeager`');
@@ -1062,7 +1124,9 @@ async function cmdAnimPack(c) {
         const ANIM_SOURCES = [
             ['Sticker.ly', () => charAnimFromStickerly(keywords)],
             ['Tenor', () => charAnimFromTenor(keywords, title)],
-            ['Giphy', () => charAnimFromGiphy(keywords, title)]
+            ['Giphy', () => charAnimFromGiphy(keywords, title)],
+            ['TenorV2', () => charAnimFromTenorV2(keywords, title)],
+            ['Bing', () => charAnimFromBing(keywords, title)]
         ];
         let stickers = [];
         for (const [label, fn] of ANIM_SOURCES) {
