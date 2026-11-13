@@ -1,6 +1,7 @@
 // ============ anime.js : ألعاب وفعاليات الأنمي (مافيا، برا السالفة، مسابقات، صور...) ============
 import { QUIZ, EMOJI_PUZZLES, CHARACTERS, BARA_WORDS } from './animeData.js';
 import { sendImageWithQuickReply, sendSelectList } from './menu.js';
+import { GUESS_ANIME, GUESS_CHARS, guessEval, guessIsAsk } from './guessData.js';
 
 const SIG = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const LINE = '❐═━━━═╊⊰🍷⊱╉═━━━═❐';
@@ -16,7 +17,8 @@ const NAMES = [
     'اكس_او', 'xo', 'خمن_ايموجي', 'خمن_الايموجي',
     'خمن_الشخصية', 'خمن_الشخصيه', 'معرفة_الشخصية', 'معرفه_الشخصيه', 'عين',
     'سالفة', 'انضم', 'ابدا', 'لاعبين', 'صوت', 'قتل', 'حماية', 'حمايه', 'فحص', 'دوري',
-    'انهاء_اللعبة', 'انهاء_لعبة', 'انهاء_اللعبه'
+    'انهاء_اللعبة', 'انهاء_لعبة', 'انهاء_اللعبه',
+    'احزر'
 ];
 export const animeCommandNames = NAMES;
 const PRIVATE_NAMES = new Set(['قتل', 'حماية', 'حمايه', 'فحص', 'دوري', 'حجر', 'ورقة', 'ورقه', 'مقص']);
@@ -794,12 +796,68 @@ async function eyeBrowse(ctx, query) {
     await sendAnswerForm({ sock, from, nextCmd: `.عين ${query} next` }, box('👁️', 'عُـيُـونُ الـشَّـخْـصِـيَّـة', `«🎴 الشخصية ↞ ${found ? found.ar[0] : query}\n🖼️ عدد الصور ↞ ${imgs.length}»`, 'للعبة التخمين اكتب .عين فقط'), imgs[0]);
 }
 
+// ================================================================ احزر: خمّن شخصية الأنمي بأسئلة صح / غلط
+const GUESS_TIME = 6 * 60 * 1000;
+async function guessStart(ctx) {
+    const { sock, from } = ctx;
+    if (games.has(from) || ctx.hasActiveGame?.()) return sock.sendMessage(from, { text: '⚠️ توجد لعبة قيد التشغيل! اكتبوا ' + bt('.انهاء_اللعبة') });
+    const ch = rnd(GUESS_CHARS);
+    const g = { type: 'guess', sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: ch.names, solved: false, q: 0, lastConf: 0, nextCmd: '.احزر next' };
+    games.set(from, g);
+    await say(g, box('🕵️', 'احْـزِرِ الـشَّـخْـصِـيَّـة', `«🎌 اخترتُ شخصية أنمي مشهورة.. حاولوا تخمينها!\n❓ اسألوا أي سؤال فيه كلمة «هل» وأنا أجاوب *صح ✅* أو *غلط ❌*\n💬 مثال: هل هذه الشخصية من ون بيس؟ • هل شعره أسود؟ • هل هو شرير؟ • هل يستخدم سيف؟\n⏳ الوقت: ${GUESS_TIME / 60000} دقائق\n🎁 الفائز ↞ +10 نقاط»`, 'للتخمين اكتب اسم الشخصية مباشرة في الشات'));
+    const anime = GUESS_ANIME[ch.anime]?.ar || '';
+    g.timer2 = setTimeout(async () => {
+        if (games.get(from) !== g || g.solved) return;
+        await say(g, `💡 *تلميح:* اسم الأنمي يبدأ بحرف ${bt([...anime][0] || '؟')}`);
+    }, 2 * 60 * 1000);
+    g.timer3 = setTimeout(async () => {
+        if (games.get(from) !== g || g.solved) return;
+        await say(g, `💡 *تلميح:* الشخصية ${ch.g === 'f' ? 'أنثى 👩' : 'ذكر 👨'}`);
+    }, 4 * 60 * 1000);
+    g.timer = setTimeout(async () => {
+        if (games.get(from) !== g || g.solved) return;
+        g.solved = true;
+        endGame(g);
+        await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0] || ch.en[0])} من أنمي ${anime}`, null, [], false);
+    }, GUESS_TIME);
+}
+async function guessAnswer(g, ctx) {
+    if (g.solved) return false;
+    const text = String(ctx.trimmedBody || '');
+    const asked = guessIsAsk(text);
+    // تخمين مباشر بالاسم (رسالة قصيرة بدون «هل»)
+    let verdict = null;
+    if (!asked) {
+        if (text.length <= 40 && matches(text, g.answers, false)) verdict = 'win';
+        else if (/[؟?]\s*$/.test(text)) { verdict = guessEval(g.ch, text); if (verdict === 'unknown') return false; }
+        else return false;
+    } else verdict = guessEval(g.ch, text);
+    g.q++;
+    if (verdict === 'win') {
+        g.solved = true; clearTimeout(g.timer); clearTimeout(g.timer2); clearTimeout(g.timer3);
+        await g.bank?.add(ctx.sender, 10);
+        endGame(g);
+        const wj = await realMentionJid(ctx);
+        await sendAnswerForm(g, box('🎉', 'إِجَـابَـةٌ صَـحِـيـحَـة', `«👤 الفائز ↞ ${tag(wj)}\n✅ الشخصية ↞ ${g.ch.ar[0] || g.ch.en[0]} (${GUESS_ANIME[g.ch.anime]?.ar || ''})\n❓ عدد الأسئلة ↞ ${g.q}\n🎁 +10 نقاط»`, 'عبقري أنمي!'), null, [wj]);
+        return true;
+    }
+    if (verdict === 'unknown') {
+        if (Date.now() - g.lastConf < 15000) return true;
+        g.lastConf = Date.now();
+        await g.sock.sendMessage(g.from, { text: '🤔 ما فهمت سؤالك! اسأل عن: *الأنمي* (هل من ون بيس؟) • *الجنس* (هل هو ولد؟) • *لون الشعر* (هل شعره أسود؟) • *الصفات* (هل هو شرير؟ / هل يستخدم سيف؟ / هل هو نينجا؟)' }, { quoted: ctx.msg }).catch(() => null);
+        return true;
+    }
+    await g.sock.sendMessage(g.from, { text: verdict === 'true' ? '✅ *صح*' : '❌ *غلط*' }, { quoted: ctx.msg }).catch(() => null);
+    return true;
+}
+
 // ================================================================ المعالجات الرئيسية
 // ردود نصية عادية (بدون نقطة): إجابات الجولات، حركات XO، تخمين الدخيل
 export async function handleAnimeAnswer(ctx) {
     const g = games.get(ctx.from);
     if (!g) return false;
     const text = ctx.trimmedBody;
+    if (g.type === 'guess') return guessAnswer(g, ctx);
     if (g.type === 'xo' && g.phase === 'play') return xoMove(g, ctx);
     if ((g.type === 'quiz' || g.type === 'emoji') && g.cur && !g.solved) {
         if (!matches(text, g.cur.a)) return false;
@@ -883,6 +941,7 @@ export async function handleAnimeCommand(ctx) {
             case 'اكس_او': case 'xo': await xoOpen(ctx); return true;
             case 'خمن_الشخصية': case 'خمن_الشخصيه': await charGame(ctx, 'blur'); return true;
             case 'معرفة_الشخصية': case 'معرفه_الشخصيه': await charGame(ctx, 'album'); return true;
+            case 'احزر': await guessStart(ctx); return true;
             case 'عين': if (args) await eyeBrowse(ctx, args); else await charGame(ctx, 'eyes'); return true;
             case 'انهاء_اللعبة': case 'انهاء_لعبة': case 'انهاء_اللعبه': {
                 const g = games.get(from);
