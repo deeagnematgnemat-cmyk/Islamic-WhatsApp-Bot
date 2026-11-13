@@ -309,7 +309,7 @@ const DEVELOPER_NUMBER = '962796163926';
 // ===== حماية أوامر المطور داخل البوتات الفرعية =====
 // البوت الفرعي لا يقبل أوامر المطور إلا من حساب المطور الأساسي أو حساب البوت الرئيسي
 const MAIN_BOT_NUMBER = String(global.botnumber || '962795106901').replace(/[^0-9]/g, '');
-const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين'];
+const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين', 'حظر_البوتات', 'سماح_البوتات'];
 function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
@@ -431,6 +431,11 @@ function removeOneWarningFromUser(userJid) {
 let groupTitles = {};
 let groupReservedTitles = {};
 let globalBotStopped = false;
+const SUBBOTS_PAUSE_FILE = './subbots_pause.json';
+let subBotsPausedUntil = 0;
+try { subBotsPausedUntil = Number(JSON.parse(fs.readFileSync(SUBBOTS_PAUSE_FILE, 'utf8'))?.until) || 0; } catch (e) { subBotsPausedUntil = 0; }
+function saveSubBotsPause() { try { fs.writeFileSync(SUBBOTS_PAUSE_FILE, JSON.stringify({ until: subBotsPausedUntil })); } catch (e) {} }
+function subBotsPaused() { return subBotsPausedUntil > Date.now(); }
 const stoppedSubBotGroups = new Set(); // المجموعات التي أُوقفت فيها البوتات المنصّبة فقط
 
 let commandReactionEnabled = true;
@@ -470,6 +475,7 @@ validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
 validCommands.push(...animeCommandNames);
 validCommands.push('صورة_الترحيب', 'صورة_للترحيب_افتراضي');
+validCommands.push('حظر_البوتات', 'سماح_البوتات');
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى');
 
@@ -834,6 +840,7 @@ function setupGroupAutomation(sock) {
     sock.ev.on('group-participants.update', async (anu) => {
         try {
             const { id, action } = anu;
+            if (sock.isSubBot && subBotsPaused()) return;
             if (action !== 'add') return;
             ensureTrack(id);
             if (!groupExtra.joined[id]) groupExtra.joined[id] = {};
@@ -1231,6 +1238,7 @@ function setupGroupFun(sock) {
     sock.ev.on('messages.upsert', async (m) => {
         try {
             if (m.type !== 'notify') return;
+            if (sock.isSubBot && subBotsPaused()) return;
             for (const mm of m.messages || []) {
                 const gid = mm?.key?.remoteJid;
                 const user = mm?.key?.participant;
@@ -1546,6 +1554,7 @@ if (connection === 'close') {
 sock.ev.on('group-participants.update', async (anu) => {
 try {
 const { id, action } = anu;
+if (sock.isSubBot && subBotsPaused()) return;
 const participants = (anu.participants || []).map((p) => (typeof p === 'string' ? p : (p?.id || p?.phoneNumber || ''))).filter(Boolean);
 const settings = getGroupSetting(id);
 
@@ -1668,6 +1677,7 @@ let trimmedBody = body.trim();
 let lowerBody = trimmedBody.toLowerCase();    
 
 if (sock.isSubBot && isGroup && stoppedSubBotGroups.has(from) && !isSenderDev) return;
+if (sock.isSubBot && subBotsPaused()) return;
 
 const groupSettingsForCheck = getGroupSetting(from);
 
@@ -2811,6 +2821,21 @@ if (cmdBase === 'تفعيل_البوت' || cmdBase === 'تفعيل البوت') 
     return sendBotMessage(sock, from, { text: `🟢 تم إعادة تشغيل جميع البوتات المنصّبة في هذه المجموعة.` });
 }
 
+if (cmdBase === 'حظر_البوتات') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
+    if (sock.isSubBot) return sendBotMessage(sock, from, { text: '⚠️ هذا الأمر متاح من البوت الرئيسي فقط.' });
+    if (subBotsPaused()) return sendBotMessage(sock, from, { text: 'ℹ️ البوتات المنصّبة متوقفة بالفعل، لإرجاعها اكتب `.سماح_البوتات`' });
+    subBotsPausedUntil = Number.MAX_SAFE_INTEGER; saveSubBotsPause();
+    return sendBotMessage(sock, from, { text: '🔴 تم إيقاف جميع البوتات المنصّبة بشكل كامل.\n🟢 لإرجاعها اكتب `.سماح_البوتات`' });
+}
+if (cmdBase === 'سماح_البوتات') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
+    if (sock.isSubBot) return sendBotMessage(sock, from, { text: '⚠️ هذا الأمر متاح من البوت الرئيسي فقط.' });
+    if (!subBotsPaused()) { subBotsPausedUntil = 0; saveSubBotsPause(); return sendBotMessage(sock, from, { text: 'ℹ️ البوتات المنصّبة تعمل بشكل طبيعي، لا يوجد إيقاف حالياً.' }); }
+    subBotsPausedUntil = 0; saveSubBotsPause();
+    return sendBotMessage(sock, from, { text: '🟢 تم إرجاع تشغيل جميع البوتات المنصّبة بشكل طبيعي.' });
+}
+
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });    
     const parts = trimmedBody.split(' ');    
@@ -3293,6 +3318,8 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 📢 .إذاعة <النص> ↞ إذاعة عامة
 > 🎬 .اساسي ↞ تغيير فيديو استمارة .بوت (رد على فيديو أو أرسله مع الأمر)
 > 📲 .عدد_المنصبين <رقم> ↞ تغيير عدد الهواتف المنصّبة
+> 🔴 .حظر_البوتات ↞ إيقاف جميع البوتات المنصّبة بشكل كامل
+> 🟢 .سماح_البوتات ↞ إرجاع تشغيل البوتات المنصّبة بشكل طبيعي
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
