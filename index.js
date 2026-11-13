@@ -2730,7 +2730,8 @@ if (cmdBase === 'تفاعل') {
 *『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*`;
     return sendBotMessage(sock, from, { text: reactText });    
 }    
-if (cmdBase === 'تفاعل_مطور') {    
+if (cmdBase === 'تفاعل_مطور') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });    
     const parts = trimmedBody.split(' ');    
     devReactionEmoji = parts[1] || '👑';    
     devReactionEnabled = (parts[2] || '').toLowerCase() === 'تفعيل';    
@@ -2798,6 +2799,7 @@ if (cmdBase === 'ازل_نخبة') {
 }
 
 if (cmdBase === 'عرض_نخبة') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
     vipUsers = vipUsers.filter(v => vipJids[v]);
     if (vipUsers.length === 0) return sendBotMessage(sock, from, { text: '📋 لا يوجد أعضاء نخبة مسجلين حالياً!' });
     let text = `👑 *قَـائِـمَـةُ أَعْـضَـاءِ الـنُّـخْـبَـةِ:*\n\n`;
@@ -3014,7 +3016,8 @@ if (cmdBase === 'تحويل') {
     return sendBotMessage(sock, from, { text, mentions: [sender, targetUser] });    
 }    
 
-if (cmdBase === 'قائمة_المطورين') {    
+if (cmdBase === 'قائمة_المطورين') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });    
     let text = `👑 *قَـائِـمَـةُ الـمُـطَـوِّرِيـنَ:*\n\n> @${DEVELOPER_NUMBER}\n`;
     let mentions = [DEVELOPER_NUMBER + '@s.whatsapp.net'];
 
@@ -3373,6 +3376,7 @@ if (cmdBase === '6') {
 }
 
 if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
     const devMenuText = `♟️ *قِـسْـمُ الـمُـطَـوِّرِ:*
 
 > 🔴 .ايقاف_البوت ↞ إيقاف البوت كلياً
