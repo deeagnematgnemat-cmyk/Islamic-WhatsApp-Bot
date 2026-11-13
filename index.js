@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
-import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedia } from './subbot.js';
+import { initSubBots, handleSubBotCommand, isSubBotPrivateBlocked, getSubBotMedia, getSubBotSocks } from './subbot.js';
 import { sendFormWithButtons, sendDevInfoWithButton, getButtonId, sendSectionWithButtons, sendSectionsList, setForwardContextProvider, protectionButton } from './menu.js';
 import { handleFeatureCommand, featureCommandNames, isFeatureLinkCommand, collectPackImages } from './features.js';
 import { handleToolsCommand, toolsCommandNames, isToolsLinkCommand } from './tools.js';
@@ -309,7 +309,7 @@ const DEVELOPER_NUMBER = '962796163926';
 // ===== حماية أوامر المطور داخل البوتات الفرعية =====
 // البوت الفرعي لا يقبل أوامر المطور إلا من حساب المطور الأساسي أو حساب البوت الرئيسي
 const MAIN_BOT_NUMBER = String(global.botnumber || '962795106901').replace(/[^0-9]/g, '');
-const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين', 'حظر_البوتات', 'سماح_البوتات'];
+const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين', 'حظر_البوتات', 'سماح_البوتات', 'نشر'];
 function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
@@ -475,7 +475,7 @@ validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
 validCommands.push(...animeCommandNames);
 validCommands.push('صورة_الترحيب', 'صورة_للترحيب_افتراضي');
-validCommands.push('حظر_البوتات', 'سماح_البوتات');
+validCommands.push('حظر_البوتات', 'سماح_البوتات', 'نشر');
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى');
 
@@ -2836,6 +2836,61 @@ if (cmdBase === 'سماح_البوتات') {
     return sendBotMessage(sock, from, { text: '🟢 تم إرجاع تشغيل جميع البوتات المنصّبة بشكل طبيعي.' });
 }
 
+if (cmdBase === 'نشر') {
+    if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });
+    if (sock.isSubBot) return sendBotMessage(sock, from, { text: '⚠️ هذا الأمر متاح من البوت الرئيسي فقط.' });
+    if (subBotsPaused()) return sendBotMessage(sock, from, { text: '⚠️ البوتات المنصّبة متوقفة حالياً، أرجعها أولاً بـ `.سماح_البوتات` ثم أعد النشر.' });
+    if (globalThis.__subBotsPublishing) return sendBotMessage(sock, from, { text: '⏳ عملية نشر جارية بالفعل، انتظر حتى تنتهي.' });
+    const subSocks = getSubBotSocks();
+    if (!subSocks.length) return sendBotMessage(sock, from, { text: 'ℹ️ لا توجد بوتات منصّبة متصلة حالياً.' });
+    const channelForm = `*『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*📢┊قـنـاة الـبـوت الـرسـمـيـة*
+
+*✨ كُـن أول مَـن يَـعـلـم!*
+*فـي قـنـاتـنـا سـتـجـد:*
+
+*🔹 آخـر الـتـحـديـثـات والأوامـر الـجـديـدة*
+*🔹 مـمـيـزات حـصـريـة قـبـل الـجـمـيـع*
+*🔹 إعـلانـات مـهـمـة وأخـبـار الـبـوت*
+*🔹 دعـم ومـسـاعـدة بـشـكـل مـسـتـمـر*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🤍 مـتـابـعـتـك تـعـنـي لـنـا الـكـثـيـر،*
+*وتـشـجـعـنـا نـقـدّم لـك الأفـضـل دائـمـاً.*
+
+*📌 تـابـع الـقـنـاة الآن مـن هـنـا ⬇️*
+*『https://whatsapp.com/channel/0029VbAyOwm3mFY0ohjZCB04』*
+
+*❐═━━━═╊⊰🍷⊱╉═━━━═❐*
+
+*🍷┊مـع تـحـيـات ⤺*
+*『𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉』*`;
+    globalThis.__subBotsPublishing = true;
+    await sendBotMessage(sock, from, { text: `⏳ جارٍ نشر الاستمارة عبر ${subSocks.length} بوت منصّب... سأرسل لك التقرير عند الانتهاء.` });
+    let sentCount = 0, failCount = 0;
+    try {
+        for (const subSock of subSocks) {
+            let groupsOfSub = {};
+            try { groupsOfSub = await subSock.groupFetchAllParticipating(); } catch (e) { failCount++; continue; }
+            for (const gId of Object.keys(groupsOfSub)) {
+                try {
+                    const hiddenMentions = (groupsOfSub[gId].participants || []).map(p => p.id);
+                    await subSock.sendMessage(gId, { text: channelForm, mentions: hiddenMentions });
+                    sentCount++;
+                } catch (e) { failCount++; }
+                await new Promise((r) => setTimeout(r, 3000));
+            }
+        }
+    } finally {
+        globalThis.__subBotsPublishing = false;
+    }
+    return sendBotMessage(sock, from, { text: `✅ انتهى النشر.\n📣 البوتات المنصّبة: ${subSocks.length}\n🟢 تم الإرسال في: ${sentCount} مجموعة\n🔴 فشل: ${failCount}` });
+}
+
 if (cmdBase === 'تعطيل_البوتات' || cmd === 'تعطيل بوتات') {    
     if (!isSenderDev) return sendBotMessage(sock, from, { text: '❌ مخصص للمطورين فقط!' });    
     const parts = trimmedBody.split(' ');    
@@ -3320,6 +3375,7 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 📲 .عدد_المنصبين <رقم> ↞ تغيير عدد الهواتف المنصّبة
 > 🔴 .حظر_البوتات ↞ إيقاف جميع البوتات المنصّبة بشكل كامل
 > 🟢 .سماح_البوتات ↞ إرجاع تشغيل البوتات المنصّبة بشكل طبيعي
+> 📣 .نشر ↞ نشر استمارة قناة البوت في كل مجموعات البوتات المنصّبة (منشن مخفي)
 > 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
