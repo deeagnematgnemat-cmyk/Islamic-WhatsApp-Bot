@@ -16,6 +16,7 @@ import { handleIslamicCommand, normalizeIslamicCmd, islamicCommandNames, setupIs
 import { buildTopImage } from './topimage.js';
 import { handleAnimeCommand, handleAnimeAnswer, handleAnimePrivate, animeCommandNames, withdrawAnime } from './anime.js';
 import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
+import { ghazalsExtra } from './ghazalData.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -110,6 +111,7 @@ const quotesList = [
 ];
 
 jokesList.push(...jokesExtra);
+ghazalsList.push(...ghazalsExtra);
 whatIfList.push(...whatIfExtra);
 quotesList.push(...quotesExtra);
 
