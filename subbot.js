@@ -218,6 +218,11 @@ async function removeSub(number) {
     return true;
 }
 
+// يُستدعى من index.js: اتصالات البوتات المنصّبة المتصلة حالياً
+export function getSubBotSocks() {
+    return [...subs.values()].filter(e => e.connected && e.sock && !e.stopped).map(e => e.sock);
+}
+
 // تُستدعى مرة واحدة من index.js بعد تشغيل البوت الرئيسي: تعيد تشغيل البوتات المحفوظة
 export function initSubBots(startBot) {
     startBotFn = startBot;
