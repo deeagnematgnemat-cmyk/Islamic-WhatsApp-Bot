@@ -362,3 +362,29 @@ export function guessEval(ch, text) {
     if (!results.length) return 'unknown';
     return (results.every(Boolean) !== neg) ? 'true' : 'false';
 }
+
+// ---------- ذكاء اصطناعي: يجيب على أي سؤال لم تفهمه القواعد (نفس إعدادات AI_API_KEY / AI_API_URL / AI_MODEL في features.js) ----------
+export async function guessAI(ch, question) {
+    const base = (process.env.AI_API_URL || '').replace(/\/+$/, '');
+    const key = process.env.AI_API_KEY || '';
+    const url = key ? (base || 'https://api.openai.com/v1') + '/chat/completions' : (base ? base + '/chat/completions' : 'https://text.pollinations.ai/openai');
+    const model = process.env.AI_MODEL || (key ? 'gpt-4o-mini' : 'openai');
+    const name = ch.ar[0] || ch.en[0];
+    const anime = GUESS_ANIME[ch.anime]?.ar || '';
+    const system = `أنت مقدّم لعبة تخمين داخل بوت واتساب. الشخصية السرية هي «${name}» من أنمي «${anime}». ` +
+        'إذا كان سؤال اللاعب عن هذه الشخصية (صفاتها، قصتها، قدراتها، أنمي، أصدقاؤها، ...) فأجب بكلمة واحدة فقط: «✅ صح» أو «❌ غلط» دون أي إضافة، وكن دقيقاً. ' +
+        'ولا تذكر اسم الشخصية أبداً ولا تلمّح له. أما إذا كان السؤال عاماً لا علاقة له بالشخصية (أي سؤال في أي موضوع) فأجب عنه بإيجاز ووضوح وبلغة السائل، دون ذكر اسم الشخصية.';
+    const res = await fetch(url, {
+        method: 'POST',
+        signal: AbortSignal.timeout(45000),
+        headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
+        body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: question }], temperature: 0.3 })
+    });
+    if (!res.ok) throw new Error('AI_HTTP_' + res.status);
+    const out = String((await res.json())?.choices?.[0]?.message?.content || '').trim();
+    if (!out) throw new Error('AI_EMPTY');
+    // منع تسريب الاسم
+    const nz = guessNz(out);
+    for (const n of ch.names) { const k = guessNz(n); if (k.replace(/ /g, '').length >= 3 && (' ' + nz + ' ').includes(' ' + k + ' ')) return '🤐 هذا يكشف الاسم! اسأل بطريقة ثانية.'; }
+    return out.slice(0, 1500);
+}
