@@ -507,6 +507,21 @@ if (!sock?.isSubBot && botJidNum && (cleanNum === botJidNum || cleanNum.endsWith
 return extraDevelopers.some(dev => cleanNum.includes(dev) || dev.includes(cleanNum));
 }
 
+// يتعرّف على رقم المطور الأساسي مباشرة حتى لو وصل المرسل بمعرّف LID بدل الرقم
+async function isMainDeveloperMsg(sock, msg, sender) {
+try {
+const k = msg?.key || {};
+for (const j of [sender, k.participant, k.participantAlt, k.participantPn, k.senderPn, k.remoteJidAlt, msg?.participant_pn]) {
+if (typeof j === 'string' && j.endsWith('@s.whatsapp.net') && jidDigits(j) === DEVELOPER_NUMBER) return true;
+}
+if (typeof sender === 'string' && sender.endsWith('@lid')) {
+const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(sender);
+if (pn && jidDigits(pn) === DEVELOPER_NUMBER) return true;
+}
+} catch (e) {}
+return false;
+}
+
 async function getUserProfilePic(sock, senderJid) {
 try {
 return await sock.profilePictureUrl(senderJid, 'image');
@@ -1659,7 +1674,8 @@ if (isGroup) {
     userMsgsDirty = true;    
 }    
     
-let isSenderDev = isDeveloper(sender, sock);    
+const isSenderMainDevMsg = await isMainDeveloperMsg(sock, msg, sender);
+let isSenderDev = isDeveloper(sender, sock) || isSenderMainDevMsg;    
 let isSenderExtraDev = isExtraDeveloper(sender);    
 let isSenderAdmin = isFromMe || isSenderDev;    
 
@@ -1893,7 +1909,7 @@ let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n'
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
 
 // البوت الفرعي: رفض أي أمر خاص بالمطور من غير المطور الأساسي وحساب البوت الرئيسي
-if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender)) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
+if (sock.isSubBot && (DEV_ONLY_COMMANDS.includes(cmdBase) || DEV_ONLY_COMMANDS.includes(cmd)) && !isMainAccount(sender) && !isSenderMainDevMsg) return sendBotMessage(sock, from, { text: '❌ هذا الأمر للمطور الرئيسي فقط!' });
 
 if (commandReactionEnabled) {    
     try {    
