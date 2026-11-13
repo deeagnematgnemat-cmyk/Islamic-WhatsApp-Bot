@@ -1,7 +1,7 @@
 // ============ anime.js : ألعاب وفعاليات الأنمي (مافيا، برا السالفة، مسابقات، صور...) ============
 import { QUIZ, EMOJI_PUZZLES, CHARACTERS, BARA_WORDS } from './animeData.js';
 import { sendImageWithQuickReply, sendSelectList } from './menu.js';
-import { GUESS_ANIME, GUESS_CHARS, guessEval, guessIsAsk } from './guessData.js';
+import { GUESS_ANIME, GUESS_CHARS, guessEval, guessIsAsk, guessAI, guessNz } from './guessData.js';
 
 const SIG = '『✦』 𝐸𝓇𝑒𝓃 🍷 𝐵𝑜𝓉 『✦』';
 const LINE = '❐═━━━═╊⊰🍷⊱╉═━━━═❐';
@@ -804,7 +804,7 @@ async function guessStart(ctx) {
     const ch = rnd(GUESS_CHARS);
     const g = { type: 'guess', sock, from, bank: ctx.bank, hostIds: idsOf(ctx), ch, answers: ch.names, solved: false, q: 0, lastConf: 0, nextCmd: '.احزر next' };
     games.set(from, g);
-    await say(g, box('🕵️', 'احْـزِرِ الـشَّـخْـصِـيَّـة', `«🎌 اخترتُ شخصية أنمي مشهورة.. حاولوا تخمينها!\n❓ اسألوا أي سؤال فيه كلمة «هل» وأنا أجاوب *صح ✅* أو *غلط ❌*\n💬 مثال: هل هذه الشخصية من ون بيس؟ • هل شعره أسود؟ • هل هو شرير؟ • هل يستخدم سيف؟\n⏳ الوقت: ${GUESS_TIME / 60000} دقائق\n🎁 الفائز ↞ +10 نقاط»`, 'للتخمين اكتب اسم الشخصية مباشرة في الشات'));
+    await say(g, guessMark(box('🕵️', 'احْـزِرِ الـشَّـخْـصِـيَّـة', `«🎌 اخترتُ شخصية أنمي مشهورة.. حاولوا تخمينها!\n❓ اسألوا أي سؤال فيه كلمة «هل» وأنا أجاوب *صح ✅* أو *غلط ❌*\n💬 مثال: هل هذه الشخصية من ون بيس؟ • هل شعره أسود؟ • هل هو شرير؟ • هل يستخدم سيف؟\n⏳ الوقت: ${GUESS_TIME / 60000} دقائق\n🎁 الفائز ↞ +10 نقاط»`, 'للتخمين اكتب اسم الشخصية مباشرة في الشات')));
     const anime = GUESS_ANIME[ch.anime]?.ar || '';
     g.timer2 = setTimeout(async () => {
         if (games.get(from) !== g || g.solved) return;
@@ -821,9 +821,12 @@ async function guessStart(ctx) {
         await sendAnswerForm(g, `⏰ *انتهى الوقت!*\n✅ الشخصية: ${bt(ch.ar[0] || ch.en[0])} من أنمي ${anime}`, null, [], false);
     }, GUESS_TIME);
 }
+const guessSent = new Set();   // نصوص أرسلها البوت نفسه (حتى لا يرد على رسائله)
+const guessMark = (t) => { guessSent.add(guessNz(t)); if (guessSent.size > 300) guessSent.delete(guessSent.values().next().value); return t; };
 async function guessAnswer(g, ctx) {
     if (g.solved) return false;
     const text = String(ctx.trimmedBody || '');
+    if (text.includes(SIG) || guessSent.has(guessNz(text))) return false;   // رسالة من البوت نفسه
     const asked = guessIsAsk(text);
     // تخمين مباشر بالاسم (رسالة قصيرة بدون «هل»)
     let verdict = null;
@@ -842,9 +845,17 @@ async function guessAnswer(g, ctx) {
         return true;
     }
     if (verdict === 'unknown') {
+        // سؤال لم تفهمه القواعد: يجيب عليه الذكاء الاصطناعي
+        if ((g.aiBusy || 0) >= 3) return true;
+        g.aiBusy = (g.aiBusy || 0) + 1;
+        let ans = null;
+        try { ans = await guessAI(g.ch, text); } catch (e) { console.error('خطأ ذكاء احزر:', e?.message || e); }
+        g.aiBusy--;
+        if (games.get(g.from) !== g || g.solved) return true;
+        if (ans) { await g.sock.sendMessage(g.from, { text: guessMark(ans) }, { quoted: ctx.msg }).catch(() => null); return true; }
         if (Date.now() - g.lastConf < 15000) return true;
         g.lastConf = Date.now();
-        await g.sock.sendMessage(g.from, { text: '🤔 ما فهمت سؤالك! اسأل عن: *الأنمي* (هل من ون بيس؟) • *الجنس* (هل هو ولد؟) • *لون الشعر* (هل شعره أسود؟) • *الصفات* (هل هو شرير؟ / هل يستخدم سيف؟ / هل هو نينجا؟)' }, { quoted: ctx.msg }).catch(() => null);
+        await g.sock.sendMessage(g.from, { text: guessMark('🤔 ما فهمت سؤالك! اسأل عن: *الأنمي* (هل من ون بيس؟) • *الجنس* (هل هو ولد؟) • *لون الشعر* (هل شعره أسود؟) • *الصفات* (هل هو شرير؟ / هل يستخدم سيف؟ / هل هو نينجا؟)') }, { quoted: ctx.msg }).catch(() => null);
         return true;
     }
     await g.sock.sendMessage(g.from, { text: verdict === 'true' ? '✅ *صح*' : '❌ *غلط*' }, { quoted: ctx.msg }).catch(() => null);
