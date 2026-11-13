@@ -469,6 +469,7 @@ validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
 validCommands.push(...animeCommandNames);
+validCommands.push('صورة_الترحيب', 'صورة_للترحيب_افتراضي');
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
 validCommands.push('مستواي', 'توب_المستويات', 'تايتن', 'اهجم', 'توب_المهاجمين', 'ميلادي', 'اقرب_ميلاد', 'بطاقتي', 'مزاد', 'زايد', 'كبسولة', 'تفعيل_اشعار_المستوى', 'توقيف_اشعار_المستوى');
 
@@ -579,7 +580,7 @@ return text + '\n\n' + tag;
 }
 function persistWelcome(groupId) {
 const g = getGroupSetting(groupId);
-welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '' };
+welcomeStore[groupId] = { welcome: !!g.welcome, goodbye: !!g.goodbye, welcomeText: g.welcomeText || '', goodbyeText: g.goodbyeText || '', welcomeImage: g.welcomeImage || '' };
 try { fs.writeFileSync(WELCOME_FILE, JSON.stringify(welcomeStore)); } catch (e) {}
 }
 
@@ -1580,7 +1581,7 @@ if (action === 'add' && settings.welcome) {
 *『𝑽. 𝑳. 𝑫 ⊰🗡⊱ 𝑬𝑵𝑮𝑳𝑨𝑵𝑫』*`;
 
         try {
-            await sendBotMessage(sock, id, { image: { url: userPp }, caption: welcomeMsg, mentions: [user] });
+            await sendBotMessage(sock, id, { image: (settings.welcomeImage && fs.existsSync(settings.welcomeImage)) ? fs.readFileSync(settings.welcomeImage) : { url: userPp }, caption: welcomeMsg, mentions: [user] });
         } catch (err) {
             await sendBotMessage(sock, id, { text: welcomeMsg, mentions: [user] });
         }
@@ -1876,6 +1877,7 @@ let cmd = trimmedBody.substring(1).toLowerCase().trim().replace(/[أإآا]/g, '
 cmd = normalizeGroupExtraCmd(cmd);
 cmd = normalizeGroupFunCmd(cmd);
 cmd = normalizeIslamicCmd(cmd);
+cmd = cmd.replace(/^صورة[ _](ال|لل)ترحيب(?:[ _](افتراضي))?$/, (m, a, d) => d ? 'صورة_للترحيب_افتراضي' : 'صورة_الترحيب');
 let cmdBase = /^تغيير_(ترحيب|توديع)\n/.test(cmd) ? cmd.split('\n')[0] : cmd.split(' ')[0];    
 
 if (!isValidCmd(cmdBase) && !isValidCmd(cmd)) return;    
@@ -1909,7 +1911,7 @@ const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
 if (await handleGroupExtraCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev })) return;
 if (await handleGroupFunCommand({ sock, msg, from, sender, cmd, trimmedBody, isSenderAdmin, isSenderDev })) return;
 
-if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
+if (['قفل', 'غلق', 'فتح', 'حذف', 'مسح', 'الكل', 'منشن', 'رفع', 'ترقية', 'ازل', 'تنزيل', 'طرد', 'اضف_انذار', 'ازل_انذار', 'حذف_انذار', 'صفر', 'عدد_الانذارات', 'قائمة_الانذارات', 'كتم', 'الغاء_كتم', 'فك_كتم', 'تفعيل ادمن', 'توقيف ادمن', 'تفعيل ترحيب', 'توقيف ترحيب', 'تفعيل توديع', 'توقيف توديع', 'تغيير_ترحيب', 'تغيير_توديع', 'ترحيب_افتراضي', 'صورة_الترحيب', 'صورة_للترحيب_افتراضي', 'توديع_افتراضي', 'تفعيل_كشف_المحذوف', 'توقيف_كشف_المحذوف', 'قائمة_المحذوف', 'تفعيل_كشف_المعدل', 'توقيف_كشف_المعدل', 'قائمة_المعدل', 'تغيير_الاسم', 'تغيير_الوصف', 'رابط_الجروب', 'الرابط', 'اضافة_لقب', 'ازالة_لقب', 'حجز_لقب', 'الغاء_حجز_لقب'].includes(cmdBase) || cmd.startsWith('تغيير_الاسم') || cmd.startsWith('تغيير_الوصف') || cmd === 'تفعيل ادمن' || cmd === 'توقيف ادمن' || cmd === 'تفعيل ترحيب' || cmd === 'توقيف ترحيب' || cmd === 'تفعيل توديع' || cmd === 'توقيف توديع' || cmd === 'رابط_الجروب' || cmd === 'الرابط' || cmd === 'غلق') {    
     if (!isSenderAdmin && !isSenderDev) {    
         return sendBotMessage(sock, from, { text: '❌ هذا الأمر مخصص للمشرفين والمطور فقط لا غير!' });    
     }    
@@ -2147,6 +2149,34 @@ if (cmd.startsWith('تغيير_توديع')) {
 if (cmd === 'ترحيب_افتراضي') {
     getGroupSetting(from).welcomeText = ''; persistWelcome(from);
     return sendBotMessage(sock, from, { text: '✅ تم إرجاع استمارة الترحيب الأساسية لهذه المجموعة.' });
+}
+if (cmd === 'صورة_الترحيب') {
+    try {
+        const unwrap = (m) => m?.ephemeralMessage?.message || m?.viewOnceMessage?.message || m?.viewOnceMessageV2?.message || m?.documentWithCaptionMessage?.message || m;
+        let mediaMsg = unwrap(quotedMsg);
+        if (!mediaMsg?.imageMessage) mediaMsg = unwrap(msg.message);
+        if (!mediaMsg?.imageMessage) {
+            return sendBotMessage(sock, from, { text: '📌 رد على صورة بكلمة `.صورة_الترحيب` أو أرسل الصورة وفي وصفها `.صورة_الترحيب` لتصبح صورة الترحيب لهذه المجموعة.' });
+        }
+        const buffer = await downloadMediaMessage({ key: msg.key, message: mediaMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        if (!buffer || !buffer.length) throw new Error('empty media');
+        const WELCOME_MEDIA_DIR = './welcome_media';
+        if (!fs.existsSync(WELCOME_MEDIA_DIR)) fs.mkdirSync(WELCOME_MEDIA_DIR, { recursive: true });
+        const safeId = String(from).replace(/[^0-9a-zA-Z_-]/g, '_');
+        const file = `${WELCOME_MEDIA_DIR}/${safeId}.jpg`;
+        fs.writeFileSync(file, buffer);
+        getGroupSetting(from).welcomeImage = file; persistWelcome(from);
+        return sendBotMessage(sock, from, { text: '✅ تم تغيير صورة الترحيب لهذه المجموعة فقط.' });
+    } catch (e) {
+        console.error('خطأ حفظ صورة الترحيب:', e?.message || e);
+        return sendBotMessage(sock, from, { text: '❌ فشل حفظ الصورة، تأكد أنها صالحة وأعد المحاولة.' });
+    }
+}
+if (cmd === 'صورة_للترحيب_افتراضي') {
+    const g = getGroupSetting(from);
+    if (g.welcomeImage && fs.existsSync(g.welcomeImage)) { try { fs.unlinkSync(g.welcomeImage); } catch (e) {} }
+    g.welcomeImage = ''; persistWelcome(from);
+    return sendBotMessage(sock, from, { text: '✅ تم إرجاع صورة الترحيب الأساسية (صورة المجموعة) لهذه المجموعة.' });
 }
 if (cmd === 'توديع_افتراضي') {
     getGroupSetting(from).goodbyeText = ''; persistWelcome(from);
@@ -3297,7 +3327,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
 > ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
-> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي\n> 📜 .قوانين ↞ عرض قوانين المجموعة\n> ✏️ .ضبط_قوانين <النص> ↞ ضبط القوانين\n> 🚨 .منشن_المشرفين ↞ منشن المشرفين فقط\n> 🚫 .حظر_اكواد <الكود> ↞ طرد الأعضاء الجدد بكود دولة معين\n> ✅ .سماح_اكواد <الكود> ↞ إزالة كود من الحظر\n> 📉 .غير_المتفاعلين <أيام> ↞ عرض غير المتفاعلين\n> ⚔️ .طرد_غير_المتفاعلين <أيام> ↞ طرد غير المتفاعلين\n> ⏳ .قفل_مؤقت <دقائق> ↞ قفل ثم فتح تلقائي\n> 🗓️ .جدولة_قفل 23:00 06:00 ↞ قفل وفتح يومي تلقائي`;
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> 🖼️ .صورة_الترحيب ↞ تغيير صورة الترحيب (رد على صورة)\n> ♻️ .صورة_للترحيب_افتراضي ↞ إرجاع صورة الترحيب لصورة المجموعة\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي\n> 📜 .قوانين ↞ عرض قوانين المجموعة\n> ✏️ .ضبط_قوانين <النص> ↞ ضبط القوانين\n> 🚨 .منشن_المشرفين ↞ منشن المشرفين فقط\n> 🚫 .حظر_اكواد <الكود> ↞ طرد الأعضاء الجدد بكود دولة معين\n> ✅ .سماح_اكواد <الكود> ↞ إزالة كود من الحظر\n> 📉 .غير_المتفاعلين <أيام> ↞ عرض غير المتفاعلين\n> ⚔️ .طرد_غير_المتفاعلين <أيام> ↞ طرد غير المتفاعلين\n> ⏳ .قفل_مؤقت <دقائق> ↞ قفل ثم فتح تلقائي\n> 🗓️ .جدولة_قفل 23:00 06:00 ↞ قفل وفتح يومي تلقائي`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
