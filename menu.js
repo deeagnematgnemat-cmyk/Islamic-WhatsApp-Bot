@@ -238,7 +238,9 @@ export function protectionButton(settings = {}) {
                 item('🔗', 'حماية الروابط', 'حظر_رابط', 'سماح_رابط', settings.antiLink),
                 item('🤬', 'حماية الشتم', 'حظر_شتم', 'سماح_شتم', settings.antiBadWords),
                 item('📇', 'حماية الجهات', 'حظر_جهات', 'سماح_جهات', settings.antiContact),
-                item('📢', 'حماية توجيه القنوات', 'حظر_توجيه', 'سماح_توجيه', settings.antiForward)
+                item('📢', 'حماية توجيه القنوات', 'حظر_توجيه', 'سماح_توجيه', settings.antiForward),
+                item('🚫', 'حماية السبام', 'حظر_سبام', 'سماح_سبام', settings.antiSpam),
+                item('🎭', 'حماية الملصقات المتتالية', 'حظر_ملصقات', 'سماح_ملصقات', settings.antiStickerSpam)
             ]
         })
     };
