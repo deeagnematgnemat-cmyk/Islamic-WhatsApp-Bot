@@ -2,6 +2,7 @@
 // مواقيت الصلاة لجميع دول العالم (الأردن بطريقة وزارة الأوقاف الأردنية) • حاسبة • تاريخ هجري/ميلادي • عملات • طقس
 // عمري • زخرفة • QR • اختصار روابط • باسورد • قرعة • تصويت • تذكير
 import crypto from 'crypto';
+import fs from 'fs';
 import axios from 'axios';
 import QRCode from 'qrcode';
 import { sendSectionWithButtons } from './menu.js';
@@ -607,6 +608,87 @@ async function cmdRemind(c) {
     await c.reply(`✅ تم ضبط التذكير بعد *${fmtRemain(ms)}*\n📝 ${note}\n\nℹ️ التذكيرات تُلغى إذا أُعيد تشغيل البوت.`);
 }
 
+// ---------------------------------------------------------------- إضافات: قبلة • ملاحظة/ملاحظاتي • ذهب
+const KAABA = { lat: 21.422487, lng: 39.826206 };
+export function qiblaInfo(lat, lng) {
+    const rad = (d) => (d * Math.PI) / 180, deg = (r) => (r * 180) / Math.PI;
+    const p1 = rad(lat), p2 = rad(KAABA.lat), dl = rad(KAABA.lng - lng);
+    const y = Math.sin(dl) * Math.cos(p2);
+    const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+    const bearing = (deg(Math.atan2(y, x)) + 360) % 360;
+    const a = Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+    const km = 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
+    const names = ['شمالاً', 'شمال شرق', 'شرقاً', 'جنوب شرق', 'جنوباً', 'جنوب غرب', 'غرباً', 'شمال غرب'];
+    return { bearing, km, dir: names[Math.round(bearing / 45) % 8] };
+}
+async function cmdQibla(c) {
+    const loc = await resolveLocation(c.args);
+    const q = qiblaInfo(loc.lat, loc.lng);
+    await c.reply(`🧭 *اتجاه القبلة*\n\n📍 ${[loc.city, loc.country].filter(Boolean).join('، ')}\n\n🕋 الاتجاه: *${q.bearing.toFixed(1)}°* من الشمال (${q.dir})\n📏 المسافة إلى الكعبة: *${Math.round(q.km).toLocaleString('en-US')} كم*\n\n💡 افتح بوصلة الجوال ووجّهها نحو ${q.bearing.toFixed(0)}° مع الابتعاد عن المعادن والأجهزة الكهربائية.\n🌍 لمكان آخر: \`.قبلة مصر القاهرة\``);
+}
+
+const NOTES_FILE = './notes.json';
+function loadNotes() { try { const d = JSON.parse(fs.readFileSync(NOTES_FILE, 'utf8')); return d && typeof d === 'object' ? d : {}; } catch (e) { return {}; } }
+function saveNotes(d) { try { fs.writeFileSync(NOTES_FILE, JSON.stringify(d)); } catch (e) { console.error('تعذر حفظ الملاحظات:', e?.message || e); } }
+async function cmdNoteAdd(c) {
+    const text = String(c.args || '').trim();
+    if (!text) return c.reply('📝 *الملاحظات*\n\nمثال: `.ملاحظة موعد الطبيب الخميس`\nلعرض ملاحظاتك: `.ملاحظاتي`');
+    if (text.length > 500) return c.reply('⚠️ الملاحظة طويلة (الحد 500 حرف).');
+    const all = loadNotes(); const list = all[c.sender] || (all[c.sender] = []);
+    if (list.length >= 30) return c.reply('❌ وصلت للحد الأقصى (30 ملاحظة). احذف بعضها بـ `.ملاحظاتي حذف <الرقم>`');
+    list.push({ t: text, at: Date.now() });
+    saveNotes(all);
+    await c.reply(`✅ تم حفظ الملاحظة رقم *${list.length}*.\n📋 لعرضها: \`.ملاحظاتي\``);
+}
+async function cmdNotesList(c) {
+    const all = loadNotes(); const list = all[c.sender] || [];
+    const a = toEnDigits(String(c.args || '')).trim();
+    if (/^(مسح|حذف)\s*(الكل|all)?$/i.test(a) && !/\d/.test(a)) {
+        if (/الكل|all/i.test(a)) { delete all[c.sender]; saveNotes(all); return c.reply('🗑️ تم حذف كل ملاحظاتك.'); }
+        return c.reply('📌 لحذف ملاحظة: `.ملاحظاتي حذف 2`\nلحذف الكل: `.ملاحظاتي حذف الكل`');
+    }
+    const m = /^(?:حذف|مسح)\s+(\d{1,2})$/.exec(a);
+    if (m) {
+        const i = Number(m[1]) - 1;
+        if (!list[i]) return c.reply('❌ لا توجد ملاحظة بهذا الرقم.');
+        list.splice(i, 1); if (!list.length) delete all[c.sender];
+        saveNotes(all);
+        return c.reply('🗑️ تم حذف الملاحظة.');
+    }
+    if (!list.length) return c.reply('📝 لا توجد ملاحظات محفوظة لديك.\nأضف ملاحظة: `.ملاحظة نصك هنا`');
+    const fmt = (t) => new Date(t).toLocaleDateString('en-GB', { timeZone: 'Asia/Amman' });
+    await c.reply(`📝 *ملاحظاتك (${list.length}):*\n\n${list.map((n, i) => `*${i + 1}.* ${n.t}\n> 📅 ${fmt(n.at)}`).join('\n\n')}\n\n🗑️ للحذف: \`.ملاحظاتي حذف <الرقم>\``);
+}
+
+async function cmdGold(c) {
+    const get = async (url) => (await http(url, { timeout: 12000 })).data;
+    let gold = null, silver = null, coins = null;
+    await Promise.all([
+        get('https://api.gold-api.com/price/XAU').then((d) => { if (Number(d?.price) > 0) gold = Number(d.price); }).catch(() => {}),
+        get('https://api.gold-api.com/price/XAG').then((d) => { if (Number(d?.price) > 0) silver = Number(d.price); }).catch(() => {}),
+        get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true').then((d) => { if (d?.bitcoin?.usd) coins = d; }).catch(() => {})
+    ]);
+    if (!gold && !coins) throw friendly('❌ تعذر جلب الأسعار الآن (الخدمة لا تستجيب). حاول مرة أخرى بعد قليل.');
+    let jod = null;
+    try { jod = (await getRates()).rates.JOD || null; } catch (e) {}
+    const GRAM = 31.1035;
+    const n2 = (v) => v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    const both = (usd) => `${n2(usd)}$` + (jod ? ` ≈ ${n2(usd * jod)} د.أ` : '');
+    let out = '🥇 *أسعار الذهب والمعادن والعملات الرقمية*\n';
+    if (gold) {
+        const g24 = gold / GRAM;
+        out += `\n🥇 *الذهب:*\n> الأونصة ↞ ${both(gold)}\n> عيار 24 (غرام) ↞ ${both(g24)}\n> عيار 21 (غرام) ↞ ${both(g24 * 21 / 24)}\n> عيار 18 (غرام) ↞ ${both(g24 * 18 / 24)}\n`;
+    }
+    if (silver) out += `\n🥈 *الفضة:*\n> الأونصة ↞ ${both(silver)}\n> الغرام ↞ ${both(silver / GRAM)}\n`;
+    if (coins) {
+        const ch = (v) => (Number.isFinite(v) ? ` (${v >= 0 ? '🟢 +' : '🔴 '}${v.toFixed(1)}%)` : '');
+        out += `\n₿ *العملات الرقمية:*\n> بيتكوين ↞ ${n2(coins.bitcoin.usd)}$${ch(coins.bitcoin.usd_24h_change)}\n`;
+        if (coins.ethereum?.usd) out += `> إيثريوم ↞ ${n2(coins.ethereum.usd)}$${ch(coins.ethereum.usd_24h_change)}\n`;
+    }
+    out += '\nℹ️ أسعار السوق العالمي الفورية ولا تشمل المصنعية أو الضريبة، وقد تختلف عن أسعار محلات الصاغة.';
+    await c.reply(out);
+}
+
 // ---------------------------------------------------------------- نص القسم
 export const TOOLS_SECTION = `🧰 *قِـسْـمُ الأَدَوَاتِ:*
 
@@ -626,12 +708,15 @@ export const TOOLS_SECTION = `🧰 *قِـسْـمُ الأَدَوَاتِ:*
 > 🧮 .حاسبة 25*4+10 ↞ حاسبة (جذر • ^ • % • أقواس)
 > 💱 .عملة 100 دولار دينار ↞ تحويل العملات
 > 🌤️ .طقس [دولة] [مدينة] ↞ حالة الطقس والحرارة
+> 🥇 .ذهب ↞ أسعار الذهب والفضة والعملات الرقمية
 
 🛠️ *أدوات متنوعة:*
 > ✨ .زخرفة <نص> ↞ زخرفة الأسماء بعدة أشكال
 > 📱 .qr <نص أو رابط> ↞ إنشاء باركود QR
 > 🔗 .اختصار <رابط> ↞ اختصار الروابط الطويلة
 > 🔐 .باسورد [الطول] ↞ كلمة مرور قوية
+> 🧭 .قبلة [دولة] [مدينة] ↞ اتجاه القبلة والمسافة للكعبة
+> 📝 .ملاحظة <نص> ↞ حفظ ملاحظة • .ملاحظاتي لعرضها (.ملاحظاتي حذف 2)
 
 👥 *للمجموعات:*
 > 🎲 .قرعة ↞ اختيار عضو عشوائي (أو .قرعة أ | ب | ج)
@@ -648,7 +733,8 @@ const COMMANDS = {
     'دول': ['countries'],
     'حاسبة': ['calc'], 'تاريخ': ['date', 'هجري'], 'عملة': ['currency', 'عملات'], 'طقس': ['weather'], 'عمري': ['age'],
     'زخرفة': ['زخرفه', 'font'], 'qr': ['باركود'], 'اختصار': ['short'], 'باسورد': ['pass', 'password'],
-    'قرعة': ['pick', 'قرعه'], 'تصويت': ['poll', 'استفتاء'], 'تذكير': ['remind', 'ذكرني']
+    'قرعة': ['pick', 'قرعه'], 'تصويت': ['poll', 'استفتاء'], 'تذكير': ['remind', 'ذكرني'],
+    'قبلة': ['قبله', 'qibla'], 'ملاحظة': ['ملاحظه', 'note'], 'ملاحظاتي': ['notes'], 'ذهب': ['gold', 'الذهب']
 };
 const CANON = {};
 for (const [name, aliases] of Object.entries(COMMANDS)) {
@@ -677,9 +763,10 @@ async function sendSection(c, text) {
 const HANDLERS = {
     'الادوات': (c) => sendSection(c, TOOLS_SECTION),
     'مواقيت': cmdPrayer, 'دول': cmdCountries, 'حاسبة': cmdCalc, 'تاريخ': cmdDate, 'عملة': cmdCurrency, 'طقس': cmdWeather, 'عمري': cmdAge,
-    'زخرفة': cmdFont, 'qr': cmdQR, 'اختصار': cmdShorten, 'باسورد': cmdPassword, 'قرعة': cmdPick, 'تصويت': cmdPoll, 'تذكير': cmdRemind
+    'زخرفة': cmdFont, 'qr': cmdQR, 'اختصار': cmdShorten, 'باسورد': cmdPassword, 'قرعة': cmdPick, 'تصويت': cmdPoll, 'تذكير': cmdRemind,
+    'قبلة': cmdQibla, 'ملاحظة': cmdNoteAdd, 'ملاحظاتي': cmdNotesList, 'ذهب': cmdGold
 };
-const NET_CMDS = new Set(['مواقيت', 'عملة', 'طقس', 'اختصار', 'qr']);
+const NET_CMDS = new Set(['مواقيت', 'عملة', 'طقس', 'اختصار', 'qr', 'قبلة', 'ذهب']);
 const COOLDOWN = new Map();
 
 export async function handleToolsCommand(ctx) {
