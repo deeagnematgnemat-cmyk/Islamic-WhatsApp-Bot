@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { cmdYtSearch, _internal as YT } from './ytsearch.js';
-import { sendVideoCarousel } from './menu.js';
+import { sendVideoCarousel, sendCardWithButtons, selectButton } from './menu.js';
 import {
     DlError, withSlot, searchVideos, getVideoInfo, downloadYt, fetchThumb,
     parseYtInput, isYtId, fmtDuration, fmtViews, _ext
@@ -499,7 +499,7 @@ function normTik(v, host) {
     return {
         id, title: String(v.title || '').trim(), author: uid || String(v.author?.nickname || '').trim(),
         duration: Number(v.duration || 0), plays: Number(v.play_count || 0),
-        play: absTik(v.play || v.hdplay, host), url: uid && id ? `https://www.tiktok.com/@${uid}/video/${id}` : ''
+        play: absTik(v.play || v.hdplay, host), cover: absTik(v.cover || v.origin_cover || '', host), url: uid && id ? `https://www.tiktok.com/@${uid}/video/${id}` : ''
     };
 }
 
@@ -697,6 +697,149 @@ async function cmdEdits(c) {
     }
 }
 
+// ---------------------------------------------------------------- بحث تيك توك: بحث ← اختيار فيديو ← اختيار النوع ← تنزيل (نفس أسلوب .بحث_يوت)
+//   .بحث_تيك <كلمات>               ← نتائج + زر «اختر فيديو»
+//   .بحث_تيك ~v <معرّف الفيديو>      ← (من الزر) بطاقة اختيار النوع
+//   .بحث_تيك ~d <معرّف> video|mp3    ← (من الزر) التنزيل والإرسال
+const TKS_CMD = '.بحث_تيك';
+const TKS_NUM = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
+const TKS_CACHE = new Map();
+const TKS_TTL = 3 * 3600 * 1000;
+const tkRemember = (items) => { for (const v of items) TKS_CACHE.set(v.id, { at: Date.now(), item: v }); while (TKS_CACHE.size > 300) TKS_CACHE.delete(TKS_CACHE.keys().next().value); };
+const tkRecall = (id) => { const e = TKS_CACHE.get(id); if (!e) return null; if (Date.now() - e.at > TKS_TTL) { TKS_CACHE.delete(id); return null; } return e.item; };
+const TKS_USAGE = `📌 *الاستخدام:*\n\`${TKS_CMD} كلمة البحث\`\nأو \`${TKS_CMD} رابط تيك توك\`\n\n💡 مثال: \`${TKS_CMD} ناروتو\``;
+
+async function tiktokSearch(query, notes) {
+    let list = await tikwmSearch(query, notes);
+    if (!list.length && /[\u0600-\u06FF]/.test(query)) {
+        const en = await toEnglish(query);
+        if (en && en.toLowerCase() !== query.toLowerCase()) list = await tikwmSearch(en, notes);
+    }
+    if (!list.length) list = await webSearchTikTok(query, notes);
+    if (!list.length) { const base = query.toLowerCase().replace(/[^a-z0-9]/g, ''); if (base) list = await tagSearch(base, notes); }
+    const seen = new Set();
+    return list.filter((v) => v.id && v.url && !seen.has(v.id) && seen.add(v.id)).slice(0, 6);
+}
+async function tkCover(url) {
+    if (!url) return null;
+    try { const b = await getBuf(url, { timeout: 15000, max: 3 * MB }); return b.length > 1500 ? b : null; } catch (e) { return null; }
+}
+
+async function tkStepSearch(c, query) {
+    const notes = [];
+    const items = await tiktokSearch(query, notes);
+    if (!items.length) {
+        console.error('[بحث_تيك] لا نتائج:', notes.join(' | '));
+        const err = new DlError(`❌ لم أجد نتائج لـ «${cut(query, 40)}». جرّب كلمات أخرى.`);
+        err.debug = notes.join('\n');
+        throw err;
+    }
+    tkRemember(items);
+    const stat = (v) => `> 👤 @${cut(v.author, 18) || '—'}  •  ⏱️ ${v.duration ? fmtDuration(v.duration) : '—'}  •  👁️ ${v.plays ? fmtViews(v.plays) : '—'}`;
+    const list = items.map((v, i) => [`> ${TKS_NUM[i]} ${cut(v.title, 42) || 'فيديو تيك توك'}`, stat(v)]);
+    const text = frame('🎵 *نَـتَـائِـجُ بَـحْـثِ تِـيـك تُـوك:*', [
+        [row('🔎', 'البحث', cut(query, 60)), row('📊', 'النتائج', `${items.length} فيديو`)], ...list
+    ], '💡 اضغط زر «اختر فيديو» بالأسفل.');
+    const button = selectButton('🎵 اختر فيديو', [{
+        title: '🎬 النتائج',
+        rows: items.map((v, i) => ({
+            header: '', title: `${TKS_NUM[i]} ${cut(v.title, 22) || 'فيديو تيك توك'}`,
+            description: `👤 @${cut(v.author, 16)} • ⏱️ ${v.duration ? fmtDuration(v.duration) : '—'}`, id: `${TKS_CMD} ~v ${v.id}`
+        }))
+    }]);
+    const image = await tkCover(items[0].cover);
+    const ok = await sendCardWithButtons(c.sock, c.from, { title: '', subtitle: '', image, text, footer: DEV, mentionJid: c.sender, extraButtons: [button] });
+    if (!ok) {
+        const fallback = items.map((v, i) => `${i + 1}. ${cut(v.title, 60) || 'فيديو'}\n${v.url}`).join('\n\n');
+        await c.reply(`${text}\n\n${fallback}\n\n⚠️ تعذر عرض الأزرار، انسخ رابط الفيديو وأرسله مع الأمر:\n${TKS_CMD} <الرابط>`);
+    }
+}
+
+async function tkStepKind(c, id) {
+    const v = tkRecall(id);
+    if (!v) return c.reply('⌛ انتهت صلاحية نتائج البحث، أعد البحث من جديد بـ `' + TKS_CMD + ' <كلمات>`.');
+    const meta = [row('📛', 'العنوان', cut(v.title, 50) || 'فيديو تيك توك'), row('👤', 'الحساب', '@' + (cut(v.author, 30) || '—'))];
+    if (v.duration) meta.push(row('⏱️', 'المدة', fmtDuration(v.duration)));
+    const KINDS = [{ k: 'video', emoji: '🎥', label: 'فيديو', desc: 'بدون علامة مائية' }, { k: 'mp3', emoji: '🎧', label: 'صوت MP3', desc: 'تحميل الصوت فقط' }];
+    const text = frame('🎥 *اخْـتَـرِ الـنَّـوْعَ:*', [meta, KINDS.map((r) => row(r.emoji, r.label, r.desc))], '💡 اضغط زر «اختر النوع» بالأسفل.');
+    const button = selectButton('🎥 اختر النوع', [{ title: 'النوع', rows: KINDS.map((r) => ({ header: '', title: `${r.emoji} ${r.label}`, description: r.desc, id: `${TKS_CMD} ~d ${id} ${r.k}` })) }]);
+    const image = await tkCover(v.cover);
+    const ok = await sendCardWithButtons(c.sock, c.from, { title: '', subtitle: '', image, text, footer: DEV, mentionJid: c.sender, extraButtons: [button] });
+    if (!ok) await c.reply(`${text}\n\n⚠️ تعذر عرض الأزرار، أرسل: ${TKS_CMD} ~d ${id} video`);
+}
+
+async function tkStepDownload(c, id, kind) {
+    const v = tkRecall(id);
+    if (!v) return c.reply('⌛ انتهت صلاحية نتائج البحث، أعد البحث من جديد بـ `' + TKS_CMD + ' <كلمات>`.');
+    const audio = kind === 'mp3';
+    await waiting(c, audio ? '🎧' : '🎥', audio ? 'صوت MP3' : 'فيديو', 'تيك توك');
+    const res = await withSlot(() => fetchMedia(v.url, 'tiktok', audio));
+    await deliver(c, res, { audio, label: 'تيك توك' });
+}
+
+async function cmdTikSearch(c, fallbackText = '') {
+    const a = String(c.args || '').trim();
+    let m = /^~v\s+(\d{8,25})\s*$/.exec(a);
+    if (m) return tkStepKind(c, m[1]);
+    m = /^~d\s+(\d{8,25})\s+(video|mp3)\s*$/i.exec(a);
+    if (m) return tkStepDownload(c, m[1], m[2].toLowerCase());
+    if (a.startsWith('~')) return c.reply(TKS_USAGE);
+
+    const q = a || (extractUrl(fallbackText) && detectPlatform(extractUrl(fallbackText)) === 'tiktok' ? extractUrl(fallbackText) : '');
+    if (!q) return c.reply(TKS_USAGE);
+    const url = extractUrl(q);
+    if (url) {
+        const um = /tiktok\.com\/@([\w.\-]+)\/video\/(\d{8,25})/i.exec(url);
+        if (!um) return c.reply('❌ أرسل الرابط الكامل للفيديو (tiktok.com/@حساب/video/...) أو استخدم الأمر `.تيك <رابط>`.');
+        tkRemember([{ id: um[2], title: '', author: um[1], duration: 0, plays: 0, play: '', cover: '', url: `https://www.tiktok.com/@${um[1]}/video/${um[2]}` }]);
+        return tkStepKind(c, um[2]);
+    }
+    return tkStepSearch(c, q.slice(0, 80));
+}
+
+// ---------------------------------------------------------------- كلمات الأغنية (lyrics.ovh)
+async function cmdLyrics(c) {
+    const q = String(c.args || '').trim();
+    if (!q) return c.reply(usage('.كلمات', '<اسم الأغنية>', 'فيروز سلامات', false) + '\n💡 للدقة اكتب: `.كلمات الفنان - الأغنية`');
+    const notFound = new DlError('❌ لم أجد كلمات هذه الأغنية. جرّب كتابتها هكذا: `.كلمات الفنان - اسم الأغنية`');
+    let artist = '', title = '';
+    const sep = /\s[-–|]\s/.exec(q);
+    if (sep) { artist = q.slice(0, sep.index).trim(); title = q.slice(sep.index + sep[0].length).trim(); }
+    else {
+        try {
+            const j = await getJson('https://api.lyrics.ovh/suggest/' + encodeURIComponent(q), 15000);
+            const first = j?.data?.[0];
+            artist = first?.artist?.name || ''; title = first?.title || '';
+        } catch (e) { /* يُعالج أدناه */ }
+    }
+    if (!artist || !title) throw notFound;
+    let lyrics = '';
+    try {
+        const j = await getJson(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`, 20000);
+        lyrics = String(j?.lyrics || '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    } catch (e) { throw notFound; }
+    if (!lyrics) throw notFound;
+    const cutText = lyrics.length > 3500 ? lyrics.slice(0, 3500).replace(/\n[^\n]*$/, '') + '\n…' : lyrics;
+    await c.reply(`🎼 *${cut(title, 60)}* — ${cut(artist, 40)}\n\n${cutText}\n\n🤖 ${DEV}`);
+}
+
+// ---------------------------------------------------------------- لصوت: تحويل فيديو/صوت إلى MP3
+async function cmdToAudio(c, getTarget, download) {
+    const t = getTarget(c, ['videoMessage', 'audioMessage', 'documentMessage']);
+    if (!t) return c.reply('📌 *الاستخدام:* أرسل فيديو مع الأمر `.لصوت` أو رد على فيديو/مقطع صوتي به، وسأحوّله إلى MP3.');
+    const buf = await download(c, t);
+    if (!buf || !buf.length) throw new DlError('❌ تعذر تحميل الملف من واتساب، أعد المحاولة.');
+    const dir = mkjob();
+    try {
+        const inp = path.join(dir, 'in.bin');
+        fs.writeFileSync(inp, buf);
+        const a = await toAudio(inp, dir);
+        const out = finishFile(a.file);
+        await c.media({ audio: out, mimetype: a.mime, fileName: 'audio' + a.ext });
+        await c.reply(done('تحويل إلى صوت', 'فيديو ← MP3', out.length));
+    } finally { rmrf(dir); }
+}
+
 // ---------------------------------------------------------------- الموزّع (يستدعيه features.js)
 // يرجع دالة معالجة لكل اسم أمر أساسي؛ fq = دالة تقرأ نص الرسالة المردود عليها
 export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
@@ -718,7 +861,10 @@ export function buildMoreDownloadHandlers({ quotedText, getTarget, download }) {
         'اذان': cmdAdhan,
         'غلاف': (c) => cmdCover(c, fq(c)),
         'معلومات_فيديو': (c) => cmdVideoInfo(c, fq(c)),
-        'ايدت': cmdEdits
+        'ايدت': cmdEdits,
+        'بحث_تيك': (c) => cmdTikSearch(c, fq(c)),
+        'كلمات': cmdLyrics,
+        'لصوت': (c) => cmdToAudio(c, getTarget, download)
     };
 }
 
@@ -730,9 +876,10 @@ export const MORE_COMMANDS = {
     'اغنية': ['song', 'اغاني', 'أغنية'], 'سورة': ['surah', 'سوره'], 'قارئ': ['القراء', 'قراء', 'reciters'],
     'محاضرة': ['lecture', 'محاضره'], 'اذان': ['adhan', 'azan', 'أذان'],
     'غلاف': ['cover', 'thumb', 'ثمنيل'], 'معلومات_فيديو': ['vinfo', 'معلومات_يوتيوب'],
-    'ايدت': ['edit', 'edits', 'ايديت', 'ايديتات', 'إيديت', 'ايدتات']
+    'ايدت': ['edit', 'edits', 'ايديت', 'ايديتات', 'إيديت', 'ايدتات'],
+    'بحث_تيك': ['tiktoksearch', 'بحث_تيكتوك'], 'كلمات': ['lyrics', 'كلمات_اغنية'], 'لصوت': ['tomp3', 'للصوت']
 };
-export const MORE_LINK_COMMANDS = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'غلاف', 'معلومات_فيديو'];
+export const MORE_LINK_COMMANDS = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'غلاف', 'معلومات_فيديو', 'بحث_تيك'];
 export const MORE_HEAVY = ['تيك', 'انستا', 'فيس', 'تويتر', 'سناب', 'ساوند', 'بنتريست_تنزيل', 'ميديافاير', 'حمل', 'اغنية', 'سورة', 'محاضرة', 'اذان', 'غلاف', 'معلومات_فيديو', 'ايدت'];
 
 export const _internalMore = { PLATFORMS, SURAHS, RECITERS };
