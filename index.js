@@ -17,6 +17,7 @@ import { buildTopImage } from './topimage.js';
 import { handleAnimeCommand, handleAnimeAnswer, handleAnimePrivate, animeCommandNames, withdrawAnime } from './anime.js';
 import { jokesExtra, whatIfExtra, quotesExtra, lookAlikes } from './funData.js';
 import { ghazalsExtra } from './ghazalData.js';
+import { extrasCommandNames, checkSpam, findBannedWord, handleExtrasCommand, handleExtrasAnswer } from './extras.js';
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
@@ -311,7 +312,7 @@ const DEVELOPER_NUMBER = '962796163926';
 // ===== حماية أوامر المطور داخل البوتات الفرعية =====
 // البوت الفرعي لا يقبل أوامر المطور إلا من حساب المطور الأساسي أو حساب البوت الرئيسي
 const MAIN_BOT_NUMBER = String(global.botnumber || '962795106901').replace(/[^0-9]/g, '');
-const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين', 'حظر_البوتات', 'سماح_البوتات', 'نشر'];
+const DEV_ONLY_COMMANDS = ['7', 'المطور', 'مطور', 'ايقاف_البوت', 'إيقاف_البوت', 'إيقاف البوت', 'تفعيل_البوت', 'تفعيل البوت', 'بوم', 'اضافة_مطور', 'حذف_مطور', 'اضف_نخبة', 'ازل_نخبة', 'عرض_نخبة', 'قائمة_المطورين', 'سجل_البوت', 'اختبار', 'اذاعة', 'إذاعة', 'اساسي', 'ريستارت', 'تعطيل_البوتات', 'تعطيل بوتات', 'عدد_المنصبين', 'حظر_البوتات', 'سماح_البوتات', 'نشر', 'احصائيات'];
 function isMainAccount(senderJid) {
 const n = String(senderJid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
 return !!n && (n === DEVELOPER_NUMBER || n === MAIN_BOT_NUMBER);
@@ -476,6 +477,7 @@ validCommands.push(...featureCommandNames);
 validCommands.push(...toolsCommandNames);
 validCommands.push(...islamicCommandNames);
 validCommands.push(...animeCommandNames);
+validCommands.push(...extrasCommandNames);
 validCommands.push('صورة_الترحيب', 'صورة_للترحيب_افتراضي');
 validCommands.push('حظر_البوتات', 'سماح_البوتات', 'نشر');
 validCommands.push('قوانين', 'ضبط_قوانين', 'منشن_المشرفين', 'حظر_اكواد', 'سماح_اكواد', 'غير_المتفاعلين', 'طرد_غير_المتفاعلين', 'قفل_مؤقت', 'جدولة_قفل');
@@ -1743,6 +1745,8 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
 
     const wordsInBody = lowerBody.split(/\s+/);
     const hasBadWord = strictBadWords.some(badWord => wordsInBody.includes(badWord));
+    const spamKind = isFromMe ? null : checkSpam(from, sender, msg.message);
+    const bannedHit = findBannedWord(from, trimmedBody);
 
     if (settings.antiContact && (mType.includes('contactMessage') || mType.includes('contactsArrayMessage'))) {    
         violationDetected = true;    
@@ -1760,6 +1764,15 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
         violationDetected = true;    
         violationType = 'الشتم والسب القوي';    
         shouldLockChat = true;
+    } else if (bannedHit) {
+        violationDetected = true;
+        violationType = 'كلمة محظورة';
+    } else if (settings.antiSpam !== false && spamKind === 'text') {
+        violationDetected = true;
+        violationType = 'تكرار الرسائل (سبام)';
+    } else if (settings.antiStickerSpam !== false && spamKind === 'sticker') {
+        violationDetected = true;
+        violationType = 'سبام الملصقات';
     }    
 
     if (violationDetected) {    
@@ -1785,6 +1798,7 @@ if (isGroup && !isSenderAdmin && !isSenderDev) {
 if (privateBlocked) return;
 
 if (isGroup && !trimmedBody.startsWith('.') && await handleAnimeAnswer({ sock, msg, from, sender, isGroup, trimmedBody, bank: animeBank })) return;
+if (isGroup && !trimmedBody.startsWith('.') && await handleExtrasAnswer({ sock, msg, from, sender, trimmedBody, bank: animeBank, sendBotMessage })) return;
 
 if (trimmedBody === '.انسحب' || lowerBody === 'انسحاب') {    
     if (activeGames[from]) {    
@@ -1932,6 +1946,7 @@ if (!isGroup && cmdBase !== 'devinfo_form') {
 if (await handleIslamicCommand({ sock, from, sender, cmd, cmdBase, isSenderAdmin, isSenderDev, sendBotMessage })) return;
 if (await handleFeatureCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
 if (await handleToolsCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, getUserProfilePic })) return;
+if (await handleExtrasCommand({ sock, msg, from, sender, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, bank: animeBank, sendBotMessage, getGroupSetting, hasActiveGame: () => !!activeGames[from], getData: () => ({ userMessagesCount, userNames, userPoints, bankAccounts, userWarnings }), subBotCount: () => { try { return (getSubBotSocks() || []).length; } catch (e) { return 0; } } })) return;
 if (await handleAnimeCommand({ sock, msg, from, sender, isGroup, cmd, cmdBase, trimmedBody, isSenderAdmin, isSenderDev, bank: animeBank, getTarget: getTargetUser, hasActiveGame: () => !!activeGames[from] })) return;
 
 const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;    
@@ -3217,10 +3232,16 @@ if (cmdBase === '1') {
 📢 4. حماية توجيه القنوات: [${settings.antiForward !== false ? '🟢 مفعلة' : '🔴 معطلة'}]
 > تفعيل: .حظر_توجيه | سماح: .سماح_توجيه
 
+🚫 5. حماية السبام (نفس الرسالة 3 مرات): [${settings.antiSpam !== false ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_سبام | سماح: .سماح_سبام
+
+🎭 6. حماية الملصقات (3 ملصقات متتالية): [${settings.antiStickerSpam !== false ? '🟢 مفعلة' : '🔴 معطلة'}]
+> تفعيل: .حظر_ملصقات | سماح: .سماح_ملصقات
+
 ⚙️ لتصفير إنذارات أي عضو: \`.صفر @العضو\``;
 try { 
     try {
-        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton({ ...settings, antiForward: settings.antiForward !== false })]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
+        if (!(await sendSectionWithButtons(sock, from, text1, userPp, sender, [protectionButton({ ...settings, antiForward: settings.antiForward !== false, antiSpam: settings.antiSpam !== false, antiStickerSpam: settings.antiStickerSpam !== false })]))) await sendBotMessage(sock, from, { image: { url: userPp }, caption: text1, mentions: [sender] }); 
     } catch (err) {
         await sendBotMessage(sock, from, { text: text1, mentions: [sender] });
     }
@@ -3252,7 +3273,7 @@ if (cmdBase === '2' || cmd === 'الترفيه' || cmd === 'العاب' || cmd =
 > 🎴 .معرفة_الشخصية ↞ صور عشوائية من بنتريست
 > 👁️ .عين ↞ خمن صاحب العيون (.عين اسم ↞ صور عيونه)
 > 🕵️ .احزر ↞ احزر شخصية أنمي (اسأل بـ «هل» والبوت يجاوب صح/غلط)
-> 👥 .انضم | .ابدا | .لاعبين | .صوت | .دوري
+> 🎯 .صدق_او_كذب ↞ عبارة والجميع يجاوب صدق أو كذب (+10 نقاط)\n> 🔤 .حروف ↞ خمّن الكلمة حرفاً حرفاً (+10 نقاط)\n> 🧮 .حساب_سريع ↞ أسرع واحد يحل المسألة (+10 نقاط)\n> 👥 .انضم | .ابدا | .لاعبين | .صوت | .دوري
 > 🛑 .انهاء_اللعبة ↞ إنهاء لعبة الأنمي
 > 🚪 .انسحب ↞ إلغاء الفعالية`;
 const userPp = await getUserProfilePic(sock, sender);
@@ -3310,7 +3331,7 @@ if (cmdBase === '4') {
 > ✨ .اسماء_الله ↞ اسم من أسماء الله الحسنى مع معناه
 > 📜 .قصة_نبي ↞ قصة مختصرة عن نبي أو صحابي
 > 🔔 .تذكير_اذكار <النوع> <الوقت> ↞ إرسال الأذكار تلقائياً (مثال: .تذكير_اذكار الاستيقاظ 6:00ص)
-> 🔕 .الغاء_تذكير ↞ إلغاء تذكير الأذكار`;
+> 🔕 .الغاء_تذكير ↞ إلغاء تذكير الأذكار\n> 🌟 .اية_اليوم ↞ آية اليوم مع تفسيرها\n> 📿 .تسبيح ↞ مسبحة تفاعلية (جولة = 100) • .تسبيح صفر للتصفير\n> 📖 .ختمتي ↞ تتبّع ختمة القرآن بالصفحات (.ختمتي قرأت 5 • .ختمتي صفحة 120)`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
@@ -3329,7 +3350,7 @@ if (cmdBase === '5') {
 
 > 🤣 .نكتة ↞ نكتة مضحكة
 > 🤔 .ماذا_لو ↞ تساؤلات خيالية
-> 🗣️ .قول ↞ حكمة اليوم\n> 🪞 .شبيهك ↞ شبيهك بشخصية أو حيوان`;
+> 🗣️ .قول ↞ حكمة اليوم\n> 🪞 .شبيهك ↞ شبيهك بشخصية أو حيوان\n> 🧩 .لغز ↞ لغز مع كشف الجواب بعد 30 ثانية\n> 😂 .ميم ↞ ميم عشوائي\n> 🤫 .اعترف [@منشن] ↞ سؤال اعتراف محرج لعضو`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
@@ -3364,7 +3385,7 @@ if (cmdBase === '6') {
 > 🎉 .اقرب_ميلاد ↞ أقرب أعياد الميلاد
 > 🪪 .بطاقتي ↞ بطاقة عضويتك
 > 🔨 .مزاد ↞ مزاد الألقاب (.زايد <المبلغ>)
-> 📦 .كبسولة <أيام> <النص> ↞ رسالة تصل المجموعة بعد مدة`;
+> 📦 .كبسولة <أيام> <النص> ↞ رسالة تصل المجموعة بعد مدة\n> 📊 .تقرير_اسبوعي ↞ تقرير نشاط المجموعة آخر 7 أيام (للمشرفين)`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
@@ -3399,7 +3420,7 @@ if (cmdBase === '7' || cmd === 'المطور' || cmd === 'مطور') {
 > 🔴 .حظر_البوتات ↞ إيقاف جميع البوتات المنصّبة بشكل كامل
 > 🟢 .سماح_البوتات ↞ إرجاع تشغيل البوتات المنصّبة بشكل طبيعي
 > 📣 .نشر ↞ نشر استمارة قناة البوت في كل مجموعات البوتات المنصّبة (منشن مخفي)
-> 🔄 .ريستارت ↞ إعادة التشغيل.`;
+> 📊 .احصائيات ↞ إحصائيات البوت (المجموعات • الأعضاء • الرسائل • النظام)\n> 🔄 .ريستارت ↞ إعادة التشغيل.`;
     try { 
         try {
             const devPp = await getUserProfilePic(sock, sender);
@@ -3433,7 +3454,7 @@ if (cmdBase === '8' || cmd === 'الادارة' || cmd === 'الاداره') {
 > 🟢 .تفعيل ترحيب / توقيف ترحيب ↞ تفعيل/إيقاف الترحيب التلقائي
 > 🔴 .تفعيل توديع / توقيف توديع ↞ تفعيل/إيقاف التوديع التلقائي
 > ✏️ .تغيير_ترحيب <النص> ↞ تغيير استمارة الترحيب لهذه المجموعة
-> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> 🖼️ .صورة_الترحيب ↞ تغيير صورة الترحيب (رد على صورة)\n> ♻️ .صورة_للترحيب_افتراضي ↞ إرجاع صورة الترحيب لصورة المجموعة\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي\n> 📜 .قوانين ↞ عرض قوانين المجموعة\n> ✏️ .ضبط_قوانين <النص> ↞ ضبط القوانين\n> 🚨 .منشن_المشرفين ↞ منشن المشرفين فقط\n> 🚫 .حظر_اكواد <الكود> ↞ طرد الأعضاء الجدد بكود دولة معين\n> ✅ .سماح_اكواد <الكود> ↞ إزالة كود من الحظر\n> 📉 .غير_المتفاعلين <أيام> ↞ عرض غير المتفاعلين\n> ⚔️ .طرد_غير_المتفاعلين <أيام> ↞ طرد غير المتفاعلين\n> ⏳ .قفل_مؤقت <دقائق> ↞ قفل ثم فتح تلقائي\n> 🗓️ .جدولة_قفل 23:00 06:00 ↞ قفل وفتح يومي تلقائي`;
+> ✏️ .تغيير_توديع <النص> ↞ تغيير استمارة التوديع لهذه المجموعة\n> ♻️ .ترحيب_افتراضي ↞ إرجاع الترحيب الأساسي\n> 🖼️ .صورة_الترحيب ↞ تغيير صورة الترحيب (رد على صورة)\n> ♻️ .صورة_للترحيب_افتراضي ↞ إرجاع صورة الترحيب لصورة المجموعة\n> ♻️ .توديع_افتراضي ↞ إرجاع التوديع الأساسي\n> 📜 .قوانين ↞ عرض قوانين المجموعة\n> ✏️ .ضبط_قوانين <النص> ↞ ضبط القوانين\n> 🚨 .منشن_المشرفين ↞ منشن المشرفين فقط\n> 🚫 .حظر_اكواد <الكود> ↞ طرد الأعضاء الجدد بكود دولة معين\n> ✅ .سماح_اكواد <الكود> ↞ إزالة كود من الحظر\n> 📉 .غير_المتفاعلين <أيام> ↞ عرض غير المتفاعلين\n> ⚔️ .طرد_غير_المتفاعلين <أيام> ↞ طرد غير المتفاعلين\n> ⏳ .قفل_مؤقت <دقائق> ↞ قفل ثم فتح تلقائي\n> 🗓️ .جدولة_قفل 23:00 06:00 ↞ قفل وفتح يومي تلقائي\n\n> 🚫 .حظر <كلمة> ↞ حذف أي رسالة فيها الكلمة وإنذار صاحبها\n> 🧾 .قائمة_الكلمات_المحظورة ↞ عرض الكلمات المحظورة\n> ♻️ .ازل_حظر <كلمة> ↞ إزالة كلمة من المحظورات`;
     const userPp = await getUserProfilePic(sock, sender);
     try { 
         try {
