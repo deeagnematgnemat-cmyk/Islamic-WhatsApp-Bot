@@ -43,7 +43,9 @@ const COMMANDS = {
     'تحميل': [], 'بحث_يوت': [],
     // الذكاء الاصطناعي
     'اسأل': ['ai'], 'تخيل': ['imagine'], 'تلخيص': ['sum'], 'ترجمة': ['tr'],
-    'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': []
+    'صحح': ['fix'], 'شرح': ['explain'], 'اكتب': ['write'], 'كود': ['code'], 'نسيان': ['reset'], 'ذكاء': [],
+    // إضافات
+    'ميم_ملصق': ['memesticker'], 'حذف_خلفية': ['removebg', 'rmbg'], 'فلتر': ['filter'], 'وصف_صورة': ['describe'], 'نطق': ['tts', 'speak'], 'شخصية': ['persona']
 };
 Object.assign(COMMANDS, MORE_COMMANDS);   // أوامر قسم التنزيل الإضافية (moredl.js)
 const CANON = {};   // الاسم (أو الاختصار) المُطبَّع -> الاسم الأساسي
@@ -76,6 +78,9 @@ export const STICKER_SECTION = `🏷️ *قِـسْـمُ الـمَـلْـصَ
 > 🗂️ .باك [اسم] ↞ صور كثيرة (3 إلى 30) إلى حزمة ملصقات جاهزة
 > 📦 .حزمة <اسم الشخصية> ↞ حزمة ملصقات كاملة (30 ملصق) للشخصية
 > 🎞️ .متحرك <اسم الشخصية> ↞ حزمة ملصقات متحركة (30 ملصق) للشخصية من tenor
+> 😂 .ميم_ملصق <نص فوق> | <نص تحت> ↞ كتابة نص على الصورة وتحويلها لملصق ميم
+> ✂️ .حذف_خلفية ↞ إزالة خلفية الصورة (ملصق شفاف + PNG)
+> 🎨 .فلتر <النوع> ↞ فلاتر الصور: قديم • معكوس • بكسل • دافئ • بارد • حيوي • مرآة
 
 💡 أرسل الأمر مع الصورة أو رد على صورة/فيديو/ملصق.`;
 
@@ -104,6 +109,7 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 🔗 .بحث_يوت <رابط> ↞ تنزيل مباشر من رابط يوتيوب
 > 🎥 الجودات ↞ 360p • 480p • 720p • 1080p (مقطع جاهز في واتساب)
 > 🎧 صوت MP3 ↞ تحميل الصوت فقط
+> 🎵 .بحث_تيك <كلمة البحث> ↞ بحث في تيك توك ثم اختيار الفيديو والنوع
 
 🌐 *مواقع التواصل:*
 > 🎵 .تيك <رابط> ↞ تيك توك بدون علامة مائية
@@ -122,11 +128,13 @@ export const DOWNLOAD_SECTION = `📥 *قِـسْـمُ الـتَّـنْـزِ
 > 📖 .سورة <اسم أو رقم> [القارئ] ↞ تلاوة سورة كاملة
 > 🎙️ .قارئ ↞ قائمة القرّاء المتاحين
 > 🕌 .اذان [مكة|المدينة|الأقصى|مصر] ↞ صوت الأذان
+> 🎼 .كلمات <اسم الأغنية> ↞ كلمات الأغنية
 
 🛠️ *أدوات:*
 > 🖼️ .غلاف <رابط> ↞ صورة غلاف فيديو يوتيوب
 > 📋 .معلومات_فيديو <رابط> ↞ العنوان والمدة والمشاهدات
 > 🎬 .ايدت <اسم الشخصية> ↞ 3 إيديتات تيك توك بشكل أفقي
+> 🎧 .لصوت ↞ تحويل فيديو إلى MP3 (رد على الفيديو)
 
 💡 مثال: \`.بحث_يوت إيرين ييغر\` • \`.تيك https://...\` • \`.سورة الكهف ماهر\`
 📌 يمكنك أيضاً الرد على رسالة فيها رابط بالأمر.
@@ -142,6 +150,9 @@ export const AI_SECTION = `🤖 *قِـسْـمُ الـذَّكَـاءِ ال�
 > 💡 .شرح <موضوع> ↞ شرح مبسّط
 > ✍️ .اكتب <طلب> ↞ كتابة منشور/رسالة/قصيدة
 > 💻 .كود <طلب> ↞ مساعدة في البرمجة
+> 🖼️ .وصف_صورة ↞ وصف الصورة بالذكاء الاصطناعي (رد على صورة)
+> 🔊 .نطق <نص> ↞ تحويل النص إلى صوت
+> 🎭 .شخصية <الاسم> | <رسالة> ↞ يتحدث بأسلوب شخصية أنمي
 > 🧹 .نسيان ↞ مسح ذاكرة محادثتك
 
 💡 يمكنك الرد على رسالة بالأمر بدل كتابة النص.
@@ -1640,9 +1651,143 @@ const dlSafe = (fn) => async (c) => {
 // تجهيز أداة التنزيل مسبقاً حتى لا ينتظر أول مستخدم
 setTimeout(() => { warmupYtdlp().catch((e) => console.error('[yt-dlp] التجهيز المسبق:', e?.friendly || e?.message || e)); }, 20000).unref?.();
 
+// ---------------------------------------------------------------- إضافات: ميم_ملصق • حذف_خلفية • فلتر • وصف_صورة • نطق • شخصية
+async function memeLayer(sharp, text, fontfile, color) {
+    return sharp({
+        text: {
+            text: `<span foreground="${color}">${escXml(text)}</span>`, rgba: true, width: 480, height: 150, align: 'centre',
+            ...(fontfile ? { fontfile, font: 'Cairo' } : { font: 'sans' })
+        }
+    }).png().toBuffer();
+}
+async function cmdMemeSticker(c) {
+    const usage = '📌 أرسل صورة (أو رد على صورة) مع الأمر:\n`.ميم_ملصق نص الأعلى | نص الأسفل`\n\n💡 مثال: `.ميم_ملصق لما تشوف الدرجات | وانت نايم`\nيمكنك كتابة نص واحد فقط (يظهر بالأعلى).';
+    const parts = String(c.args || '').split('|').map((x) => x.trim());
+    const top = parts[0] || '', bottom = parts.slice(1).join(' ').trim();
+    if (!top && !bottom) return c.reply(usage);
+    if (top.length > 80 || bottom.length > 80) return c.reply('⚠️ كل نص بحد أقصى 80 حرفاً.');
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const fontfile = await ensureFont();
+    const base = await sharp(buf, { failOn: 'none' }).rotate().resize(512, 512, { fit: 'cover' }).flatten({ background: '#000000' }).png().toBuffer();
+    const layers = [];
+    const place = async (text, atTop) => {
+        const main = await memeLayer(sharp, text, fontfile, '#ffffff');
+        const shadow = await memeLayer(sharp, text, fontfile, '#000000');
+        const meta = await sharp(main).metadata();
+        const left = Math.max(0, Math.round((512 - meta.width) / 2));
+        const topPos = atTop ? 10 : Math.max(0, 512 - meta.height - 10);
+        for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2]]) layers.push({ input: shadow, left: Math.max(0, left + dx), top: Math.max(0, topPos + dy) });
+        layers.push({ input: main, left, top: topPos });
+    };
+    if (top) await place(top, true);
+    if (bottom) await place(bottom, false);
+    const out = await sharp(base).composite(layers).png().toBuffer();
+    await c.media({ sticker: await makeSticker(out, StickerTypes.FULL) });
+}
+
+async function cmdRemoveBg(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    let removeBackground;
+    try { ({ removeBackground } = await import('@imgly/background-removal-node')); }
+    catch (e) { return c.reply('❌ مكتبة إزالة الخلفية غير مثبّتة على السيرفر. تأكد من تثبيت الحزم (npm install) ثم أعد التشغيل.'); }
+    await c.reply('✂️ جاري إزالة الخلفية، قد تستغرق لحظات...');
+    const png = await sharp(buf, { failOn: 'none' }).rotate().resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
+    const blob = await removeBackground(new Blob([png], { type: 'image/png' }), { output: { format: 'image/png' } });
+    const out = Buffer.from(await blob.arrayBuffer());
+    await c.media({ sticker: await makeSticker(out, StickerTypes.FULL) });
+    await c.media({ document: out, mimetype: 'image/png', fileName: 'no-background.png', caption: '✂️ تمت إزالة الخلفية (نسخة PNG شفافة).' });
+}
+
+const FILTER_NAMES = ['قديم', 'معكوس', 'بكسل', 'دافئ', 'بارد', 'حيوي', 'مرآة'];
+async function applyFilter(sharp, buf, key) {
+    const base = () => sharp(buf, { failOn: 'none' }).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' });
+    let img;
+    if (key === 'قديم') img = base().recomb([[0.393, 0.769, 0.189], [0.349, 0.686, 0.168], [0.272, 0.534, 0.131]]);
+    else if (key === 'معكوس') img = base().negate();
+    else if (key === 'دافئ') img = base().linear([1.12, 1.0, 0.88], [0, 0, 0]);
+    else if (key === 'بارد') img = base().linear([0.88, 1.0, 1.12], [0, 0, 0]);
+    else if (key === 'حيوي') img = base().modulate({ saturation: 1.7, brightness: 1.05 });
+    else if (key === 'مرآة') img = base().flop();
+    else if (key === 'بكسل') {
+        const pre = await base().jpeg({ quality: 90 }).toBuffer();
+        const meta = await sharp(pre).metadata();
+        const small = await sharp(pre).resize(Math.max(8, Math.round(meta.width / 14)), null, { kernel: 'nearest' }).png().toBuffer();
+        img = sharp(small).resize(meta.width, meta.height, { kernel: 'nearest' });
+    }
+    return await img.jpeg({ quality: 90 }).toBuffer();
+}
+async function cmdFilter(c) {
+    const key = FILTER_NAMES.find((n) => norm(n) === norm(String(c.args || '').trim().split(/\s+/)[0] || ''));
+    if (!key) return c.reply(`🎨 *فلاتر الصور:*\n\n${FILTER_NAMES.map((n) => `> 🎨 .فلتر ${n}`).join('\n')}\n\n💡 أرسل الصورة مع الأمر، أو رد على صورة به.`);
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    await c.media({ image: await applyFilter(sharp, buf, key), caption: `🎨 تم تطبيق فلتر *${key}*.` });
+}
+
+async function cmdDescribe(c) {
+    const buf = await getInputImage(c); if (!buf) return;
+    const sharp = await sharpOrFail();
+    const small = await sharp(buf, { failOn: 'none' }).rotate().resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: 80 }).toBuffer();
+    const q = (c.args || '').trim() || 'صف هذه الصورة بالتفصيل وبلغة عربية واضحة.';
+    const out = await aiChat([
+        { role: 'system', content: SYSTEM + ' مهمتك وصف الصور بدقة، ولا تخترع تفاصيل غير موجودة فيها.' },
+        { role: 'user', content: [{ type: 'text', text: q }, { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + small.toString('base64') } }] }
+    ]);
+    await c.reply(clip(`🖼️ *وصف الصورة:*\n\n${out}`));
+}
+
+function splitForTts(text, max = 180) {
+    const out = []; let cur = '';
+    for (const w of text.replace(/\s+/g, ' ').trim().split(' ')) {
+        if ((cur + ' ' + w).trim().length > max) { if (cur) out.push(cur); cur = w.slice(0, max); } else cur = (cur + ' ' + w).trim();
+    }
+    if (cur) out.push(cur);
+    return out;
+}
+async function cmdSpeak(c) {
+    let text = argOrQuoted(c);
+    let tl = 'ar';
+    const words = text.split(/\s+/);
+    const langKey = Object.keys(LANGS).find((k) => norm(k) === norm(words[0] || ''));
+    if (langKey && words.length > 1) { tl = LANGS[langKey]; text = words.slice(1).join(' '); }
+    if (!text) return c.reply('📌 اكتب النص بعد الأمر أو رد على رسالة.\nمثال: `.نطق السلام عليكم` • `.نطق انجليزي hello my friend`');
+    if (text.length > 600) return c.reply('⚠️ النص طويل (الحد 600 حرف).');
+    const parts = [];
+    for (const chunk of splitForTts(text)) {
+        const { buf } = await httpBuffer(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(chunk)}`, 5 * 1024 * 1024, { timeout: 20000, headers: { Referer: 'https://translate.google.com/' } });
+        if (buf.length < 500) throw new Error('TTS_EMPTY');
+        parts.push(buf);
+    }
+    const mp3 = Buffer.concat(parts);
+    const id = uid();
+    const inp = path.join(TMP, `tts_${id}.mp3`), outp = path.join(TMP, `tts_${id}.ogg`);
+    try {
+        fs.writeFileSync(inp, mp3);
+        await run(FFMPEG, ['-y', '-v', 'error', '-i', inp, '-c:a', 'libopus', '-b:a', '32k', '-ac', '1', '-f', 'ogg', outp], 60000);
+        await c.media({ audio: fs.readFileSync(outp), mimetype: 'audio/ogg; codecs=opus', ptt: true });
+    } catch (e) {
+        await c.media({ audio: mp3, mimetype: 'audio/mpeg' });
+    } finally { rm(inp, outp); }
+}
+
+async function cmdPersona(c) {
+    const usage = '📌 *الاستخدام:*\n`.شخصية <الاسم> | <رسالتك>`\n\n💡 أمثلة:\n`.شخصية ناروتو | كيف حالك؟`\n`.شخصية ليفاي | شو رأيك بالتنظيف؟`';
+    let raw = (c.args || '').trim(), name, msgText;
+    if (raw.includes('|')) { const [n, ...rest] = raw.split('|'); name = n.trim(); msgText = rest.join('|').trim(); }
+    else { const w = raw.split(/\s+/); name = w[0] || ''; msgText = w.slice(1).join(' '); }
+    if (!msgText) msgText = quotedText(c);
+    if (!name || !msgText) return c.reply(usage);
+    if (name.length > 40) return c.reply('⚠️ اسم الشخصية طويل جداً.');
+    const system = `تقمّص شخصية "${name}" (من الأنمي أو الألعاب أو القصص أو التاريخ حسب المعروف عنها). تحدّث بأسلوبها ونبرتها وعباراتها المشهورة باللغة العربية، بإيجاز (3 جمل كحد أقصى)، وابقَ داخل الشخصية دائماً. إن كنت لا تعرف هذه الشخصية فاعتذر بلطف واطلب اسماً آخر. تجنّب الألفاظ النابية أو المحتوى المسيء.`;
+    const out = await askAI(c, system, msgText.slice(0, 500));
+    await c.reply(clip(`🎭 *${name}:*\n\n${out}`));
+}
+
 // ---------------------------------------------------------------- الموزّع
 const COOLDOWN = new Map();
-const HEAVY = new Set(['بحث_يوت', 'حزمة', 'متحرك', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'تحسين_4k', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود']);
+const HEAVY = new Set(['بحث_يوت', 'حزمة', 'متحرك', 'صورة', 'بنتريست', 'خلفية', 'بروفايل', 'انمي', 'تحسين', 'تحسين_4k', 'قراءة', 'ترجمة_صورة', 'اسأل', 'تخيل', 'تلخيص', 'ترجمة', 'صحح', 'شرح', 'اكتب', 'كود', 'ميم_ملصق', 'حذف_خلفية', 'فلتر', 'وصف_صورة', 'نطق', 'شخصية', 'بحث_تيك', 'كلمات', 'لصوت']);
 for (const n of MORE_HEAVY) HEAVY.add(n);
 let running = 0;
 // أوامر فيها تحميل/تحضير: يظهر لها عدّاد تقدم حي حتى يجهز الطلب
@@ -1668,7 +1813,8 @@ const HANDLERS = {
     'شرح': (c) => cmdSimpleAI(c, SYSTEM + ' اشرح الموضوع التالي بأسلوب مبسّط مع مثال قصير.', '📌 مثال: `.شرح الذكاء الاصطناعي`'),
     'اكتب': (c) => cmdSimpleAI(c, SYSTEM + ' اكتب النص المطلوب (منشور/رسالة/قصيدة/إعلان...) بأسلوب جميل جاهز للنشر.', '📌 مثال: `.اكتب منشور ترحيب بأعضاء الجروب`'),
     'كود': (c) => cmdSimpleAI(c, SYSTEM + ' أنت مبرمج خبير. أجب بكود صحيح داخل كتل مع شرح مختصر.', '📌 مثال: `.كود دالة جافاسكربت لعكس نص`'),
-    'نسيان': async (c) => { memory.delete(c.sender); await c.reply('🧹 تم مسح ذاكرة محادثتك مع الذكاء الاصطناعي.'); }
+    'نسيان': async (c) => { memory.delete(c.sender); await c.reply('🧹 تم مسح ذاكرة محادثتك مع الذكاء الاصطناعي.'); },
+    'ميم_ملصق': cmdMemeSticker, 'حذف_خلفية': cmdRemoveBg, 'فلتر': cmdFilter, 'وصف_صورة': cmdDescribe, 'نطق': cmdSpeak, 'شخصية': cmdPersona
 };
 
 for (const [k, fn] of Object.entries(buildMoreDownloadHandlers({ quotedText, getTarget, download }))) HANDLERS[k] = dlSafe(fn);
@@ -1687,7 +1833,7 @@ export async function handleFeatureCommand(ctx) {
         media: (content) => sock.sendMessage(from, content, { quoted: msg })
     };
 
-    if (HEAVY.has(name) && !(name === 'بحث_يوت' && args.startsWith('~'))) {
+    if (HEAVY.has(name) && !((name === 'بحث_يوت' || name === 'بحث_تيك') && args.startsWith('~'))) {
         const last = COOLDOWN.get(ctx.sender) || 0;
         if (Date.now() - last < 4000) { await c.reply('⏳ انتظر بضع ثوانٍ قبل الأمر التالي.'); return true; }
         COOLDOWN.set(ctx.sender, Date.now());
